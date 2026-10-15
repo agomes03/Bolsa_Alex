@@ -31,3 +31,22 @@ def test_preguntas_bien_formadas():
 def test_ejemplo_de_tamano_del_test_coincide_con_la_calculadora():
     assert costes.tamano_por_riesgo(10_000, 1, 50, 45) == 20
     assert costes.tamano_por_riesgo(10_000, 1, 20, 18) == 50
+
+
+def test_alias_ingles_y_siglas():
+    assert aprendizaje.buscar("spread")[0].termino == "Horquilla"
+    assert aprendizaje.buscar("drawdown")[0].termino == "Caída máxima"
+    assert aprendizaje.buscar("plusvalia")[0].termino == "Ganancia patrimonial"
+    nombres = {t.termino for t in aprendizaje.GLOSARIO}
+    assert set(aprendizaje.ALIAS) <= nombres
+
+
+def test_busqueda_por_inicio_de_palabra():
+    # «oco» no debe encontrar «poco» ni «coco»: solo el alias OCO.
+    assert [t.termino for t in aprendizaje.buscar("OCO")] == ["Stop relacionadas"]
+
+
+def test_parecidos_corrige_errores_y_busca_en_guias():
+    assert aprendizaje.parecidos("dividedno")[0].termino == "Dividendo"
+    assert any("renta" in g.titulo for g in aprendizaje.buscar_guias("renta"))
+    assert aprendizaje.parecidos("") == [] and aprendizaje.buscar_guias("") == []

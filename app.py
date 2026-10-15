@@ -458,6 +458,12 @@ def pagina_calculadoras():
 
 def pagina_aprende():
     st.title("🎓 Aprende")
+    q = st.text_input("🔎 ¿Qué palabra no entiendes?", placeholder="stop-loss, PER, plusvalía, spread, tasa Tobin...",
+                      help="Busca en el diccionario, en las guías paso a paso y en el test. Vale sin tildes, con "
+                           "siglas y con términos en inglés.")
+    if q.strip():
+        aprende_resultados(q)
+        st.divider()
     t1, t2, t3, t4 = st.tabs(["📘 Lo esencial", "📖 Diccionario", "🛠️ Cómo se hace", "✅ Ponte a prueba"])
     with t1:
         aprende_esencial()
@@ -515,25 +521,55 @@ def _termino_md(t) -> str:
     return texto
 
 
-def aprende_diccionario():
-    st.caption(f"{len(aprendizaje.GLOSARIO)} términos explicados en lenguaje sencillo, con ejemplos en euros.")
-    c = st.columns([2, 1]) if not movil else [st.container(), st.container()]
-    q = c[0].text_input("🔎 Buscar", placeholder="stop, dividendo, PER, tasa Tobin...")
-    cat = c[1].selectbox("Tema", ["Todos"] + aprendizaje.CATEGORIAS)
-    categoria = None if cat == "Todos" else cat
-    if not q and not categoria:
-        for nombre in aprendizaje.CATEGORIAS:
-            terminos = aprendizaje.buscar(categoria=nombre)
-            with st.expander(f"{nombre} ({len(terminos)})"):
-                for t in terminos:
+def aprende_resultados(q: str):
+    terminos = aprendizaje.buscar(q)
+    guias = aprendizaje.buscar_guias(q)
+    preguntas = aprendizaje.buscar_preguntas(q)
+    if not (terminos or guias or preguntas):
+        parecidos = aprendizaje.parecidos(q)
+        if parecidos:
+            st.info(f"No aparece «{q}». ¿Quizás buscabas…?")
+            for t in parecidos[:3]:
+                with st.container(border=True):
                     st.markdown(_termino_md(t), unsafe_allow_html=True)
+        else:
+            st.info(f"No aparece «{q}». Prueba con otra palabra o mira los temas del 📖 Diccionario.")
         return
-    resultados = aprendizaje.buscar(q, categoria)
-    if not resultados:
-        st.info("No hay ningún término con esas palabras. Prueba con otra o elige un tema.")
-    for t in resultados:
-        with st.container(border=True):
-            st.markdown(_termino_md(t), unsafe_allow_html=True)
+    # Los que coinciden en el nombre se muestran abiertos; el resto, plegados para no llenar la pantalla.
+    for i, t in enumerate(terminos[:12]):
+        if i < 3:
+            with st.container(border=True):
+                st.markdown(_termino_md(t), unsafe_allow_html=True)
+        else:
+            with st.expander(f"📖 {t.termino}"):
+                st.markdown(_termino_md(t), unsafe_allow_html=True)
+    if len(terminos) > 12:
+        st.caption(f"Y {len(terminos) - 12} términos más: escribe una palabra más concreta.")
+    for g in guias:
+        with st.expander(f"🛠️ Guía: {g.titulo}"):
+            _guia(g)
+    for p in preguntas:
+        with st.expander(f"✅ Del test: {p.pregunta[:70]}"):
+            st.markdown(f"**{p.pregunta}**\n\nRespuesta: **{p.opciones[p.correcta]}**. {p.explicacion}")
+
+
+def aprende_diccionario():
+    st.caption(f"{len(aprendizaje.GLOSARIO)} términos explicados en lenguaje sencillo, con ejemplos en euros. "
+               "Para buscar una palabra, usa el buscador de arriba.")
+    for nombre in aprendizaje.CATEGORIAS:
+        terminos = aprendizaje.buscar(categoria=nombre)
+        with st.expander(f"{nombre} ({len(terminos)})"):
+            for t in terminos:
+                st.markdown(_termino_md(t), unsafe_allow_html=True)
+
+
+def _guia(g):
+    st.markdown(f"**Para qué:** {g.para_que}")
+    st.markdown("\n".join(f"{i}. {p}" for i, p in enumerate(g.pasos, 1)))
+    if g.errores:
+        st.markdown("**Errores típicos:**\n" + "\n".join(f"- ❌ {e}" for e in g.errores))
+    if g.en_la_app:
+        st.caption("📱 " + g.en_la_app)
 
 
 def aprende_guias():
@@ -541,12 +577,7 @@ def aprende_guias():
                "Bankinter pueden variar un poco entre la web y la app del móvil.")
     for g in aprendizaje.GUIAS:
         with st.expander(f"🛠️ {g.titulo}"):
-            st.markdown(f"**Para qué:** {g.para_que}")
-            st.markdown("\n".join(f"{i}. {p}" for i, p in enumerate(g.pasos, 1)))
-            if g.errores:
-                st.markdown("**Errores típicos:**\n" + "\n".join(f"- ❌ {e}" for e in g.errores))
-            if g.en_la_app:
-                st.caption("📱 " + g.en_la_app)
+            _guia(g)
 
     with st.expander("🧮 Practica: cuántas acciones comprar y dónde poner el stop"):
         st.write("La cantidad no se elige a ojo: sale de cuánto aceptas perder si la operación sale mal.")

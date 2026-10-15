@@ -6,6 +6,7 @@ impuestos son los vigentes en octubre de 2026 (compruébalos antes de operar).
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from dataclasses import dataclass, field
 
@@ -449,17 +450,84 @@ GLOSARIO: list[Termino] = [
 ]
 
 
+# Otras formas de llamar a un término (en inglés, siglas o como se dice en la calle).
+ALIAS: dict[str, tuple[str, ...]] = {
+    "Acción": ("título", "títulos", "valor", "share", "stock"),
+    "Horquilla": ("spread", "bid", "ask", "precio de compra y venta", "diferencial"),
+    "Caída máxima": ("drawdown", "máxima caída"),
+    "Stop dinámica": ("trailing stop", "stop móvil", "stop dinámico"),
+    "Stop relacionadas": ("OCO", "órdenes relacionadas", "one cancels other"),
+    "Stop-loss": ("stop loss", "stoploss", "parar pérdidas", "limitar pérdidas"),
+    "Objetivo de precio": ("take profit", "recoger beneficios"),
+    "Ganancia patrimonial": ("plusvalía", "minusvalía", "plusvalías", "beneficio al vender"),
+    "Tasa Tobin": ("ITF", "impuesto sobre transacciones financieras"),
+    "Fondo indexado": ("indexado", "gestión pasiva", "index fund", "fondo índice"),
+    "Comprar / Vender (largo)": ("long", "posición larga", "estar largo"),
+    "Venta en corto": ("short", "corto", "ponerse corto"),
+    "Rentabilidad anualizada": ("CAGR", "TAE", "rentabilidad anual"),
+    "Comisión": ("corretaje", "gastos del bróker"),
+    "Media móvil": ("SMA", "EMA", "media"),
+    "Riesgo por operación": ("position sizing", "tamaño de la posición", "cuántas acciones comprar"),
+    "Mercado alcista": ("bull market", "toro"),
+    "Mercado bajista": ("bear market", "oso", "crash"),
+    "Precio / valor contable": ("P/VC", "PVC", "price to book"),
+    "BPA": ("EPS", "beneficio por acción"),
+    "Fed": ("Reserva Federal", "FOMC"),
+    "BCE": ("Banco Central Europeo",),
+    "Capitalización": ("market cap", "valor en bolsa"),
+    "Dividendo flexible (scrip)": ("scrip dividend", "dividendo en acciones"),
+    "Fecha ex-dividendo": ("ex-date", "ex dividendo", "fecha de corte"),
+    "Libro de órdenes": ("profundidad de mercado", "posiciones del mercado"),
+    "Rebalanceo": ("reequilibrio", "rebalancear"),
+    "Concentración": ("demasiado en una empresa",),
+    "ETF": ("fondo cotizado", "exchange traded fund"),
+    "TER": ("gastos corrientes", "comisión de gestión"),
+    "Small caps": ("empresas pequeñas", "pequeñas compañías"),
+    "Blue chip": ("valores grandes", "grandes empresas"),
+    "Volatilidad": ("cuánto se mueve",),
+    "Apalancamiento": ("leverage", "apalancado"),
+    "Interés compuesto": ("interés sobre interés",),
+}
+
+
 def _norm(texto: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", texto.lower()) if unicodedata.category(c) != "Mn")
 
 
+def _contiene(q: str, texto: str) -> bool:
+    """`q` aparece en `texto` empezando en el inicio de una palabra (así «oco» no encuentra «poco»)."""
+    return re.search(r"(?<![a-z0-9])" + re.escape(q), texto) is not None
+
+
+def _nombres(t: Termino) -> list[str]:
+    return [_norm(t.termino)] + [_norm(a) for a in ALIAS.get(t.termino, ())]
+
+
 def buscar(texto: str = "", categoria: str | None = None) -> list[Termino]:
-    """Términos que contienen `texto` (sin distinguir tildes ni mayúsculas), primero los que lo tienen en el
-    nombre, y en orden alfabético."""
+    """Términos que contienen `texto` (sin distinguir tildes ni mayúsculas, también por sus alias). Primero los
+    que lo tienen en el nombre o un alias, y en orden alfabético."""
     q = _norm(texto.strip())
     salida = [t for t in GLOSARIO if (not categoria or t.categoria == categoria)
-              and (not q or q in _norm(t.termino) or q in _norm(t.definicion) or q in _norm(t.ejemplo))]
-    return sorted(salida, key=lambda t: (bool(q) and q not in _norm(t.termino), _norm(t.termino)))
+              and (not q or any(_contiene(q, n) for n in _nombres(t)) or _contiene(q, _norm(t.definicion))
+                   or _contiene(q, _norm(t.ejemplo)))]
+    return sorted(salida, key=lambda t: (bool(q) and not any(_contiene(q, n) for n in _nombres(t)), _norm(t.termino)))
+
+
+def parecidos(texto: str, n: int = 5) -> list[Termino]:
+    """Términos con un nombre parecido (para errores al escribir: «stoploss», «dividedno»...)."""
+    import difflib
+
+    q = _norm(texto.strip())
+    if not q:
+        return []
+    por_nombre = {n_: t for t in GLOSARIO for n_ in _nombres(t)}
+    encontrados = difflib.get_close_matches(q, list(por_nombre), n=n * 2, cutoff=0.6)
+    salida = []
+    for nombre in encontrados:
+        t = por_nombre[nombre]
+        if t not in salida:
+            salida.append(t)
+    return salida[:n]
 
 
 def definicion(termino: str) -> str:
@@ -605,6 +673,13 @@ GUIAS: list[Guia] = [
 ]
 
 
+def buscar_guias(texto: str) -> list[Guia]:
+    q = _norm(texto.strip())
+    if not q:
+        return []
+    return [g for g in GUIAS if _contiene(q, _norm(" ".join([g.titulo, g.para_que, g.en_la_app, *g.pasos, *g.errores])))]
+
+
 # ---------------------------------------------------------------------------------------------- test
 @dataclass(frozen=True)
 class Pregunta:
@@ -649,4 +724,12 @@ PREGUNTAS: list[Pregunta] = [
 ]
 
 
-__all__ = ["CATEGORIAS", "GLOSARIO", "GUIAS", "PREGUNTAS", "Termino", "Guia", "Pregunta", "buscar", "definicion"]
+def buscar_preguntas(texto: str) -> list[Pregunta]:
+    q = _norm(texto.strip())
+    if not q:
+        return []
+    return [p for p in PREGUNTAS if _contiene(q, _norm(" ".join([p.pregunta, p.explicacion, *p.opciones])))]
+
+
+__all__ = ["ALIAS", "CATEGORIAS", "GLOSARIO", "GUIAS", "PREGUNTAS", "Termino", "Guia", "Pregunta", "buscar",
+           "buscar_guias", "buscar_preguntas", "definicion", "parecidos"]
