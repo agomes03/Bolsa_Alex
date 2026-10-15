@@ -192,7 +192,8 @@ def ejecutar(acciones: dict[str, pd.DataFrame], indices: dict[str, pd.DataFrame]
             for filtro in (False, True):
                 if nombre == "Todas a partes iguales" and filtro:
                     continue
-                cap = 10_000.0 if n <= 10 else 20_000.0
+                # La referencia se simula con mucho capital para que las comisiones mínimas no la penalicen.
+                cap = 1_000_000.0 if nombre == "Todas a partes iguales" else 10_000.0 if n <= 10 else 20_000.0
                 _, met = simular_rotacion(cierres, sig, n, tarifa, cap, permitido if filtro else None,
                                           inicio=inicio_oos)
                 fila = {"senal": nombre, "n": n, "filtro_mercado": filtro, "capital": cap, **met}

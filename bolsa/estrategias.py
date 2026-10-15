@@ -77,9 +77,13 @@ def evaluar_cartera(cierres: pd.DataFrame, permitido: pd.DataFrame, c: CarteraMo
     sig = senal(cierres, c.senal)
     curva, met = experimentos.simular_rotacion(cierres, sig, c.n, tarifa, capital,
                                                permitido if c.filtro_mercado else None, inicio=pd.Timestamp(desde))
+    # Referencia: todas las acciones a partes iguales con un capital grande, para que las comisiones mínimas
+    # no la penalicen (se parece al coste de un fondo indexado). Después se escala a la misma cifra.
     todas, met_todas = experimentos.simular_rotacion(cierres, pd.DataFrame(1.0, index=cierres.index,
                                                                            columns=cierres.columns),
-                                                     len(cierres.columns), tarifa, capital, inicio=pd.Timestamp(desde))
+                                                     len(cierres.columns), tarifa, 1_000_000.0,
+                                                     inicio=pd.Timestamp(desde))
+    todas = todas * capital / 1_000_000.0
     escala = 10_000.0 / capital
 
     def semanal(s: pd.Series) -> dict:
@@ -88,6 +92,7 @@ def evaluar_cartera(cierres: pd.DataFrame, permitido: pd.DataFrame, c: CarteraMo
 
     anual = (curva.resample("YE").last() / curva.resample("YE").last().shift(1).fillna(capital) - 1) * 100
     anual_todas = (todas.resample("YE").last() / todas.resample("YE").last().shift(1).fillna(capital) - 1) * 100
+    met_todas["gastos"] = met_todas["gastos"] * capital / 1_000_000.0
     return {"metricas": met, "referencia": met_todas, "curva": semanal(curva), "curva_referencia": semanal(todas),
             "por_ano": [{"ano": int(d.year), "cartera": float(a), "todas": float(b)}
                         for d, a, b in zip(anual.index, anual.values, anual_todas.values)],
