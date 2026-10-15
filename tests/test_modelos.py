@@ -181,3 +181,10 @@ def test_ningun_objetivo_ve_el_futuro(objetivo):
     panel = modelo_ml.construir_panel({f"T{i}.MC": hist(i, patron=False) for i in range(n)})
     wf = modelo_ml.walk_forward(panel, objetivo=objetivo)
     assert wf["metricas"]["auc"] < 0.56, wf["metricas"]["auc"]
+
+
+def test_nivel_de_riesgo():
+    assert informe.nivel_riesgo(0.30, 0.14) == "alto"
+    assert informe.nivel_riesgo(0.10, 0.14) == "bajo"
+    assert informe.nivel_riesgo(0.15, 0.14) == "normal"
+    assert informe.nivel_riesgo(None, 0.14) is None

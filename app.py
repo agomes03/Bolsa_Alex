@@ -607,7 +607,20 @@ def pagina_aprende():
   - **20-30%**: acciones individuales elegidas con este asistente, para aprender y buscar algo extra.
   - Antes, un **colchón de emergencia** (3-6 meses de gastos) fuera de la bolsa.
 
-### 2. Cómo leer la predicción 🔮
+### 2. Lo que funciona y lo que no (comprobado con datos reales)
+- ❌ **Adivinar si una acción subirá el mes que viene**: con 10 años de 130 empresas, ningún modelo lo hace mejor
+  que lanzar una moneda. Desconfía de quien te lo prometa.
+- ✅ **Estimar el riesgo de una caída fuerte**: sí se puede. Las acciones con riesgo "muy alto" sufrieron caídas
+  de más del 10% tres veces más a menudo que las de riesgo "muy bajo". La app lo usa para que evites sustos.
+- ✅ **Carteras sencillas revisadas una vez al mes** (📦 Carteras modelo): quedarse con las acciones que más han
+  subido en el último año (momentum) o con las más estables (baja volatilidad) funcionó mejor que comprar y
+  vender cada pocos días con stop-loss.
+- ✅ **Regla de protección para los fondos indexados**: salir solo cuando el índice cae claramente por debajo de
+  su media de 200 sesiones redujo casi a la mitad las peores caídas de los últimos 30-100 años.
+
+### 2 bis. Cómo leer las cifras de la app 🔮
+- **Nota global (0-100)**: el puesto de la acción frente a todas las demás (100 = la mejor de hoy).
+- **Riesgo de caída**: probabilidad de que caiga más de un 10% en algún momento del próximo mes, frente a lo normal.
 - **Probabilidad de subir**: de las situaciones del pasado más parecidas a la de hoy, en cuántas subió.
   60% no significa que vaya a subir: significa que de cada 10 veces así, unas 6 subió y 4 bajó.
 - **Rango probable**: entre qué precios quedó en 8 de cada 10 casos parecidos.
