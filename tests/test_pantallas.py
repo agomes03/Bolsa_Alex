@@ -245,3 +245,36 @@ def test_finnhub_conectado(monkeypatch):
     at = abrir("pagina_analizar", secretos=secretos, estado={"analizar_ticker": "AAPL"})
     sin_fallos(at)
     assert any("tiempo real, Finnhub" in c.value for c in at.caption)
+
+
+def test_vigilar_sin_stop_desde_mi_cartera():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    boton = [b for b in at.button if "Vigilarlas sin stop-loss" in b.label]
+    assert boton, "con acciones sin stop-loss debe ofrecer vigilarlas"
+    boton[0].click().run()
+    sin_fallos(at)
+    d = at.session_state["_datos"]
+    acciones = [t for t in ("SAN.MC", "IDR.MC") if t in d["cartera_real"]["posiciones"]]
+    assert all(d["cartera_real"]["posiciones"][t]["sin_stop"] for t in acciones)
+    assert all(d["cartera_real"]["posiciones"][t]["alarma"] for t in acciones)
+    avisos = {a["ticker"] for a in d["alertas"]}
+    assert set(acciones) <= avisos
+    assert not [b for b in at.button if "Vigilarlas sin stop-loss" in b.label]   # ya no lo vuelve a pedir
+    # Desmarcar una: deja de vigilarla y borra su aviso.
+    at.toggle(key="ss_SAN.MC").set_value(False).run()
+    d = at.session_state["_datos"]
+    assert not d["cartera_real"]["posiciones"]["SAN.MC"].get("sin_stop")
+    assert "SAN.MC" not in {a["ticker"] for a in d["alertas"]}
+
+
+def test_cambiar_el_nivel_de_alarma_de_una_posicion():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    at.toggle(key="ss_SAN.MC").set_value(True).run()
+    sin_fallos(at)
+    at.number_input(key="alarma_SAN.MC").set_value(1.0).run()
+    at.button(key="gss_SAN.MC").click().run()
+    sin_fallos(at)
+    pos = at.session_state["_datos"]["cartera_real"]["posiciones"]["SAN.MC"]
+    assert pos["sin_stop"] and pos["alarma"] == 1.0
+    assert [a["precio"] for a in at.session_state["_datos"]["alertas"] if a["ticker"] == "SAN.MC"] == [1.0]

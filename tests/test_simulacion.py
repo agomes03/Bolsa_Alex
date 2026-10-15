@@ -231,3 +231,12 @@ def test_almacen_gist(monkeypatch):
     assert a.cargar() == {"x": 1}
     assert almacen.desde_secrets({"gist": {"token": "t", "id": "i"}}).en_la_nube
     assert not almacen.desde_secrets({}).en_la_nube
+
+
+def test_posicion_sin_stop_solo_vigilar():
+    # Sin stop-loss a propósito: no pide el stop; avisa al bajar del nivel de alarma.
+    assert bankinter.consejo_posicion(11, 10, None, 10.4, 70, sin_stop=True, alarma=9.9)[0] == "mantener"
+    nivel, texto = bankinter.consejo_posicion(9.8, 10, None, 10.4, 70, sin_stop=True, alarma=9.9)
+    assert nivel == "vigilar" and "nivel de alarma" in texto
+    # La tendencia rota se sigue avisando aunque no tenga stop.
+    assert bankinter.consejo_posicion(11, 10, None, 10.4, 30, sin_stop=True, alarma=9.9)[0] == "vigilar"

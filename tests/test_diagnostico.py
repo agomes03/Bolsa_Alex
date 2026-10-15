@@ -81,3 +81,13 @@ def test_diagnostico_multiactivo_cripto_y_oro():
 
 def test_diagnostico_sin_posiciones():
     assert diagnostico.diagnosticar([])["semaforo"] == "sin_datos"
+
+
+def test_las_vigiladas_sin_stop_no_cuentan_como_sin_stop():
+    from bolsa import diagnostico as dg_mod
+
+    pos = [{"ticker": "SAN.MC", "acciones": 100, "precio_medio": 10, "precio": 11, "fx": 1.0, "sin_stop": True},
+           {"ticker": "ITX.MC", "acciones": 10, "precio_medio": 50, "precio": 55, "fx": 1.0}]
+    titulos = [h["titulo"] for h in dg_mod.diagnosticar(pos)["hallazgos"]]
+    sin = [t for t in titulos if t.startswith("Sin stop-loss")]
+    assert sin and "Santander" not in sin[0] and "Inditex" in sin[0]

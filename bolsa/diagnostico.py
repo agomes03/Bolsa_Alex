@@ -162,12 +162,13 @@ def diagnosticar(posiciones: list[dict], otros_ahorros: float = 0.0, perfil: str
               + que)
 
     # 6. Stop-loss
-    sin_stop = [_nombre(p) for p in pos if not p.get("stop") and p["clase"] == "Acciones"]
+    sin_stop = [_nombre(p) for p in pos if not p.get("stop") and not p.get("sin_stop") and p["clase"] == "Acciones"]
     if sin_stop:
         h("media", f"Sin stop-loss registrado: {', '.join(sin_stop)}",
           "Un stop-loss vende automáticamente si el precio cae hasta el nivel que eliges y evita que una caída "
           "fuerte se convierta en una pérdida enorme. Más abajo tienes la orden lista para cada posición. Si ya lo "
-          "tienes puesto en tu bróker, apúntalo en la posición para que la app lo vigile.")
+          "tienes puesto en tu bróker, apúntalo en la posición para que la app lo vigile. Si las compraste sin "
+          "stop-loss a propósito, márcalas como «solo vigilar»: la app te avisará si caen de tu nivel de alarma.")
 
     # 7. Lo que dice el informe del día de cada empresa
     for p in pos:

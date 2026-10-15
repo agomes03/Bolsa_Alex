@@ -10,14 +10,16 @@ import streamlit as st
 
 import plotly.graph_objects as go
 
-from bolsa import (asesor, asesor_diario, avisos, bankinter, comparativa, dividendos, reequilibrio, semanal, cartera, costes, diagnostico, estrategias, experimentos, horario, importador,
-                   patrones, senales, simulador)
+from bolsa import (alertas, asesor, asesor_diario, avisos, bankinter, cartera, comparativa, costes, diagnostico,
+                   dividendos, estrategias, experimentos, horario, importador, patrones, reequilibrio, semanal, senales,
+                   simulador)
 from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
-from ui_comun import (palabras_de_la_pagina, cargar_dividendos_varios, historia_larga_eur, cargar_noticias, mostrar_plotly, reducir, selector_valor, almacen_actual, cargar_activos, enlace, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
-                      datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, num,
-                      pct, perfil)
+from ui_comun import (almacen_actual, cargar_activos, cargar_dividendos_varios, cargar_fundamentales_varios,
+                      cargar_historico, cargar_informe, cargar_noticias, cargar_varios, datos_usuario, enlace,
+                      estrategia_actual, eur, fecha, fx, guardar_datos, historia_larga_eur, mercado_alcista_para,
+                      mostrar_plotly, num, palabras_de_la_pagina, pct, perfil, reducir, selector_valor)
 
 UNIVERSOS = {
     "IBEX 35": (tuple(IBEX35), "^IBEX"),
@@ -464,7 +466,7 @@ def revisar_cartera_real() -> list[dict]:
         stop_sug = max(ev.plan.stop, pos.get("stop") or 0) if ev.plan else None
         nivel, texto = bankinter.consejo_posicion(
             ev.precio, pos["precio_medio"], pos.get("stop"), stop_sug, ev.puntuacion, p.umbral_venta,
-            any("resultados" in a for a in ev.avisos))
+            any("resultados" in a for a in ev.avisos), pos.get("sin_stop", False), pos.get("alarma"))
         filas.append({**base, "precio": ev.precio, "nivel": nivel, "consejo": texto, "var_1d": _var_1d(df),
                       "ev": ev, "stop_sugerido": stop_sug, "fx": fx(t, funds.get(t)) or 1.0,
                       "resultados_pronto": any("resultados" in a for a in ev.avisos)})
@@ -507,7 +509,8 @@ def asesor_hoy(inf: dict | None):
         filas_inf = {r["ticker"]: r for r in (inf or {}).get("ranking", [])}
         posiciones = [{"ticker": f["ticker"], "acciones": f["pos"]["acciones"], "precio_medio": f["pos"]["precio_medio"],
                        "fx_medio": f["pos"].get("fx_medio", 1.0), "precio": f["precio"], "fx": f["fx"],
-                       "stop": f["pos"].get("stop"), "clase": f["clase"], "nombre": f["nombre"]}
+                       "stop": f["pos"].get("stop"), "clase": f["clase"], "nombre": f["nombre"],
+                   "sin_stop": f["pos"].get("sin_stop", False)}
                       for f in filas if f["precio"]]
         dg = diagnostico.diagnosticar(posiciones, d.get("otros_ahorros", 0.0), _perfil_guardado(), pf.tarifa,
                                       filas_inf)
@@ -648,6 +651,7 @@ def pagina_bankinter():
         p_hacer, p_diag, p_div, p_comp, p_anadir = st.tabs(["📋 Qué hacer", "🩺 Diagnóstico", "💶 Dividendos",
                                                              "📊 Comparar", "➕ Añadir"])
         with p_hacer:
+            bloque_vigilar_todas(filas)
             for f in filas:
                 posicion_detalle(f, cr)
             bloque_telegram()
@@ -711,6 +715,9 @@ def bloque_anadir(cr: dict):
             precio = c[1].number_input("Precio medio de compra", 0.0, value=0.0, format="%.4f")
             f_compra = c[2 % len(c)].date_input("Fecha de compra", date.today(), format="DD/MM/YYYY")
             stop = c[3 % len(c)].number_input("Stop-loss puesto (0 si no tienes)", 0.0, value=0.0)
+            solo_vigilar = st.checkbox(f"La compré sin stop-loss: vigílala y avísame si cae un "
+                                       f"{CAIDA_ALARMA * 100:.0f} %", value=True,
+                                       help="Solo si no pones stop-loss. Avisar no es vender: la decisión es tuya.")
             if st.form_submit_button("Guardar posición", type="primary"):
                 t, nombre, tipo = ticker, "", None
                 if otro:
@@ -727,6 +734,13 @@ def bloque_anadir(cr: dict):
                 else:
                     cr["posiciones"][t].update(nombre=nombre or cr["posiciones"][t].get("nombre"),
                                                clase=clase_de(t, tipo, nombre))
+                    if solo_vigilar and not stop and cr["posiciones"][t]["clase"] == "Acciones":
+                        try:
+                            df = cargar_varios((t,), "1mo").get(t)
+                            actual = float(df["Close"].iloc[-1]) if df is not None and not df.empty else precio
+                        except Exception:  # noqa: BLE001
+                            actual = precio
+                        vigilar_sin_stop(t, nombre_posicion(t, cr["posiciones"][t]), None, actual)
                     guardar_datos()
                     st.rerun()
     copia_seguridad()
@@ -897,7 +911,8 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     filas_inf = {r["ticker"]: r for r in inf.get("ranking", [])}
     posiciones = [{"ticker": f["ticker"], "acciones": f["pos"]["acciones"], "precio_medio": f["pos"]["precio_medio"],
                    "fx_medio": f["pos"].get("fx_medio", 1.0), "precio": f["precio"], "fx": f["fx"],
-                   "stop": f["pos"].get("stop"), "clase": f["clase"], "nombre": f["nombre"]}
+                   "stop": f["pos"].get("stop"), "clase": f["clase"], "nombre": f["nombre"],
+                   "sin_stop": f["pos"].get("sin_stop", False)}
                   for f in filas if f["precio"]]
     dg = diagnostico.diagnosticar(posiciones, otros, perfil_nombre, pf.tarifa, filas_inf)
     if dg["semaforo"] == "sin_datos":
@@ -1003,6 +1018,8 @@ def revisar_e_importar(leidas: pd.DataFrame, origen: str):
                              column_config={"clase": st.column_config.SelectboxColumn("Tipo", options=CLASES)})
     reemplazar = st.checkbox("Reemplazar mi cartera actual por esta", value=True, key=f"rep_{origen}")
     if st.button("📥 Importar", type="primary", key=f"imp_{origen}"):
+        previas = (d.get("cartera_real") or {}).get("posiciones", {})
+        conservar = {t: {k: p[k] for k in ("stop", "sin_stop", "alarma") if p.get(k)} for t, p in previas.items()}
         cr = d["cartera_real"] = cartera.nueva(None) if reemplazar else d.setdefault("cartera_real",
                                                                                       cartera.nueva(None))
         malas = []
@@ -1014,11 +1031,70 @@ def revisar_e_importar(leidas: pd.DataFrame, origen: str):
             cartera.comprar(cr, tk, _cantidad(r["acciones"]), float(r["precio_medio"]), pf.tarifa,
                             nota=f"Importada ({origen})", fx=fx(tk) or 1.0)
             cr["posiciones"][tk].update(nombre=str(r["nombre"]), clase=r["clase"] if r["clase"] in CLASES
-                                        else clase_de(tk, None, str(r["nombre"])))
+                                        else clase_de(tk, None, str(r["nombre"])), **conservar.get(tk, {}))
         guardar_datos()
         if malas:
             st.warning("No se importaron (falta código o precio): " + ", ".join(malas))
         st.rerun()
+
+
+CAIDA_ALARMA = 0.10        # nivel de alarma por defecto: un 10 % por debajo del precio de hoy
+NOTA_ALARMA = "Nivel de alarma de tu posición sin stop-loss"
+
+
+def vigilar_sin_stop(ticker: str, nombre: str, nivel: float | None, precio_actual: float | None) -> str | None:
+    """Marca la posición como «sin stop-loss, solo vigilar» con su nivel de alarma y crea (o cambia) el aviso de
+    precio que avisa en la app y por Telegram. Devuelve un error o None. No guarda: llama luego a guardar_datos()."""
+    d = datos_usuario()
+    pos = d["cartera_real"]["posiciones"][ticker]
+    if nivel is None and precio_actual:
+        nivel = round(precio_actual * (1 - CAIDA_ALARMA), 2)
+    lista = d.setdefault("alertas", [])
+    lista[:] = [a for a in lista if not (a.get("ticker") == ticker and a.get("nota") == NOTA_ALARMA)]
+    if nivel:
+        err = alertas.nueva(lista, ticker, nombre, "baja", nivel, precio_actual, NOTA_ALARMA)
+        if err:
+            return err
+    pos.update(sin_stop=True, alarma=nivel, stop=None)
+    if not st.session_state.get(f"ss_{ticker}"):       # si el interruptor ya está encendido, no se toca
+        try:
+            st.session_state[f"ss_{ticker}"] = True
+        except Exception:  # noqa: BLE001 - el interruptor ya se ha pintado en esta vuelta: se pondrá en la siguiente
+            st.session_state.setdefault("_ss_resincronizar", set()).add(ticker)
+    return None
+
+
+def dejar_de_vigilar(ticker: str) -> None:
+    d = datos_usuario()
+    pos = d["cartera_real"]["posiciones"].get(ticker, {})
+    pos.pop("sin_stop", None)
+    pos.pop("alarma", None)
+    d["alertas"] = [a for a in d.get("alertas", []) if not (a.get("ticker") == ticker and a.get("nota") == NOTA_ALARMA)]
+    st.session_state[f"ss_{ticker}"] = False
+
+
+def _al_cambiar_vigilancia(ticker: str) -> None:
+    if not st.session_state.get(f"ss_{ticker}"):
+        dejar_de_vigilar(ticker)
+        guardar_datos()
+
+
+def bloque_vigilar_todas(filas: list[dict]):
+    """Un botón para marcar de golpe las acciones sin stop-loss como «solo vigilar»."""
+    sin = [f for f in filas if f["clase"] == "Acciones" and f["precio"] and not f["pos"].get("stop")
+           and not f["pos"].get("sin_stop")]
+    if not sin:
+        return
+    with st.container(border=True):
+        st.markdown(f"**¿Las compraste sin stop-loss a propósito?** ({', '.join(f['nombre'] for f in sin)})")
+        st.caption(f"La app dejará de pedirte el stop y las vigilará por ti: te avisa (aquí, en 🧭 Hoy y por Telegram) "
+                   f"si alguna cae un {CAIDA_ALARMA * 100:.0f} % desde el precio de hoy. Avisar no es vender: la "
+                   "decisión es tuya. Puedes cambiar el nivel de cada una abajo.")
+        if st.button("👀 Vigilarlas sin stop-loss", key="vigilar_todas", width="stretch"):
+            for f in sin:
+                vigilar_sin_stop(f["ticker"], f["nombre"], None, f["precio"])
+            guardar_datos()
+            st.rerun()
 
 
 def posicion_detalle(f: dict, cr: dict):
@@ -1038,6 +1114,8 @@ def posicion_detalle(f: dict, cr: dict):
                                        key=f"stop_{t}")
         if c[0].button("Guardar stop", key=f"gstop_{t}"):
             pos["stop"] = nuevo_stop or None
+            if nuevo_stop:
+                dejar_de_vigilar(t)      # con stop-loss puesto ya no hace falta el nivel de alarma
             guardar_datos()
             st.rerun()
         precio_v = c[1].number_input("Vendida a (precio)", 0.0, value=float(f["precio"] or 0.0), key=f"pv_{t}")
@@ -1054,6 +1132,27 @@ def posicion_detalle(f: dict, cr: dict):
             cr["posiciones"].pop(t, None)
             guardar_datos()
             st.rerun()
+        if f["clase"] == "Acciones" and f["precio"]:
+            pendientes = st.session_state.get("_ss_resincronizar", set())
+            if f"ss_{t}" not in st.session_state or t in pendientes:
+                st.session_state[f"ss_{t}"] = bool(pos.get("sin_stop"))
+                pendientes.discard(t)
+            solo = st.toggle("Sin stop-loss: vigílala tú y avísame si cae", key=f"ss_{t}",
+                             on_change=_al_cambiar_vigilancia, args=(t,),
+                             help="Para acciones compradas sin stop-loss a propósito (largo plazo). La app deja de "
+                                  "pedirte el stop y te avisa si baja de tu nivel de alarma; no vende nada.")
+            if solo:
+                v = st.columns([2, 1])
+                nivel = v[0].number_input("Nivel de alarma (avisa, no vende)", 0.0,
+                                          value=float(pos.get("alarma") or round(f["precio"] * (1 - CAIDA_ALARMA), 2)),
+                                          key=f"alarma_{t}")
+                if v[1].button("Guardar", key=f"gss_{t}", width="stretch"):
+                    err = vigilar_sin_stop(t, f["nombre"], nivel or None, f["precio"])
+                    if err:
+                        st.error(err)
+                    else:
+                        guardar_datos()
+                        st.rerun()
 
 
 # --------------------------------------------------------------------------- operar en Bankinter (desde Analizar)

@@ -257,14 +257,24 @@ def ticket(ticker: str, operacion: str, acciones: int, precio: float, stop: floa
 
 
 def consejo_posicion(precio: float, precio_medio: float, stop: float | None, stop_sugerido: float | None,
-                     puntuacion: int | None, umbral_venta: int = 40, resultados_pronto: bool = False) -> tuple[str, str]:
-    """(nivel, texto). nivel: 'vender', 'vigilar', 'subir_stop', 'mantener', 'poner_stop'."""
+                     puntuacion: int | None, umbral_venta: int = 40, resultados_pronto: bool = False,
+                     sin_stop: bool = False, alarma: float | None = None) -> tuple[str, str]:
+    """(nivel, texto). nivel: 'vender', 'vigilar', 'subir_stop', 'mantener', 'poner_stop'.
+    `sin_stop`: la compraste sin stop-loss y quieres solo vigilarla; `alarma`: precio que avisa pero no vende."""
     if stop and precio <= stop:
         return "vender", ("Ha tocado tu stop-loss: según tu plan, toca vender (si tenías la orden stop puesta en "
                           f"{_donde()}, ya se habrá vendido; compruébalo en tus órdenes).")
     if puntuacion is not None and puntuacion < umbral_venta:
         return "vigilar", (f"La puntuación técnica ha bajado a {puntuacion}/100: la tendencia se ha estropeado. "
                            "Plantéate vender o, al menos, acercar el stop.")
+    if not stop and sin_stop:
+        if alarma and precio <= alarma:
+            return "vigilar", (f"Ha bajado de tu nivel de alarma ({_num(alarma)}). No tiene stop-loss, así que no se "
+                               "vende sola: decide con calma si el motivo por el que la compraste sigue en pie.")
+        texto = "Sin stop-loss, la vigilas tú" + (f": te aviso si baja de {_num(alarma)}." if alarma else ".")
+        if resultados_pronto:
+            texto += " Ojo: presenta resultados en los próximos días."
+        return "mantener", texto
     if not stop:
         return "poner_stop", (f"No tienes stop-loss registrado. Crea en {_donde()} una orden Stop de venta con "
                               f"activación en {_num(stop_sugerido)} para limitar pérdidas." if stop_sugerido else

@@ -33,7 +33,8 @@ def avisos_cartera(cartera_real: dict, ranking: list[dict], umbral_venta: int = 
             continue
         stop_sug = max(r.get("stop") or 0, pos.get("stop") or 0) or None
         nivel, texto = bankinter.consejo_posicion(r["precio"], pos["precio_medio"], pos.get("stop"), stop_sug,
-                                                  r["puntuacion"], umbral_venta, r.get("resultados_pronto", False))
+                                                  r["puntuacion"], umbral_venta, r.get("resultados_pronto", False),
+                                                  pos.get("sin_stop", False), pos.get("alarma"))
         if nivel != "mantener":
             avisos.append(f"• {r['nombre']}: {texto}")
     return avisos
