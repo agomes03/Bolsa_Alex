@@ -14,7 +14,7 @@ import pandas as pd
 
 from . import modelo_ml, simulador
 from .costes import Tarifa, acciones_asequibles, itf_pct
-from .tickers import ETFS, indice_de_referencia
+from .tickers import ETFS, indice_de_referencia, sector_de
 
 
 # --------------------------------------------------------------------------- métricas
@@ -36,7 +36,8 @@ def resumen_curva(curva: pd.Series, capital: float, gastos: float = 0.0, operaci
 # --------------------------------------------------------------------------- cartera mensual por ranking
 def simular_rotacion(cierres: pd.DataFrame, senal: pd.DataFrame, n: int, tarifa: Tarifa,
                      capital: float = 10_000.0, permitido: pd.DataFrame | None = None, cada: int = 21,
-                     inicio: pd.Timestamp | None = None, tolerancia: float = 0.25) -> tuple[pd.Series, dict]:
+                     inicio: pd.Timestamp | None = None, tolerancia: float = 0.25,
+                     max_por_sector: int | None = None) -> tuple[pd.Series, dict]:
     """Cada `cada` sesiones se queda con las `n` acciones de mayor señal (decidido con el cierre anterior),
     a partes iguales. Los huecos que no se pueden llenar (p. ej. mercado bajista) quedan en liquidez.
     Paga comisión por operación e impuesto de transacciones en las compras."""
@@ -49,6 +50,7 @@ def simular_rotacion(cierres: pd.DataFrame, senal: pd.DataFrame, n: int, tarifa:
     ok_perm = permitido.reindex(index=fechas, columns=tickers).fillna(False).to_numpy().astype(bool) \
         if permitido is not None else None
     itf = np.array([itf_pct(t) / 100 for t in tickers])
+    sectores = [sector_de(t) for t in tickers]
     acc = np.zeros(len(tickers))
     efectivo, gastos, ops = float(capital), 0.0, 0
     curva = np.empty(len(fechas) - i0)
@@ -60,7 +62,7 @@ def simular_rotacion(cierres: pd.DataFrame, senal: pd.DataFrame, n: int, tarifa:
             if ok_perm is not None:
                 elegible &= ok_perm[t - 1]
             sig[~elegible] = -np.inf
-            top = [j for j in np.argsort(-sig)[:n] if np.isfinite(sig[j])]
+            top = elegir_top(sig, n, sectores if max_por_sector else None, max_por_sector)
             valor = efectivo + float(np.nansum(acc * p))
             objetivo_euros = valor / n
             # Ventas: lo que sale del top y lo que sobra de lo que se queda
@@ -99,6 +101,23 @@ def simular_rotacion(cierres: pd.DataFrame, senal: pd.DataFrame, n: int, tarifa:
     resumen["cartera_final"] = {tickers[j]: int(acc[j]) for j in np.nonzero(acc > 0)[0]}
     resumen["efectivo_final"] = efectivo
     return serie, resumen
+
+
+def elegir_top(sig: np.ndarray, n: int, sectores: list[str] | None = None, max_por_sector: int | None = None) -> list[int]:
+    """Índices de las n mejores señales (finitas), con como mucho `max_por_sector` del mismo sector."""
+    elegidos, por_sector = [], {}
+    for j in np.argsort(-sig, kind="stable"):
+        if not np.isfinite(sig[j]):
+            break
+        if sectores is not None and max_por_sector and sectores[j] not in ("—", "", None):  # sector desconocido: sin límite
+            s = sectores[j]
+            if por_sector.get(s, 0) >= max_por_sector:
+                continue
+            por_sector[s] = por_sector.get(s, 0) + 1
+        elegidos.append(int(j))
+        if len(elegidos) >= n:
+            break
+    return elegidos
 
 
 def senales_basicas(cierres: pd.DataFrame) -> dict[str, pd.DataFrame]:

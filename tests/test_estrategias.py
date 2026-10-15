@@ -66,3 +66,22 @@ def test_filtro_tendencia_indice_reduce_caidas():
     r = experimentos.filtro_tendencia_indice(c, 200, 0.02)
     assert 0 < r["tiempo_invertido"] < 1
     assert r["filtro"]["max_caida_pct"] >= r["mantener"]["max_caida_pct"] - 5
+
+
+def test_limite_por_sector():
+    sig = np.array([9.0, 8.0, 7.0, 6.0, 5.0, -np.inf])
+    sectores = ["Banca", "Banca", "Banca", "Energía", "Salud", "Salud"]
+    assert experimentos.elegir_top(sig, 4, sectores, 2) == [0, 1, 3, 4]
+    assert experimentos.elegir_top(sig, 4) == [0, 1, 2, 3]
+    assert experimentos.elegir_top(sig, 10) == [0, 1, 2, 3, 4]  # nunca elige señales -inf
+
+
+def test_composicion_respeta_sector():
+    c = cierres_sinteticos()
+    c.columns = ["SAN.MC", "BBVA.MC", "CABK.MC", "SAB.MC", "BKT.MC", "UNI.MC", "IBE.MC", "REP.MC", "ITX.MC",
+                 "TEF.MC", "GRF.MC", "ACS.MC"]
+    perm = pd.DataFrame(True, index=c.index, columns=c.columns)
+    comp = estrategias.composicion_hoy(c, perm, estrategias.CARTERAS["es_dinamica"])
+    from collections import Counter
+    from bolsa.tickers import sector_de
+    assert max(Counter(sector_de(x["ticker"]) for x in comp).values()) <= 2

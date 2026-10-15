@@ -25,6 +25,7 @@ import pandas as pd
 
 from . import experimentos
 from .costes import Tarifa
+from .tickers import sector_de
 from .tickers import ETFS
 
 
@@ -40,11 +41,14 @@ class CarteraModelo:
     universo: str = "espana"      # "espana" (acciones españolas) o "global"
     capital: float = 10_000.0     # capital con el que se simula (realista para sus comisiones)
     perfiles: tuple = ()          # perfiles de 🎯 Mi plan a los que se recomienda
+    max_por_sector: int = 2       # diversificación: como mucho N empresas del mismo sector
 
 
 _DESC = {
-    "momentum": "Cada mes, las {n} acciones que más han subido en el último año (sin contar el último mes). ",
-    "baja_vol": "Cada mes, las {n} acciones más estables (las que menos se mueven). ",
+    "momentum": "Cada mes, las {n} acciones que más han subido en el último año (sin contar el último mes), con "
+                "como mucho 2 del mismo sector. ",
+    "baja_vol": "Cada mes, las {n} acciones más estables (las que menos se mueven), con como mucho 2 del mismo "
+                "sector. ",
 }
 
 # Elegidas con el laboratorio (datos reales 2020-2026, comisiones de Bankinter, en euros). En España el filtro
@@ -62,14 +66,16 @@ CARTERAS = {
     "dinamica": CarteraModelo(
         "dinamica", "Dinámica internacional", "momentum", 10, False, "dinámico (importes grandes)",
         _DESC["momentum"].format(n=10) + "Con acciones de España, Europa y EEUU. Solo tiene sentido con mucho "
-        "dinero (≈5.000 € por empresa) por las comisiones internacionales.", "global", 50_000.0),
+        "dinero (≈5.000 € por empresa) por las comisiones internacionales.", "global", 50_000.0,
+        max_por_sector=3),
     "equilibrada": CarteraModelo(
         "equilibrada", "Equilibrada internacional", "momentum", 20, True, "moderado (importes grandes)",
         _DESC["momentum"].format(n=20) + "Solo de mercados en tendencia alcista: ganó parecido a la media con "
-        "caídas menores.", "global", 100_000.0),
+        "caídas menores.", "global", 100_000.0, max_por_sector=4),
     "tranquila": CarteraModelo(
         "tranquila", "Tranquila internacional", "baja_vol", 20, True, "conservador (importes grandes)",
-        _DESC["baja_vol"].format(n=20) + "Solo de mercados en tendencia alcista.", "global", 100_000.0),
+        _DESC["baja_vol"].format(n=20) + "Solo de mercados en tendencia alcista.", "global", 100_000.0,
+        max_por_sector=4),
 }
 CARTERA_POR_PERFIL = {p: c for c in CARTERAS.values() if c.universo == "espana" for p in c.perfiles}
 
@@ -96,8 +102,10 @@ def composicion_hoy(cierres: pd.DataFrame, permitido: pd.DataFrame, c: CarteraMo
     ok = sig.notna() & cierres.iloc[-1].notna()
     if c.filtro_mercado:
         ok &= permitido.iloc[-1].reindex(sig.index).fillna(False).astype(bool)
-    elegidas = sig[ok].sort_values(ascending=False).head(c.n)
-    return [{"ticker": t, "senal": float(v), "precio_eur": float(cierres[t].iloc[-1])} for t, v in elegidas.items()]
+    valores = np.where(ok.to_numpy(), sig.to_numpy(dtype=float), -np.inf)
+    idx = experimentos.elegir_top(valores, c.n, [sector_de(t) for t in sig.index], c.max_por_sector)
+    return [{"ticker": sig.index[j], "senal": float(sig.iloc[j]), "precio_eur": float(cierres[sig.index[j]].iloc[-1])}
+            for j in idx]
 
 
 def evaluar_cartera(cierres: pd.DataFrame, permitido: pd.DataFrame, c: CarteraModelo, tarifa: Tarifa,
@@ -107,7 +115,8 @@ def evaluar_cartera(cierres: pd.DataFrame, permitido: pd.DataFrame, c: CarteraMo
     capital = c.capital
     sig = senal(cierres, c.senal)
     curva, met = experimentos.simular_rotacion(cierres, sig, c.n, tarifa, capital,
-                                               permitido if c.filtro_mercado else None, inicio=pd.Timestamp(desde))
+                                               permitido if c.filtro_mercado else None, inicio=pd.Timestamp(desde),
+                                               max_por_sector=c.max_por_sector)
     # Referencia: todas las acciones a partes iguales con un capital grande, para que las comisiones mínimas
     # no la penalicen (se parece al coste de un fondo indexado). Después se escala a la misma cifra.
     todas, met_todas = experimentos.simular_rotacion(cierres, pd.DataFrame(1.0, index=cierres.index,

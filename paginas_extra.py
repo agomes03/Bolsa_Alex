@@ -468,7 +468,8 @@ def robot_cartera(rb: dict):
         return
     sig = estrategias.senal(cierres, c.senal)
     curva, met = experimentos.simular_rotacion(cierres, sig, c.n, pf.tarifa, rb["capital"],
-                                               perm if c.filtro_mercado else None, inicio=inicio[0])
+                                               perm if c.filtro_mercado else None, inicio=inicio[0],
+                                               max_por_sector=c.max_por_sector)
     unos = pd.DataFrame(1.0, index=cierres.index, columns=cierres.columns)
     ref, met_ref = experimentos.simular_rotacion(cierres, unos, len(cierres.columns), pf.tarifa, rb["capital"],
                                                  inicio=inicio[0])

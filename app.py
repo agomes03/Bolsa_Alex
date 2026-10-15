@@ -247,6 +247,55 @@ def pagina_noticias():
         tarjeta_noticia(n, expandida=i < 3 and not movil)
 
 
+def plan_de_compra(ticker, ev, fund, f_eur, m, etiqueta, color) -> float:
+    """Plan con stop-loss, costes y órdenes. Si el veredicto no es de compra, queda plegado."""
+    if color == "green":
+        st.subheader("📋 Si decides comprar")
+        contenedor = st.container()
+    else:
+        contenedor = st.expander(f"📋 Si aun así decides comprar (el veredicto de hoy es «{etiqueta}»)")
+    importe = 0.0
+    with contenedor:
+        p = ev.plan
+        if f_eur is None:
+            st.warning("No se ha podido obtener el tipo de cambio de su divisa: no se pueden calcular importes en "
+                       "euros para esta acción.")
+        else:
+            # Como mucho el 20 % del dinero en una sola empresa (diversificación), aunque el stop esté muy cerca.
+            n = min(costes.tamano_por_riesgo(capital, riesgo, p.entrada * f_eur, p.stop * f_eur),
+                    costes.acciones_asequibles(capital * 0.20, p.entrada * f_eur, ticker, tarifa))
+            importe = n * p.entrada * f_eur
+            cap_empresa = fund.get("marketCap")
+            iv = costes.coste_ida_y_vuelta(importe, ticker, tarifa, capitalizacion=cap_empresa) if importe else None
+            c = st.columns(2 if movil else 4)
+            c[0].metric("Comprar", f"{n} {'acción' if n == 1 else 'acciones'}", f"≈ {eur(importe)}",
+                    delta_color="off")
+            c[1].metric("Stop-loss (vender si baja a)", eur(p.stop, m), pct(-p.riesgo_pct), delta_color="off")
+            c[2 % len(c)].metric("Objetivo", eur(p.objetivo, m), pct(p.beneficio_pct))
+            if iv:
+                c[3 % len(c)].metric("Costes Bankinter", eur(iv["total"]), f"{pct(iv['pct'], 2, False)} del importe",
+                                     delta_color="off", help="Comprar + vender + 1 año de custodia (si es extranjera).")
+            st.markdown(
+                f"Si sale mal y salta el stop, perderías unos **{eur(n * (p.entrada - p.stop) * f_eur)}** "
+                f"(como máximo el {num(riesgo, 1)} % de tus {eur(capital)}). Si llega al objetivo, "
+                f"ganarías unos **{eur(n * (p.objetivo - p.entrada) * f_eur)}** antes de impuestos. Nunca más del "
+                "20 % de tu dinero en una sola empresa.")
+            st.caption("El stop-loss está a 2 veces lo que se mueve en un día normal (para que el ruido diario no lo "
+                       "active) y el objetivo al doble de esa distancia: así ganas 2 € por cada 1 € que arriesgas.")
+            if n == 0:
+                st.info("Con tu dinero y tu riesgo máximo no llega para comprar ni una acción con este stop-loss.")
+            elif iv and iv["pct"] > 2:
+                st.warning(f"Los costes se comerían un {pct(iv['pct'], 1, False)} de la inversión. "
+                           + ("En Bankinter, las acciones extranjeras pagan 20 € por operación, un 1 % de cambio de "
+                              "divisa y una custodia mínima de 24 € al año: solo compensan con unos 5.000 € o más."
+                              if not costes.es_nacional(ticker) else "Con importes tan pequeños, la comisión mínima "
+                              "pesa mucho."))
+            if color != "green":
+                st.info("Si aun así compras, que sea con poco dinero y con el stop-loss puesto desde el primer día.")
+            bloque_operar(ticker, n, p, f_eur)
+    return importe
+
+
 def pagina_analizar():
     st.title("🔍 Analizar una acción")
     pre = st.session_state.pop("analizar_ticker", None)
@@ -321,44 +370,7 @@ def pagina_analizar():
 
     importe_ref = 1_000.0
     if ev.plan:
-        st.subheader("📋 Si decides comprar")
-        p = ev.plan
-        if f_eur is None:
-            st.warning("No se ha podido obtener el tipo de cambio de su divisa: no se pueden calcular importes en "
-                       "euros para esta acción.")
-        else:
-            # Como mucho el 20 % del dinero en una sola empresa (diversificación), aunque el stop esté muy cerca.
-            n = min(costes.tamano_por_riesgo(capital, riesgo, p.entrada * f_eur, p.stop * f_eur),
-                    costes.acciones_asequibles(capital * 0.20, p.entrada * f_eur, ticker, tarifa))
-            importe = n * p.entrada * f_eur
-            importe_ref = importe or importe_ref
-            cap_empresa = fund.get("marketCap")
-            iv = costes.coste_ida_y_vuelta(importe, ticker, tarifa, capitalizacion=cap_empresa) if importe else None
-            c = st.columns(2 if movil else 4)
-            c[0].metric("Comprar", f"{n} acciones", f"≈ {eur(importe)}", delta_color="off")
-            c[1].metric("Stop-loss (vender si baja a)", eur(p.stop, m), pct(-p.riesgo_pct), delta_color="off")
-            c[2 % len(c)].metric("Objetivo", eur(p.objetivo, m), pct(p.beneficio_pct))
-            if iv:
-                c[3 % len(c)].metric("Costes Bankinter", eur(iv["total"]), f"{pct(iv['pct'], 2, False)} del importe",
-                                     delta_color="off", help="Comprar + vender + 1 año de custodia (si es extranjera).")
-            st.markdown(
-                f"Si sale mal y salta el stop, perderías unos **{eur(n * (p.entrada - p.stop) * f_eur)}** "
-                f"(como máximo el {num(riesgo, 1)} % de tus {eur(capital)}). Si llega al objetivo, "
-                f"ganarías unos **{eur(n * (p.objetivo - p.entrada) * f_eur)}** antes de impuestos. Nunca más del "
-                "20 % de tu dinero en una sola empresa.")
-            st.caption("El stop-loss está a 2 veces lo que se mueve en un día normal (para que el ruido diario no lo "
-                       "active) y el objetivo al doble de esa distancia: así ganas 2 € por cada 1 € que arriesgas.")
-            if n == 0:
-                st.info("Con tu dinero y tu riesgo máximo no llega para comprar ni una acción con este stop-loss.")
-            elif iv and iv["pct"] > 2:
-                st.warning(f"Los costes se comerían un {pct(iv['pct'], 1, False)} de la inversión. "
-                           + ("En Bankinter, las acciones extranjeras pagan 20 € por operación, un 1 % de cambio de "
-                              "divisa y una custodia mínima de 24 € al año: solo compensan con unos 5.000 € o más."
-                              if not costes.es_nacional(ticker) else "Con importes tan pequeños, la comisión mínima "
-                              "pesa mucho."))
-            if color != "green":
-                st.info(f"El veredicto de hoy es «{etiqueta}», no de compra. Si aun así compras, usa poco dinero.")
-            bloque_operar(ticker, n, p, f_eur)
+        importe_ref = plan_de_compra(ticker, ev, fund, f_eur, m, etiqueta, color) or importe_ref
 
     st.subheader("🌦️ Qué le puede pasar a tu dinero")
     bloque_que_puede_pasar_accion(ticker, df, importe_ref)
