@@ -68,15 +68,23 @@ streamlit run app.py
 
 Se abrirá en tu navegador (http://localhost:8501). Para cerrarla, pulsa `Ctrl + C` en la terminal.
 
-## Rutina recomendada (10 minutos al día o a la semana)
-1. **Resumen del día** → mira el semáforo.
-2. **Noticias** → lee las 3-5 más influyentes y su explicación.
-3. **Radar** → apunta empresas con 70 puntos o más.
-4. **Analizar** → revisa los motivos y el plan.
-5. **Bankinter** → compra con **orden limitada** y pon el **stop-loss** en cuanto se ejecute.
+## Rutina recomendada
+**Una vez:** rellena 🎯 **Mi plan** (tu perfil y cuánto invertir) y crea un **robot** en 🎮 Cartera virtual para
+ver durante unas semanas cómo se comporta la estrategia antes de arriesgar dinero real.
+
+**Cada día o cada semana (5 minutos):**
+1. 🧭 **Hoy** → semáforo, regla de protección, ideas del día, qué puede pasar y avisos de tu cartera.
+2. 🔍 **Analizar** → antes de comprar algo, lee los motivos, el riesgo de caída y el plan con stop-loss.
+3. **Bankinter** → copia la orden que te prepara la app (orden limitada + stop-loss) y regístrala en 🏦 Mi Bankinter.
+
+**Una vez al mes:** revisa 📦 **Carteras modelo** (qué entra y qué sale) y haz tu aportación periódica al fondo
+indexado.
 
 ## Cómo decide (sin cajas negras)
-La puntuación empieza en 50 y suma o resta puntos según reglas clásicas y transparentes:
+La **nota global** (0-100) es el puesto de cada acción frente a las demás, combinando lo que ha funcionado con
+datos reales: momentum del último año (50%), puntuación técnica (30%) y menor riesgo de caída (20%).
+
+La **puntuación técnica** empieza en 50 y suma o resta puntos según reglas clásicas y transparentes:
 
 - **Tendencia de fondo**: precio por encima/debajo de su media de 200 sesiones (±15).
 - **Cruce de medias** 50/200, "cruce dorado" o "de la muerte" (±8).
@@ -85,7 +93,7 @@ La puntuación empieza en 50 y suma o resta puntos según reglas clásicas y tra
 - **Impulso MACD** (±8).
 - **Noticias** de la empresa (±6) y **ambiente del mercado** (+4 / −6).
 - **Analistas** (precio objetivo, ±6), **PER** (±3/−4) y **dividendo** (+2).
-- **Modelo de predicción** (±10), *solo si ha demostrado acertar más que el azar con esa acción*.
+- **Riesgo de caída fuerte** del modelo conjunto (+4 / −8), porque sí ha demostrado funcionar.
 - El **stop-loss** se coloca a 2 × ATR (movimiento diario típico) y el objetivo al doble de distancia
   (ganas 2 € por cada 1 € que arriesgas).
 
