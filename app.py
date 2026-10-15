@@ -19,7 +19,7 @@ from paginas_chat import pagina_chat
 from paginas_extra import bloque_operar, pagina_bankinter, pagina_cartera_virtual, pagina_simulador
 from paginas_hoy import (bloque_fases, bloque_que_puede_pasar_accion, pagina_carteras, pagina_hoy, pagina_plan,
                          pagina_radar_global)
-from ui_comun import (Perfil, cargar_activos, cargar_fundamentales, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
+from ui_comun import (Perfil, cargar_activos, conclusion_noticia, mostrar_conclusion, cargar_fundamentales, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
                       datos_usuario, es_movil, guardar_datos, eur, fila_informe, fx, mercado_alcista_para, moneda_de,
                       noticias_empresa, num, pct)
 
@@ -109,10 +109,11 @@ def tarjeta_noticia(n: noticias.Noticia, expandida: bool = False):
         st.caption(f"{n.fuente} · {noticias.hace_cuanto(n)} · Impacto {n.impacto}/10"
                    + (f" · Publicada en {n.repeticiones} medios" if n.repeticiones > 1 else "")
                    + (f" · Empresas: {empresas}" if empresas else ""))
+        mostrar_conclusion(conclusion_noticia(n.titulo, n.resumen, n.empresas, n.sentimiento))
         if n.resumen and n.resumen.lower()[:60] not in n.titulo.lower():
             st.write(n.resumen)
         if n.explicaciones:
-            st.markdown("**💡 Por qué importa:**")
+            st.markdown("**📚 Para entenderla:**")
             for e in n.explicaciones[:3]:
                 st.markdown(f"- {e}")
         else:

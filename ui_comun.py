@@ -267,6 +267,25 @@ def enlace(pagina: str, texto: str, icono: str | None = None):
             pass
 
 
+def conclusion_noticia(titulo: str, resumen: str, empresas: list[str], sentimiento: int) -> dict | None:
+    """Conclusión sencilla de una noticia con los datos de la app y tu cartera."""
+    from bolsa import conclusiones
+
+    filas = {r["ticker"]: r for r in (cargar_informe() or {}).get("ranking", [])}
+    mias = set((datos_usuario().get("cartera_real") or {}).get("posiciones", {}))
+    return conclusiones.concluir(titulo, resumen, empresas, sentimiento, filas, mias)
+
+
+def mostrar_conclusion(c: dict | None):
+    if not c:
+        return
+    with st.container(border=True):
+        st.markdown(f"**{c['icono']} {c['titulo']}** — 📍 *Dónde repercute:* {c['donde']}")
+        st.markdown(f"**Qué suele pasar:** {c['efecto']}  \n**💡 Oportunidad / qué hacer:** {c['oportunidad']}")
+        if c["te_afecta"]:
+            st.markdown(f"**📌 {c['te_afecta']}**")
+
+
 def ir_a(pagina: str, **estado):
     """Navega a otra página (p. ej. 'analizar') guardando valores en la sesión."""
     st.session_state.update(estado)

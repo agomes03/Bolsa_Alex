@@ -12,7 +12,7 @@ from bolsa import asesor, bankinter, costes, estrategias, patrones
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import asesor_hoy
-from ui_comun import (cargar_informe, cargar_varios, datos_usuario, dias_informe, eur, fecha, guardar_datos,
+from ui_comun import (conclusion_noticia, cargar_informe, cargar_varios, datos_usuario, dias_informe, eur, fecha, guardar_datos,
                       hora_espana, ir_a, moneda_de, num, pct, perfil)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
@@ -154,10 +154,16 @@ def pagina_hoy():
         st.caption("Estadísticas de lo que pasó en situaciones parecidas del pasado, no una garantía.")
 
     st.subheader("📰 Lo más importante")
+    st.caption("Con la conclusión sencilla de cada una: dónde repercute y qué oportunidad o riesgo genera. Todas en "
+               "📰 Noticias.")
     for n in inf["noticias"]["top"][:3]:
         icono = {1: "🟢", -1: "🔴", 0: "⚪"}[n["sentimiento"]]
         st.markdown(f"{icono} [{n['titulo']}]({n['enlace']})")
-        if n["explicaciones"]:
+        c = conclusion_noticia(n["titulo"], n.get("resumen", ""), n.get("empresas", []), n["sentimiento"])
+        if c:
+            st.markdown(f"<small>{c['icono']} **{c['titulo']}**: {c['oportunidad']}"
+                        + (f" **{c['te_afecta']}**" if c["te_afecta"] else "") + "</small>", unsafe_allow_html=True)
+        elif n["explicaciones"]:
             st.caption("💡 " + n["explicaciones"][0])
 
 
