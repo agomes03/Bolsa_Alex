@@ -13,7 +13,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
-from bolsa import datos, experimentos, informe  # noqa: E402
+from bolsa import costes, datos, experimentos, informe  # noqa: E402
 from bolsa.tickers import INDICES, TERMOMETROS, TODAS_LAS_ACCIONES  # noqa: E402
 
 
@@ -27,7 +27,8 @@ def main() -> int:
     indices = informe.descargar_por_bloques(list(INDICES) + list(TERMOMETROS), "10y", log=log)
     largos = {t: datos.historico(t, "max") for t in informe.INDICES_LARGOS}
     log(f"{len(acciones)} acciones, {len(indices)} índices")
-    res = experimentos.ejecutar(acciones, indices, largos, log=log)
+    acciones_eur = costes.historicos_en_euros(acciones, {"USD": indices.get("EURUSD=X")})
+    res = experimentos.ejecutar(acciones_eur, indices, largos, log=log)
     res["fecha"] = time.strftime("%Y-%m-%d")
     salida = RAIZ / "informe" / "experimentos.json"
     salida.write_text(json.dumps(informe.limpiar(res), ensure_ascii=False, indent=1), encoding="utf-8")

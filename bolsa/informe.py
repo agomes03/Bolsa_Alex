@@ -23,12 +23,12 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from . import asesor, datos, estrategias, modelo_ml, noticias, patrones, senales, simulador
+from . import asesor, costes, datos, estrategias, modelo_ml, noticias, patrones, senales, simulador
 from .costes import Tarifa
 from .tickers import (ETFS, INDICES, INDICES_MUNDIALES, TERMOMETROS, TODAS_LAS_ACCIONES, indice_de_referencia,
                       mercado_de, nombre_de, sector_de)
 
-VERSION = 2
+VERSION = 3
 INDICES_LARGOS = ("^IBEX", "^GSPC", "^STOXX50E")
 INDICES_REFERENCIA = ("^IBEX", "^STOXX50E", "^GSPC")
 
@@ -127,7 +127,8 @@ def nivel_riesgo(prob: float | None, base: float) -> str | None:
     return "alto" if prob >= base * 1.3 else "bajo" if prob <= base * 0.8 else "normal"
 
 
-def paso_ranking(acciones, indices, fundamentales, lista_noticias, modelo, params: simulador.Parametros) -> list[dict]:
+def paso_ranking(acciones, indices, fundamentales, lista_noticias, modelo, params: simulador.Parametros,
+                 tipos: dict[str, float] | None = None) -> list[dict]:
     estados = {k: senales.estado_indice(indices[k]) for k in INDICES_REFERENCIA if k in indices}
     riesgo = modelo["caida_1m"]
     cal_r = riesgo["wf"]["calibracion"]
@@ -150,7 +151,10 @@ def paso_ranking(acciones, indices, fundamentales, lista_noticias, modelo, param
         objetivo = f.get("targetMeanPrice")
         filas.append({
             "ticker": t, "nombre": nombre_de(t), "mercado": mercado_de(t), "sector": sector_de(t),
-            "etf": t in ETFS, "precio": ev.precio, "var_1d": ev.datos["var_1d"], "var_1m": ev.datos["var_1m"],
+            "etf": t in ETFS, "precio": ev.precio, "divisa": costes.divisa(t, f),
+            "precio_eur": costes.a_euros(ev.precio, t, tipos or {}, f),
+            "capitalizacion": f.get("marketCap"), "nacional": costes.es_nacional(t),
+            "var_1d": ev.datos["var_1d"], "var_1m": ev.datos["var_1m"],
             "var_1a": ev.datos["var_1a"], "puntuacion": ev.puntuacion, "veredicto": ev.veredicto, "color": ev.color,
             "rsi": ev.datos["rsi"], "volatilidad": ev.datos["volatilidad"],
             "momentum": momentum.get(t), "riesgo_caida": cal_rie.get("prob"),
@@ -191,7 +195,7 @@ def paso_ranking(acciones, indices, fundamentales, lista_noticias, modelo, param
 
 def paso_estrategia(acciones, indices, modelo, tarifa, entrenar, previo, iteraciones, log) -> dict:
     """Entrena (o reutiliza) las reglas de compra/venta con todas las acciones y el modelo conjunto."""
-    hist = {t: df for t, df in acciones.items() if t not in ETFS}
+    hist = {t: df for t, df in acciones.items() if t not in ETFS}  # ya en euros
     probs = modelo_ml.probabilidades_por_accion(modelo["sube_1m"]["wf"]["oos"])
     refs = {k: indices[k] for k in INDICES_REFERENCIA if k in indices}
     u = simulador.preparar_universo(hist, refs, probabilidades=probs)
@@ -287,7 +291,7 @@ def resumen_texto(mercado, noticias_inf, ideas, proteccion, carteras) -> list[st
     if noticias_inf["top"]:
         frases.append(f"Tono de las noticias: {tono_txt}. La más influyente: «{noticias_inf['top'][0]['titulo']}».")
     if ideas:
-        frases.append("Ideas del día (mejor nota, sectores distintos y riesgo no alto): "
+        frases.append("Ideas del día en España (mejor nota, sectores distintos y riesgo no alto): "
                       + ", ".join(i["nombre"] for i in ideas[:5]) + ".")
     else:
         frases.append("Hoy ninguna acción cumple todas las condiciones de compra: no pasa nada, paciencia.")
@@ -295,7 +299,7 @@ def resumen_texto(mercado, noticias_inf, ideas, proteccion, carteras) -> list[st
 
 
 # --------------------------------------------------------------------------- historiales
-COLUMNAS_IDEAS = ["fecha", "ticker", "precio", "puntuacion", "nota", "riesgo_caida", "indice", "precio_indice"]
+COLUMNAS_IDEAS = ["fecha", "lista", "ticker", "precio", "puntuacion", "nota", "riesgo_caida", "indice", "precio_indice"]
 
 
 def _leer_csv(ruta: Path, columnas: list[str]) -> pd.DataFrame:
@@ -305,9 +309,10 @@ def _leer_csv(ruta: Path, columnas: list[str]) -> pd.DataFrame:
         return pd.DataFrame(columns=columnas)
 
 
-def archivar_ideas(ruta: Path, hoy: str, ideas: list[dict], indices) -> pd.DataFrame:
+def archivar_ideas(ruta: Path, hoy: str, ideas: list[dict], indices, lista: str = "global") -> pd.DataFrame:
     previo = _leer_csv(ruta, COLUMNAS_IDEAS)
-    nuevas = pd.DataFrame(columns=COLUMNAS_IDEAS, data=[{"fecha": hoy, "ticker": i["ticker"], "precio": i["precio"],
+    nuevas = pd.DataFrame(columns=COLUMNAS_IDEAS, data=[{"fecha": hoy, "lista": lista, "ticker": i["ticker"],
+                                                         "precio": i["precio"],
                             "puntuacion": i["puntuacion"], "nota": i.get("nota"),
                             "riesgo_caida": i.get("riesgo_caida"),
                             "indice": i["indice"],
@@ -315,7 +320,9 @@ def archivar_ideas(ruta: Path, hoy: str, ideas: list[dict], indices) -> pd.DataF
                             if i["indice"] in indices else None} for i in ideas])
     nuevas = nuevas[COLUMNAS_IDEAS]
     if not previo.empty:
-        previo = previo[previo["fecha"] != hoy]
+        if "lista" not in previo:
+            previo["lista"] = "global"
+        previo = previo[~((previo["fecha"] == hoy) & (previo["lista"] == lista))]
     total = pd.concat([d for d in (previo, nuevas) if not d.empty] or [pd.DataFrame(columns=COLUMNAS_IDEAS)],
                       ignore_index=True)
     total.to_csv(ruta, index=False)
@@ -438,24 +445,29 @@ def actualizar(carpeta: str | Path = "informe", entrenar: bool | None = None, it
         ultima = estrategia_prev.get("fecha") if estrategia_prev else None
         entrenar = (ultima is None or (date.today() - date.fromisoformat(ultima)).days >= 7
                     or date.today().weekday() == 5)
-    estrategia = paso_estrategia(acciones, indices, modelo, tarifa, entrenar, estrategia_prev, iteraciones, log)
+    # Para simular con dinero (euros), los valores en dólares se convierten con el tipo de cambio de cada día.
+    acciones_eur = costes.historicos_en_euros(acciones, {"USD": indices.get("EURUSD=X")})
+    tipos = {"USD": float(indices["EURUSD=X"]["Close"].iloc[-1])} if "EURUSD=X" in indices else {}
+    estrategia = paso_estrategia(acciones_eur, indices, modelo, tarifa, entrenar, estrategia_prev, iteraciones, log)
     params = simulador.Parametros.desde_dict(estrategia["parametros"])
 
     log("Puntuando cada valor...")
-    ranking = paso_ranking(acciones, indices, fundamentales, lista, modelo, params)
+    ranking = paso_ranking(acciones, indices, fundamentales, lista, modelo, params, tipos)
     candidatas = [r for r in ranking if r["mercado_alcista"] is not False and r["puntuacion"] >= 55]
+    ideas_es = asesor.ideas_diversificadas(candidatas, max_ideas=5, min_puntuacion=75, max_por_sector=1,
+                                           solo_nacional=True)
     ideas = asesor.ideas_diversificadas(candidatas, max_ideas=5, min_puntuacion=75, max_por_sector=1)
     mercado = paso_mercado(indices, largos)
     noticias_inf = paso_noticias(lista)
 
     log("Carteras modelo y regla de protección...")
-    cierres = estrategias.cierres_acciones(acciones)
+    cierres = estrategias.cierres_acciones(acciones_eur)
     perm = estrategias.permitido(cierres, {k: indices[k] for k in INDICES_REFERENCIA if k in indices})
     carteras = {}
     for clave, c in estrategias.CARTERAS.items():
         ev_c = estrategias.evaluar_cartera(cierres, perm, c, tarifa)
         carteras[clave] = {"nombre": c.nombre, "perfil": c.perfil, "descripcion": c.descripcion, "n": c.n,
-                           "filtro_mercado": c.filtro_mercado,
+                           "filtro_mercado": c.filtro_mercado, "universo": c.universo,
                            "composicion": estrategias.composicion_hoy(cierres, perm, c), **ev_c}
         m = ev_c["metricas"]
         log(f"  {c.nombre}: {m['cagr_pct']:.1f}%/año, peor caída {m['max_caida_pct']:.1f}% "
@@ -463,7 +475,8 @@ def actualizar(carpeta: str | Path = "informe", entrenar: bool | None = None, it
     proteccion = estrategias.proteccion_indices({t: largos.get(t) if largos.get(t) is not None and not largos[t].empty
                                                  else indices.get(t) for t in INDICES_LARGOS})
 
-    hist_ideas = archivar_ideas(carpeta / "historico_ideas.csv", hoy, ideas, indices)
+    hist_ideas = archivar_ideas(carpeta / "historico_ideas.csv", hoy, ideas_es, indices, "espana")
+    hist_ideas = archivar_ideas(carpeta / "historico_ideas.csv", hoy, ideas, indices, "global")
     hist_not = archivar_noticias(carpeta / "historico_noticias.csv", hoy, lista) if con_noticias else None
     def resumen_modelo(clave: str) -> dict:
         mo = modelo[clave]
@@ -475,8 +488,9 @@ def actualizar(carpeta: str | Path = "informe", entrenar: bool | None = None, it
     informe = {
         "version": VERSION, "fecha": hoy, "generado": datetime.now(timezone.utc).isoformat(timespec="minutes"),
         "datos_hasta": max(df.index.max() for df in acciones.values()).date().isoformat(),
-        "resumen": resumen_texto(mercado, noticias_inf, ideas, proteccion, carteras),
-        "mercado": mercado, "noticias": noticias_inf, "ideas": [i["ticker"] for i in ideas],
+        "resumen": resumen_texto(mercado, noticias_inf, ideas_es, proteccion, carteras),
+        "mercado": mercado, "noticias": noticias_inf, "ideas_es": [i["ticker"] for i in ideas_es],
+        "ideas": [i["ticker"] for i in ideas], "tipos_cambio": tipos,
         "ranking": ranking,
         "modelo": resumen_modelo("sube_1m"), "modelo_riesgo": resumen_modelo("caida_1m"),
         "carteras": carteras, "proteccion": proteccion,

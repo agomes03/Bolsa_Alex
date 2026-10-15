@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from . import modelo_ml, simulador
-from .costes import Tarifa, itf_pct
+from .costes import Tarifa, acciones_asequibles, itf_pct
 from .tickers import ETFS, indice_de_referencia
 
 
@@ -70,7 +70,7 @@ def simular_rotacion(cierres: pd.DataFrame, senal: pd.DataFrame, n: int, tarifa:
                 deseadas = math.floor(objetivo_euros / p[j]) if j in top else 0
                 if deseadas < acc[j] and (j not in top or (acc[j] - deseadas) * p[j] > tolerancia * objetivo_euros):
                     importe = (acc[j] - deseadas) * p[j]
-                    coste = tarifa.coste(importe)
+                    coste = tarifa.coste(importe, tickers[j])
                     efectivo += importe - coste
                     gastos += coste
                     ops += 1
@@ -82,13 +82,13 @@ def simular_rotacion(cierres: pd.DataFrame, senal: pd.DataFrame, n: int, tarifa:
                 if faltan <= 0 or faltan * p[j] < tolerancia * objetivo_euros:
                     continue
                 importe = faltan * p[j]
-                coste = tarifa.coste(importe) + importe * itf[j]
+                coste = tarifa.coste(importe, tickers[j]) + importe * itf[j]
                 if importe + coste > efectivo:
-                    faltan = math.floor((efectivo - tarifa.minimo - tarifa.canon_fijo) / (p[j] * (1 + itf[j] + tarifa.pct / 100)))
+                    faltan = acciones_asequibles(efectivo, p[j], tickers[j], tarifa, itf[j] * 100)
                     if faltan <= 0:
                         continue
                     importe = faltan * p[j]
-                    coste = tarifa.coste(importe) + importe * itf[j]
+                    coste = tarifa.coste(importe, tickers[j]) + importe * itf[j]
                 efectivo -= importe + coste
                 gastos += coste
                 ops += 1
@@ -172,34 +172,38 @@ def ejecutar(acciones: dict[str, pd.DataFrame], indices: dict[str, pd.DataFrame]
             f"tramo más bajo {m['tramo_bajo']:.2f} → más alto {m['tramo_alto']:.2f} | "
             f"20% mejor {m['mejores_mes'] * 100:+.2f}% vs 20% peor {m['peores_mes'] * 100:+.2f}%")
 
-    log("2) Carteras mensuales por ranking (solo acciones, comisiones incluidas)")
+    log("2) Carteras mensuales por ranking (en euros, comisiones reales de Bankinter)")
     hist = {t: df for t, df in acciones.items() if t not in ETFS}
-    cierres = pd.DataFrame({t: df["Close"] for t, df in hist.items()}).sort_index().ffill(limit=5)
-    senales = senales_basicas(cierres)
-    for nombre, clave in (("Modelo: lo hará mejor (3 meses)", "supera_3m"), ("Modelo: subirá (1 mes)", "sube_1m"),
-                          ("Modelo: menor riesgo de caída", "caida_3m")):
-        sig = oos[clave].reindex(index=cierres.index, columns=cierres.columns)
-        senales[nombre] = -sig if clave.startswith("caida") else sig
-    r_mom = senales["Momentum 12-1"].rank(axis=1, pct=True)
-    senales["Momentum + menor riesgo (modelo)"] = r_mom + (-oos["caida_3m"]).reindex(
-        index=cierres.index, columns=cierres.columns).rank(axis=1, pct=True)
-    senales["Todas a partes iguales"] = pd.DataFrame(1.0, index=cierres.index, columns=cierres.columns)
-    permitido = permitido_por_indice(cierres, refs)
+    cierres_g = pd.DataFrame({t: df["Close"] for t, df in hist.items()}).sort_index().ffill(limit=5)
+    permitido = permitido_por_indice(cierres_g, refs)
     inicio_oos = min(v.index.min() for v in oos.values())
-    for nombre, sig in senales.items():
-        n_opciones = [len(cierres.columns)] if nombre == "Todas a partes iguales" else [5, 10, 20]
-        for n in n_opciones:
-            for filtro in (False, True):
-                if nombre == "Todas a partes iguales" and filtro:
-                    continue
-                # La referencia se simula con mucho capital para que las comisiones mínimas no la penalicen.
-                cap = 1_000_000.0 if nombre == "Todas a partes iguales" else 10_000.0 if n <= 10 else 20_000.0
-                _, met = simular_rotacion(cierres, sig, n, tarifa, cap, permitido if filtro else None,
-                                          inicio=inicio_oos)
-                fila = {"senal": nombre, "n": n, "filtro_mercado": filtro, "capital": cap, **met}
-                resultado["rotacion"].append(fila)
-                log(f"   {nombre[:34]:34} n={n:3} filtro={'sí' if filtro else 'no'} | {met['cagr_pct']:6.1f}%/año "
-                    f"caída {met['max_caida_pct']:6.1f}% sharpe {met['sharpe']:.2f} gastos {met['gastos']:7.0f}")
+    for universo in ("espana", "global"):
+        cierres = cierres_g if universo == "global" else cierres_g[[t for t in cierres_g.columns if t.endswith(".MC")]]
+        senales = senales_basicas(cierres)
+        if universo == "global":
+            for nombre, clave in (("Modelo: lo hará mejor (3 meses)", "supera_3m"), ("Modelo: subirá (1 mes)", "sube_1m"),
+                                  ("Modelo: menor riesgo de caída", "caida_3m")):
+                sig = oos[clave].reindex(index=cierres.index, columns=cierres.columns)
+                senales[nombre] = -sig if clave.startswith("caida") else sig
+        senales["Todas a partes iguales"] = pd.DataFrame(1.0, index=cierres.index, columns=cierres.columns)
+        for nombre, sig in senales.items():
+            todas = nombre == "Todas a partes iguales"
+            n_opciones = [len(cierres.columns)] if todas else ([5, 8, 12] if universo == "espana" else [5, 10, 20])
+            for n in n_opciones:
+                for filtro in (False, True):
+                    if todas and filtro:
+                        continue
+                    # Capital realista para cada universo; la referencia, con mucho capital (como un fondo).
+                    cap = 1_000_000.0 if todas else (10_000.0 if universo == "espana" else n * 5_000.0)
+                    _, met = simular_rotacion(cierres, sig, n, tarifa, cap, permitido if filtro else None,
+                                              inicio=inicio_oos)
+                    met.pop("cartera_final", None)
+                    fila = {"universo": universo, "senal": nombre, "n": n, "filtro_mercado": filtro, "capital": cap,
+                            **met}
+                    resultado["rotacion"].append(fila)
+                    log(f"   [{universo:6}] {nombre[:30]:30} n={n:3} filtro={'sí' if filtro else 'no'} | "
+                        f"{met['cagr_pct']:6.1f}%/año caída {met['max_caida_pct']:6.1f}% sharpe {met['sharpe']:.2f} "
+                        f"gastos {met['gastos'] * 10_000 / cap:7.0f} (por cada 10.000 €)")
 
     log("3) Índices: comprar y mantener frente a filtro de tendencia (historia completa)")
     for t, df in largos.items():

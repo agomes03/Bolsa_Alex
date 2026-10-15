@@ -10,7 +10,7 @@ from bolsa.indicadores import calcular_todo
 from bolsa.simulador import Parametros, Universo
 from test_bolsa import serie
 
-TARIFA = Tarifa(pct=0.2, minimo=6, canon_fijo=1)
+TARIFA = Tarifa(canon_nacional=1.0)
 
 
 # ----------------------------------------------------------------- puntuación coherente con la app
@@ -109,12 +109,23 @@ def test_parametros_roundtrip():
 def test_cartera_virtual_compra_venta():
     c = cartera.nueva(1_000.0)
     assert cartera.comprar(c, "SAN.MC", 100, 5.0, TARIFA) is None
-    assert c["efectivo"] == pytest.approx(1_000 - 500 - 7 - 1)  # comisión 7 + ITF 1
+    assert c["efectivo"] == pytest.approx(1_000 - 500 - (3.95 + 1) - 1)  # comisión + cánones + tasa Tobin
     assert "No tienes suficiente" in cartera.comprar(c, "SAN.MC", 1000, 5.0, TARIFA)
     assert cartera.vender(c, "SAN.MC", 100, 6.0, TARIFA) is None
     venta = c["historial"][-1]
-    assert venta["resultado"] == pytest.approx(600 - 7 - 500 - 8)
+    assert venta["resultado"] == pytest.approx(600 - 4.95 - 500 - 5.95)
     assert not c["posiciones"]
+
+
+def test_cartera_en_dolares():
+    c = cartera.nueva(10_000.0)
+    # 10 acciones a 110 $ con 1 $ = 0,909 € → 1.000 € + 20 € comisión + 10 € de cambio
+    assert cartera.comprar(c, "AAPL", 10, 110.0, TARIFA, fx=1 / 1.1) is None
+    assert c["efectivo"] == pytest.approx(10_000 - 1_000 - 30)
+    tabla, res = cartera.valorar(c, {"AAPL": 121.0}, {"AAPL": 1 / 1.1})
+    assert tabla.iloc[0]["valor"] == pytest.approx(1_100)
+    cartera.vender(c, "AAPL", 10, 121.0, TARIFA, fx=1 / 1.1)
+    assert c["historial"][-1]["resultado"] == pytest.approx(1_100 - 31 - 1_000 - 30)
 
 
 def test_cartera_ejecuta_stop():
@@ -133,7 +144,7 @@ def test_cartera_real_sin_efectivo():
     assert cartera.comprar(c, "ITX.MC", 10, 50.0, TARIFA) is None
     tabla, res = cartera.valorar(c, {"ITX.MC": 55.0})
     assert res["efectivo"] is None
-    assert tabla.iloc[0]["resultado"] == pytest.approx(10 * 55 - 10 * 50 - (7 + 1))
+    assert tabla.iloc[0]["resultado"] == pytest.approx(10 * 55 - 10 * 50 - (3.95 + 1 + 1))
 
 
 # ----------------------------------------------------------------- Bankinter
@@ -162,9 +173,15 @@ def test_importar_posiciones_con_cabecera_desplazada():
 
 def test_ticket_bankinter():
     texto = bankinter.ticket("SAN.MC", "Compra", 100, 8.45, stop=7.9, objetivo=9.6)
-    for parte in ("Banco Santander", "Mercado Continuo", "Limitada", "8,45 €", "100", "STOP", "7,90"):
+    for parte in ("Banco Santander", "Mercado Continuo", "Limitada", "8,45 €", "100", "stop relacionadas",
+                  "activación ≤ 7,90 €", "límite 7,74 €", "cancela la otra"):
         assert parte in texto
-    assert "Stop (de pérdidas)" in bankinter.ticket("SAN.MC", "Venta stop", 100, 7.9)
+    stop = bankinter.ticket_stop("AAPL", 5, 100.0)
+    assert "Tipo de orden ......... Stop" in stop and "menor o igual que 100,00 $" in stop and "98,00 $" in stop
+    assert "no se pueden modificar" in stop
+    assert "Xetra" in bankinter.ticket_compra("SAP.DE", 3, 200.0)
+    con_costes = bankinter.ticket_compra("MRK", 5, 100.0, tarifa=Tarifa(), importe_eur=500)
+    assert "comisión 20,00 €" in con_costes and "cambio de divisa 5,00 €" in con_costes
 
 
 def test_consejos():

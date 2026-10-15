@@ -3,7 +3,8 @@
 Sigue los principios en los que coinciden casi todos los expertos para el inversor particular:
 1. Primero un colchón de emergencia fuera de la bolsa.
 2. Lo que necesites en menos de 2-3 años, fuera de la bolsa.
-3. El núcleo, en fondos indexados/ETF globales y baratos (diversificación máxima).
+3. El núcleo, en fondos indexados globales y baratos (diversificación máxima). En España, mejor fondos
+   que ETF para aportar cada mes: no pagan comisión por aportación y se pueden traspasar sin impuestos.
 4. Una parte pequeña en acciones individuales, bien diversificadas y con stop-loss.
 5. Si el mercado está débil, entrar poco a poco en lugar de todo de golpe.
 
@@ -22,37 +23,45 @@ REACCIONES = {
 EXPERIENCIA = {"Ninguna": 0, "Básica (sé lo que es una acción y un fondo)": 1, "He invertido antes": 2}
 
 REPARTOS = {
-    "Conservador": {"Monetario / Letras del Tesoro": 35, "Bonos a corto plazo": 25, "ETF mundial": 35,
+    "Conservador": {"Monetario / Letras del Tesoro": 35, "Renta fija a corto plazo": 25, "Fondo indexado mundial": 35,
                     "Acciones individuales": 5},
-    "Moderado": {"Monetario / Letras del Tesoro": 10, "Bonos a corto plazo": 15, "ETF mundial": 60,
+    "Moderado": {"Monetario / Letras del Tesoro": 10, "Renta fija a corto plazo": 15, "Fondo indexado mundial": 60,
                  "Acciones individuales": 15},
-    "Dinámico": {"Monetario / Letras del Tesoro": 5, "Bonos a corto plazo": 0, "ETF mundial": 70,
+    "Dinámico": {"Monetario / Letras del Tesoro": 5, "Renta fija a corto plazo": 0, "Fondo indexado mundial": 70,
                  "Acciones individuales": 25},
 }
 
+# `ticker` solo se usa como referencia para simular escenarios con su historia real (no es una recomendación
+# de producto concreto).
 PRODUCTOS = {
     "Monetario / Letras del Tesoro": {
         "ticker": "XEON.DE",
-        "que": "Letras del Tesoro (se compran en tesoro.es o en Bankinter), una cuenta remunerada o un "
-               "fondo/ETF monetario. Prácticamente sin riesgo; rentan aproximadamente lo que marcan los tipos del BCE.",
+        "que": "Letras del Tesoro (en tesoro.es o en Bankinter), un fondo monetario o una cuenta remunerada. "
+               "Prácticamente sin riesgo; rentan más o menos lo que marcan los tipos del BCE.",
     },
-    "Bonos a corto plazo": {
+    "Renta fija a corto plazo": {
         "ticker": "IBGS.AS",
-        "que": "Un ETF o fondo de deuda pública europea a 1-3 años. Se mueve poco y amortigua las caídas de la bolsa.",
+        "que": "Un fondo de deuda pública europea a corto plazo (1-3 años). Se mueve poco y amortigua las caídas "
+               "de la bolsa.",
     },
-    "ETF mundial": {
+    "Fondo indexado mundial": {
         "ticker": "IWDA.AS",
-        "que": "Un ETF que replica la bolsa mundial (MSCI World o FTSE All-World): miles de empresas de todo el "
-               "mundo en una sola compra, con comisiones mínimas. Es el núcleo de la inversión a largo plazo.",
+        "que": "Un fondo indexado al MSCI World o al FTSE All-World (miles de empresas de todo el mundo) con "
+               "comisión anual baja (menos del 0,3 %). Búscalo en el buscador de fondos de Bankinter. Para aportar "
+               "cada mes es mejor un fondo que un ETF: en Bankinter cada compra de un ETF extranjero cuesta 20 €, "
+               "y entre fondos puedes hacer traspasos sin pagar impuestos.",
     },
     "Acciones individuales": {
         "ticker": None,
-        "que": "Empresas concretas elegidas con las 'Ideas del día' de la app: puntuación alta, sectores distintos, "
-               "siempre con stop-loss. Es la parte para aprender y buscar algo extra.",
+        "que": "Empresas concretas de la cartera modelo que encaja con tu perfil. Por defecto, españolas: en "
+               "Bankinter cuestan de 0 a 8 € por operación, frente a 20 € más un 1 % de cambio de divisa y "
+               "custodia (mínimo 24 € al año por valor) en las extranjeras.",
     },
 }
 
-MINIMO_POR_ACCION = 600.0  # por debajo, las comisiones mínimas se comen demasiado
+MINIMO_POR_ACCION = 1_000.0       # España: comprar + vender cuesta ~1,2 % con 1.000 € (tarifa estándar)
+MINIMO_POR_ACCION_CERO = 500.0    # con Bróker Cero solo se pagan los cánones de bolsa
+MINIMO_INTERNACIONAL = 5_000.0    # extranjeras: 20 € por operación + custodia mínima de 24 €/año
 
 
 @dataclass
@@ -112,7 +121,7 @@ def ritmo_de_entrada(fase: str | None) -> str:
 
 
 def ideas_diversificadas(ranking: list[dict], max_ideas: int = 5, min_puntuacion: int = 65,
-                         max_por_sector: int = 1) -> list[dict]:
+                         max_por_sector: int = 1, solo_nacional: bool = False) -> list[dict]:
     """Elige las mejores acciones sin repetir sector y descartando las que presentan resultados ya."""
     elegidas, por_sector = [], {}
 
@@ -120,7 +129,8 @@ def ideas_diversificadas(ranking: list[dict], max_ideas: int = 5, min_puntuacion
         return r["nota"] if r.get("nota") is not None else r.get("puntuacion", 0)
 
     candidatas = [r for r in ranking if not r.get("etf") and nota(r) >= min_puntuacion
-                  and not r.get("resultados_pronto") and r.get("riesgo_nivel") != "alto"]
+                  and not r.get("resultados_pronto") and r.get("riesgo_nivel") != "alto"
+                  and (not solo_nacional or str(r.get("ticker", "")).endswith(".MC"))]
     candidatas.sort(key=nota, reverse=True)
     for r in candidatas:
         s = r.get("sector", "—")
@@ -133,19 +143,54 @@ def ideas_diversificadas(ranking: list[dict], max_ideas: int = 5, min_puntuacion
     return elegidas
 
 
-def plan_inversion(importe: float, mensual: float, perfil: Perfil, ideas: list[dict]) -> dict:
+def veredicto(f: dict) -> tuple[str, str, str]:
+    """Veredicto ÚNICO de la app para una acción: (etiqueta, color, explicación en lenguaje llano)."""
+    tecnica = f.get("puntuacion", 50)
+    nota = f.get("nota")
+    if f.get("mercado_alcista") is False:
+        return ("Esperar", "orange", "Su mercado está en tendencia bajista: en esas fases incluso las buenas empresas "
+                "suelen caer. Mejor esperar a que se recupere.")
+    if tecnica < 40:
+        return ("Evitar por ahora", "red", "Su propia tendencia es bajista: comprar ahora es intentar coger un "
+                "cuchillo que cae.")
+    if f.get("riesgo_nivel") == "alto":
+        return ("Arriesgada ahora", "orange", "El modelo ve un riesgo alto de que caiga más de un 10 % el próximo mes. "
+                "Si la compras, que sea con poco dinero y con stop-loss.")
+    if nota is not None:
+        if nota >= 75 and tecnica >= 55:
+            texto = ("Está entre las mejores de hoy y su tendencia acompaña. Si encaja en tu plan, puedes comprarla "
+                     "con una orden limitada y protegerla con un stop-loss.")
+            if f.get("resultados_pronto"):
+                texto += " Presenta resultados en pocos días: muchos prefieren esperar a verlos."
+            return ("Candidata a comprar", "green", texto)
+        if nota >= 40:
+            return ("Neutral", "gray", "Ni de las mejores ni de las peores ahora mismo. Si ya la tienes, mantenla con "
+                    "su stop-loss; si no, hay opciones mejores.")
+        return ("Floja", "orange", "Está en la parte baja del ranking: ahora mismo hay opciones mejores.")
+    if tecnica >= 70:
+        return ("Tendencia favorable", "green", "Su tendencia y su impulso son buenos. No está en el informe diario, "
+                "así que no se ha comparado con las demás empresas.")
+    if tecnica >= 55:
+        return ("Neutral", "gray", "Señales mezcladas, ligeramente positivas.")
+    return ("Esperar", "orange", "Señales mezcladas: no hay prisa por comprar.")
+
+
+def plan_inversion(importe: float, mensual: float, perfil: Perfil, ideas: list[dict],
+                   minimo_por_accion: float = MINIMO_POR_ACCION) -> dict:
     """Reparto concreto en euros del importe inicial y de la aportación mensual."""
     reparto = dict(REPARTOS[perfil.nombre]) if perfil.invertir_en_bolsa else \
-        {"Monetario / Letras del Tesoro": 100, "Bonos a corto plazo": 0, "ETF mundial": 0, "Acciones individuales": 0}
+        {"Monetario / Letras del Tesoro": 100, "Renta fija a corto plazo": 0, "Fondo indexado mundial": 0,
+         "Acciones individuales": 0}
     euros_acciones = importe * reparto["Acciones individuales"] / 100
-    n_ideas = min(len(ideas), int(euros_acciones // MINIMO_POR_ACCION))
+    n_ideas = min(len(ideas), int(euros_acciones // minimo_por_accion))
     avisos = []
     if reparto["Acciones individuales"] and n_ideas == 0:
-        # No compensa comprar acciones sueltas con tan poco: esa parte va al ETF.
-        reparto["ETF mundial"] += reparto["Acciones individuales"]
+        # No compensa comprar acciones sueltas con tan poco: esa parte va al fondo indexado.
+        reparto["Fondo indexado mundial"] += reparto["Acciones individuales"]
         reparto["Acciones individuales"] = 0
-        avisos.append(f"Con menos de {MINIMO_POR_ACCION:.0f} € por empresa las comisiones mínimas pesan demasiado: "
-                      "de momento esa parte va al ETF mundial.")
+        avisos.append(f"Para que las comisiones no se coman la ganancia, conviene invertir al menos "
+                      f"{minimo_por_accion:,.0f} € por empresa".replace(",", ".")
+                      + ". De momento, esa parte va al fondo indexado.")
     lineas = []
     for parte, pct in reparto.items():
         if pct <= 0:
@@ -157,10 +202,10 @@ def plan_inversion(importe: float, mensual: float, perfil: Perfil, ideas: list[d
         cada = importe * reparto["Acciones individuales"] / 100 / n_ideas
         for r in ideas[:n_ideas]:
             acciones.append({**r, "euros": cada})
-    # Aportación mensual: casi todo al ETF (una sola comisión), el resto al monetario.
-    mensual_etf = mensual * (reparto["ETF mundial"] + reparto["Acciones individuales"]) / 100
-    return {"lineas": lineas, "acciones": acciones, "mensual_etf": mensual_etf,
-            "mensual_seguro": mensual - mensual_etf, "avisos": avisos, "reparto": reparto}
+    # Aportación mensual: al fondo indexado (sin comisión por aportación) y el resto a la parte segura.
+    mensual_fondo = mensual * (reparto["Fondo indexado mundial"] + reparto["Acciones individuales"]) / 100
+    return {"lineas": lineas, "acciones": acciones, "mensual_fondo": mensual_fondo,
+            "mensual_seguro": mensual - mensual_fondo, "avisos": avisos, "reparto": reparto}
 
 
 def pesos_para_escenarios(plan: dict) -> dict[str, float]:

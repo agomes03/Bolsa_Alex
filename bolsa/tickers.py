@@ -173,7 +173,6 @@ ETFS = {
     "VWCE.DE": ("Vanguard FTSE All-World (acumulación, en €)", "ETF Mundial", []),
     "IWDA.AS": ("iShares Core MSCI World (acumulación, en €)", "ETF Mundial", []),
     "SXR8.DE": ("iShares Core S&P 500 (acumulación, en €)", "ETF EEUU", []),
-    "CSPX.L": ("iShares Core S&P 500 (acumulación, en $)", "ETF EEUU", []),
     "EXSA.DE": ("iShares STOXX Europe 600 (en €)", "ETF Europa", []),
     "BBVAI.MC": ("BBVA Accion IBEX 35 ETF", "ETF España", []),
     "IBGS.AS": ("iShares Euro Government Bond 1-3 años", "Renta fija", []),

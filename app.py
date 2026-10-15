@@ -41,13 +41,15 @@ with st.sidebar:
     riesgo = st.slider("Máximo que aceptas perder por operación (% de tu dinero)", 0.5, 5.0, 1.0, 0.5,
                        help="Regla de oro de los profesionales: no arriesgar más de un 1-2% del capital "
                             "en una sola operación. Así, aunque falles varias veces seguidas, sigues en el juego.")
-    with st.expander("Comisiones Bankinter (ajústalas)"):
-        st.caption("Valores orientativos. Consulta tu tarifa real en la app: Broker → Tarifas.")
-        tarifa = costes.Tarifa(
-            pct=st.number_input("Comisión (%)", 0.0, 2.0, 0.20, 0.01),
-            minimo=st.number_input("Comisión mínima (€)", 0.0, 50.0, 6.0, 0.5),
-            canon_fijo=st.number_input("Cánones fijos (€)", 0.0, 20.0, 1.0, 0.5),
-        )
+    with st.expander("Tus comisiones en Bankinter"):
+        broker_cero = st.toggle("Tengo el servicio Bróker Cero", value=False,
+                                help="Con Bróker Cero, comprar y vender acciones españolas por Internet cuesta 0 € "
+                                     "(solo pagas los cánones de la bolsa).")
+        canon = st.number_input("Cánones de bolsa en España por operación (€, aprox.)", 0.0, 10.0, 1.0, 0.5)
+        tarifa = costes.Tarifa(broker_cero=broker_cero, canon_nacional=canon)
+        st.caption("Tarifa pública de Bankinter (oct. 2026): acciones españolas 3,95 € hasta 2.000 € y 8 € hasta "
+                   "60.000 € por operación; extranjeras 20 € por operación, +1 % si se cambia de divisa, y una "
+                   "custodia mínima de 24 € al año por valor. Compruébala en Bankinter → Bróker → Tarifas.")
     st.divider()
     st.caption(f"Cotizaciones de Yahoo Finance (retraso ~15 min). Noticias de {len(noticias.FUENTES_RSS)} "
                "fuentes RSS en español e inglés. Se actualizan solas cada 5-10 minutos.")
@@ -463,23 +465,6 @@ def pagina_analizar():
     else:
         st.caption("No se han encontrado noticias recientes.")
 
-    with st.expander("🧪 ¿Funciona seguir la tendencia? Prueba con el pasado (10 años)"):
-        bt = senales.backtest_media200(df, tarifa.pct)
-        if bt:
-            curvas = pd.DataFrame({"Comprar y mantener": bt["curva_mantener"],
-                                   "Solo por encima de la media 200": bt["curva_estrategia"]})
-            st.line_chart(curvas, height=ALTO_GRAFICO - 150)
-            c = st.columns(2)
-            c[0].metric("Comprar y mantener", pct(bt["rent_mantener"], 0), f"peor caída {bt['caida_mantener']:.0f}%",
-                        delta_color="off")
-            c[1].metric("Regla de la media 200", pct(bt["rent_estrategia"], 0),
-                        f"peor caída {bt['caida_estrategia']:.0f}% · {bt['operaciones']} operaciones", delta_color="off")
-            st.caption("Normalmente la regla de la media de 200 no gana más que 'comprar y mantener', "
-                       "pero **evita gran parte de las caídas fuertes**, que es lo que hace que los principiantes "
-                       "vendan en el peor momento. Rentabilidades pasadas no garantizan las futuras.")
-        else:
-            st.caption("No hay historial suficiente.")
-
 
 def pagina_radar():
     if pagina_radar_global():
@@ -547,16 +532,32 @@ def pagina_calculadoras():
     st.title("🧮 Calculadoras")
     t1, t2, t3 = st.tabs(["💶 Coste", "🏛️ Impuestos", "🌱 Cada mes"])
     with t1:
+        st.caption("Cuánto te cuesta en Bankinter comprar, mantener un año y vender, según dónde cotice el valor.")
         importe = st.number_input("Importe que vas a invertir (€)", 50.0, 1_000_000.0, 1000.0, 50.0)
-        espanola = st.checkbox("Es una acción española del IBEX (paga el Impuesto de Transacciones Financieras)", True)
-        cc = costes.coste_compra(importe, "X.MC" if espanola else "X", tarifa)
+        tipos_valor = {"Acción española (IBEX, Mercado Continuo)": "SAN.MC",
+                       "Acción europea en euros (Alemania, Países Bajos...)": "SAP.DE",
+                       "Acción francesa (paga tasa Tobin del 0,4 %)": "MC.PA",
+                       "Acción de EEUU (en dólares)": "AAPL"}
+        tipo = st.radio("¿Qué vas a comprar?", list(tipos_valor))
+        ref = tipos_valor[tipo]
+        cc = costes.coste_compra(importe, ref, tarifa)
+        iv = costes.coste_ida_y_vuelta(importe, ref, tarifa)
         c = st.columns(1 if movil else 3)
-        c[0].metric("Comisión broker + cánones", eur(cc["comision"]))
-        c[1 % len(c)].metric("Impuesto Transacciones (0,2%)", eur(cc["itf"]))
-        c[2 % len(c)].metric("Total", eur(cc["total"]), f"{cc['pct']:.2f}% del importe", delta_color="off")
-        st.caption(f"Al vender pagarás de nuevo la comisión (≈{eur(tarifa.coste(importe))}). "
-                   f"Para cubrir compra y venta la acción tiene que subir al menos un "
-                   f"{(cc['total'] + tarifa.coste(importe)) / importe * 100:.2f}% antes de que ganes algo.")
+        c[0].metric("Al comprar", eur(cc["total"]), f"{cc['pct']:.2f} %".replace(".", ","), delta_color="off")
+        c[1 % len(c)].metric("Al vender", eur(iv["venta"]))
+        c[2 % len(c)].metric("Custodia (1 año)", eur(iv["custodia"]))
+        detalle = [f"comisión {eur(cc['comision'])}"]
+        if cc["cambio"]:
+            detalle.append(f"cambio de divisa {eur(cc['cambio'])}")
+        if cc["itf"]:
+            detalle.append(f"tasa Tobin {eur(cc['itf'])}")
+        st.caption("Compra: " + " + ".join(detalle) + ".")
+        pct_total = f"{iv['pct']:.2f}".replace(".", ",")
+        st.markdown(f"**En total, comprar, mantener un año y vender cuesta {eur(iv['total'])} ({pct_total} %)**: "
+                    "la inversión tiene que subir al menos eso para que empieces a ganar.")
+        if iv["pct"] > 2:
+            st.warning("Es un coste alto para este importe. Con poco dinero, las acciones españolas o un fondo "
+                       "indexado (sin comisión por aportación) salen mucho más baratos.")
     with t2:
         compra = st.number_input("Precio total de compra (€)", 0.0, 10_000_000.0, 1000.0, 50.0)
         venta = st.number_input("Precio total de venta (€)", 0.0, 10_000_000.0, 1300.0, 50.0)

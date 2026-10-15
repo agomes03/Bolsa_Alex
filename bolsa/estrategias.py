@@ -37,27 +37,51 @@ class CarteraModelo:
     filtro_mercado: bool
     perfil: str
     descripcion: str
+    universo: str = "espana"      # "espana" (acciones españolas) o "global"
+    capital: float = 10_000.0     # capital con el que se simula (realista para sus comisiones)
 
+
+_DESC = {
+    "momentum": "Cada mes, las {n} acciones que más han subido en el último año (sin contar el último mes). ",
+    "baja_vol": "Cada mes, las {n} acciones más estables (las que menos se mueven). ",
+}
 
 CARTERAS = {
-    "dinamica": CarteraModelo("dinamica", "Cartera dinámica (momentum 10)", "momentum", 10, False, "Dinámico",
-                              "Cada mes, las 10 acciones que más han subido en el último año (sin contar el último "
-                              "mes). Es la que más ha ganado en las pruebas, pero también la que más ha caído: "
-                              "llegó a perder más de un tercio en algún momento."),
-    "equilibrada": CarteraModelo("equilibrada", "Cartera equilibrada (momentum 20 + filtro)", "momentum", 20, True,
-                                 "Moderado", "Cada mes, las 20 acciones con más momentum, pero solo de mercados en "
-                                 "tendencia alcista; si el mercado se tuerce, esa parte queda en liquidez. Busca "
-                                 "un punto medio entre rentabilidad y sustos."),
-    "tranquila": CarteraModelo("tranquila", "Cartera tranquila (baja volatilidad 20 + filtro)", "baja_vol", 20, True,
-                               "Conservador", "Cada mes, las 20 acciones más estables (las que menos se mueven), solo "
-                               "de mercados en tendencia alcista. En años muy alcistas gana menos que la media, pero "
-                               "sus caídas han sido mucho más pequeñas."),
+    "es_dinamica": CarteraModelo(
+        "es_dinamica", "Dinámica España", "momentum", 8, False, "Dinámico",
+        _DESC["momentum"].format(n=8) + "La que más puede ganar y también la que más puede caer."),
+    "es_equilibrada": CarteraModelo(
+        "es_equilibrada", "Equilibrada España", "momentum", 8, True, "Moderado",
+        _DESC["momentum"].format(n=8) + "Si el IBEX está en tendencia bajista, esa parte queda en liquidez. "
+        "Un punto medio entre ganancia y sustos."),
+    "es_tranquila": CarteraModelo(
+        "es_tranquila", "Tranquila España", "baja_vol", 8, True, "Conservador",
+        _DESC["baja_vol"].format(n=8) + "Solo si el IBEX va al alza. En años muy alcistas gana menos que la media, "
+        "pero sus caídas han sido más pequeñas."),
+    "dinamica": CarteraModelo(
+        "dinamica", "Dinámica internacional", "momentum", 10, False, "Dinámico",
+        _DESC["momentum"].format(n=10) + "Con acciones de España, Europa y EEUU. Solo tiene sentido con mucho "
+        "dinero (≈5.000 € por empresa) por las comisiones internacionales.", "global", 50_000.0),
+    "equilibrada": CarteraModelo(
+        "equilibrada", "Equilibrada internacional", "momentum", 20, True, "Moderado",
+        _DESC["momentum"].format(n=20) + "Solo de mercados en tendencia alcista. Para importes grandes.",
+        "global", 100_000.0),
+    "tranquila": CarteraModelo(
+        "tranquila", "Tranquila internacional", "baja_vol", 20, True, "Conservador",
+        _DESC["baja_vol"].format(n=20) + "Solo de mercados en tendencia alcista. Para importes grandes.",
+        "global", 100_000.0),
 }
-CARTERA_POR_PERFIL = {c.perfil: c for c in CARTERAS.values()}
+CARTERA_POR_PERFIL = {c.perfil: c for c in CARTERAS.values() if c.universo == "espana"}
 
 
-def cierres_acciones(acciones: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    return pd.DataFrame({t: df["Close"] for t, df in acciones.items() if t not in ETFS}).sort_index().ffill(limit=5)
+def cierres_acciones(acciones: dict[str, pd.DataFrame], universo: str = "global") -> pd.DataFrame:
+    """Cierres (en euros si `acciones` ya viene convertido) de las acciones del universo, sin ETF."""
+    return pd.DataFrame({t: df["Close"] for t, df in acciones.items()
+                         if t not in ETFS and (universo == "global" or t.endswith(".MC"))}).sort_index().ffill(limit=5)
+
+
+def cierres_de(cierres: pd.DataFrame, c: CarteraModelo) -> pd.DataFrame:
+    return cierres if c.universo == "global" else cierres[[t for t in cierres.columns if t.endswith(".MC")]]
 
 
 def senal(cierres: pd.DataFrame, tipo: str) -> pd.DataFrame:
@@ -66,17 +90,21 @@ def senal(cierres: pd.DataFrame, tipo: str) -> pd.DataFrame:
 
 
 def composicion_hoy(cierres: pd.DataFrame, permitido: pd.DataFrame, c: CarteraModelo) -> list[dict]:
+    """Acciones que tocan este mes. 'precio_eur' es el último cierre en euros."""
+    cierres = cierres_de(cierres, c)
     sig = senal(cierres, c.senal).iloc[-1]
     ok = sig.notna() & cierres.iloc[-1].notna()
     if c.filtro_mercado:
         ok &= permitido.iloc[-1].reindex(sig.index).fillna(False).astype(bool)
     elegidas = sig[ok].sort_values(ascending=False).head(c.n)
-    return [{"ticker": t, "senal": float(v), "precio": float(cierres[t].iloc[-1])} for t, v in elegidas.items()]
+    return [{"ticker": t, "senal": float(v), "precio_eur": float(cierres[t].iloc[-1])} for t, v in elegidas.items()]
 
 
 def evaluar_cartera(cierres: pd.DataFrame, permitido: pd.DataFrame, c: CarteraModelo, tarifa: Tarifa,
                     desde: str = "2017-06-01") -> dict:
-    capital = 10_000.0 if c.n <= 10 else 20_000.0
+    """Simula la cartera desde `desde` con comisiones reales de Bankinter, en euros."""
+    cierres = cierres_de(cierres, c)
+    capital = c.capital
     sig = senal(cierres, c.senal)
     curva, met = experimentos.simular_rotacion(cierres, sig, c.n, tarifa, capital,
                                                permitido if c.filtro_mercado else None, inicio=pd.Timestamp(desde))

@@ -91,13 +91,71 @@ def test_noticia_antigua_pesa_menos():
     assert _n("La Fed baja los tipos", horas=1).impacto > _n("La Fed baja los tipos", horas=100).impacto
 
 
-def test_costes():
-    t = costes.Tarifa(pct=0.2, minimo=6, canon_fijo=1)
-    assert t.coste(1000) == pytest.approx(7)
-    assert t.coste(10000) == pytest.approx(21)
+def test_tarifa_bankinter_nacional():
+    t = costes.Tarifa(canon_nacional=1.0)
+    assert t.comision(1_500, "SAN.MC") == pytest.approx(3.95 + 1)
+    assert t.comision(2_000, "SAN.MC") == pytest.approx(3.95 + 1)
+    assert t.comision(10_000, "SAN.MC") == pytest.approx(8 + 1)
+    assert t.comision(100_000, "SAN.MC") == pytest.approx(70 + 1)
+    assert t.comision(1_000_000, "SAN.MC") == pytest.approx(200 + 1)  # tope de 200 €
+    assert costes.Tarifa(broker_cero=True).comision(10_000, "SAN.MC") == pytest.approx(1.0)  # solo cánones
+
+
+def test_tarifa_bankinter_internacional():
+    t = costes.Tarifa()
+    assert t.comision(1_000, "SAP.DE") == pytest.approx(20)
+    assert t.cambio_divisa(1_000, "SAP.DE") == 0          # euros: sin cambio de divisa
+    assert t.coste(1_000, "AAPL") == pytest.approx(20 + 10)  # 20 € + 1 % de cambio
+    assert t.comision(50_000, "AAPL") == pytest.approx(100)  # 0,20 % por encima de 40.000 €
+    assert t.custodia_anual(1_000, "AAPL") == pytest.approx(24)  # mínimo 6 € por trimestre
+    assert t.custodia_anual(1_000, "SAN.MC") == 0
+
+
+def test_tasa_tobin():
+    t = costes.Tarifa()
     c = costes.coste_compra(1000, "SAN.MC", t)
     assert c["itf"] == pytest.approx(2)
     assert costes.coste_compra(1000, "AAPL", t)["itf"] == 0
+    assert costes.coste_compra(1000, "MC.PA", t)["itf"] == pytest.approx(4)
+    assert costes.coste_compra(1000, "ECR.MC", t, capitalizacion=3e8)["itf"] == 0  # < 1.000 M€: exenta
+    assert costes.coste_compra(1000, "BBVAI.MC", t)["itf"] == 0  # ETF
+
+
+def test_divisas():
+    assert costes.divisa("SAN.MC") == "EUR" and costes.divisa("SAP.DE") == "EUR" and costes.divisa("NOKIA.HE") == "EUR"
+    assert costes.divisa("AAPL") == "USD" and costes.divisa("VOD.L") == "GBp"
+    assert costes.divisa("X", {"currency": "CHF"}) == "CHF"
+    tipos = {"USD": 1.10, "GBP": 0.85}
+    assert costes.a_euros(110, "AAPL", tipos) == pytest.approx(100)
+    assert costes.a_euros(8500, "VOD.L", tipos) == pytest.approx(100)  # peniques
+    assert costes.a_euros(50, "SAN.MC", tipos) == 50
+    assert costes.a_euros(10, "AAPL", {}) is None
+
+
+def test_historicos_en_euros():
+    idx = pd.bdate_range("2024-01-01", periods=5)
+    df = pd.DataFrame({"Open": 110.0, "High": 110.0, "Low": 110.0, "Close": 110.0, "Volume": 1}, index=idx)
+    fx = pd.DataFrame({"Close": [1.1, 1.1, 1.0, 1.0, 1.25]}, index=idx)
+    conv = costes.historicos_en_euros({"AAPL": df, "SAN.MC": df}, {"USD": fx})
+    assert list(conv["AAPL"]["Close"].round(2)) == [100, 100, 110, 110, 88]
+    assert conv["SAN.MC"] is df
+
+
+def test_acciones_asequibles():
+    t = costes.Tarifa()
+    n = costes.acciones_asequibles(1_000, 10, "SAN.MC", t)
+    assert n * 10 + costes.coste_compra(n * 10, "SAN.MC", t)["total"] <= 1_000
+    assert (n + 1) * 10 + costes.coste_compra((n + 1) * 10, "SAN.MC", t)["total"] > 1_000
+    assert costes.acciones_asequibles(15, 10, "AAPL", t) == 0
+
+
+def test_coste_ida_y_vuelta():
+    t = costes.Tarifa()
+    es = costes.coste_ida_y_vuelta(1_000, "SAN.MC", t)
+    us = costes.coste_ida_y_vuelta(1_000, "AAPL", t)
+    assert es["total"] == pytest.approx(4.95 + 2 + 4.95)
+    assert us["total"] == pytest.approx(30 + 30 + 24)
+    assert us["pct"] > 5 * es["pct"]
 
 
 def test_tamano_por_riesgo():

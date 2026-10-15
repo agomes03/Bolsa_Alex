@@ -1,6 +1,8 @@
 """Carteras: la virtual (dinero ficticio para practicar) y la real (lo que tienes en Bankinter).
 
-Se guardan como diccionarios sencillos (JSON) para poder almacenarlos en un archivo o en la nube.
+Se guardan como diccionarios sencillos (JSON). Los precios se guardan en la divisa del valor (como los ves
+en Bankinter) y los importes de dinero, en euros: `fx` es cuántos euros vale 1 unidad de esa divisa
+(1 para valores en euros).
 """
 
 from __future__ import annotations
@@ -23,45 +25,49 @@ def nueva(capital: float | None = 10_000.0) -> dict:
 
 
 def comprar(c: dict, ticker: str, acciones: int, precio: float, tarifa: Tarifa, fecha: str | None = None,
-            stop: float | None = None, objetivo: float | None = None, nota: str = "") -> str | None:
+            stop: float | None = None, objetivo: float | None = None, nota: str = "", fx: float = 1.0) -> str | None:
     """Registra una compra. Devuelve un mensaje de error o None si ha ido bien."""
     if acciones <= 0 or precio <= 0:
         return "El número de acciones y el precio deben ser mayores que cero."
-    importe = acciones * precio
+    importe = acciones * precio * fx
     gastos = coste_compra(importe, ticker, tarifa)["total"]
     if c.get("efectivo") is not None:
         if importe + gastos > c["efectivo"] + 1e-9:
             return (f"No tienes suficiente dinero virtual: necesitas {importe + gastos:,.2f} € "
-                    f"y tienes {c['efectivo']:,.2f} €.")
+                    f"y tienes {c['efectivo']:,.2f} €.").replace(",", "X").replace(".", ",").replace("X", ".")
         c["efectivo"] -= importe + gastos
     pos = c["posiciones"].get(ticker)
     if pos:
         total = pos["acciones"] + acciones
-        pos["precio_medio"] = (pos["precio_medio"] * pos["acciones"] + importe) / total
+        local_previo = pos["precio_medio"] * pos["acciones"]
+        pos["fx_medio"] = (pos.get("fx_medio", 1.0) * local_previo + fx * acciones * precio) / (local_previo + acciones * precio)
+        pos["precio_medio"] = (local_previo + acciones * precio) / total
         pos["acciones"] = total
         pos["gastos"] = pos.get("gastos", 0.0) + gastos
         pos["stop"] = stop if stop is not None else pos.get("stop")
         pos["objetivo"] = objetivo if objetivo is not None else pos.get("objetivo")
     else:
-        c["posiciones"][ticker] = {"acciones": acciones, "precio_medio": precio, "fecha": fecha or hoy(),
-                                   "stop": stop, "objetivo": objetivo, "gastos": gastos, "nota": nota}
+        c["posiciones"][ticker] = {"acciones": acciones, "precio_medio": precio, "fx_medio": fx,
+                                   "fecha": fecha or hoy(), "stop": stop, "objetivo": objetivo, "gastos": gastos,
+                                   "nota": nota}
     c["historial"].append({"fecha": fecha or hoy(), "tipo": "Compra", "ticker": ticker, "acciones": acciones,
                            "precio": precio, "gastos": gastos, "resultado": None, "motivo": nota})
     return None
 
 
 def vender(c: dict, ticker: str, acciones: int, precio: float, tarifa: Tarifa, fecha: str | None = None,
-           motivo: str = "Venta manual") -> str | None:
+           motivo: str = "Venta manual", fx: float = 1.0) -> str | None:
     pos = c["posiciones"].get(ticker)
     if not pos:
         return "No tienes esa acción."
     acciones = min(acciones, pos["acciones"])
     if acciones <= 0 or precio <= 0:
         return "Datos de venta no válidos."
-    importe = acciones * precio
-    gastos = tarifa.coste(importe)
+    importe = acciones * precio * fx
+    gastos = tarifa.coste(importe, ticker)
     parte_gastos_compra = pos.get("gastos", 0.0) * acciones / pos["acciones"]
-    resultado = importe - gastos - acciones * pos["precio_medio"] - parte_gastos_compra
+    invertido = acciones * pos["precio_medio"] * pos.get("fx_medio", 1.0)
+    resultado = importe - gastos - invertido - parte_gastos_compra
     if c.get("efectivo") is not None:
         c["efectivo"] += importe - gastos
     c["historial"].append({"fecha": fecha or hoy(), "tipo": "Venta", "ticker": ticker, "acciones": acciones,
@@ -73,9 +79,11 @@ def vender(c: dict, ticker: str, acciones: int, precio: float, tarifa: Tarifa, f
     return None
 
 
-def revisar_ordenes(c: dict, historicos: dict[str, pd.DataFrame], tarifa: Tarifa) -> list[str]:
+def revisar_ordenes(c: dict, historicos: dict[str, pd.DataFrame], tarifa: Tarifa,
+                    fx: dict[str, float] | None = None) -> list[str]:
     """Ejecuta los stop-loss y objetivos que se hayan tocado desde la compra (como haría el broker).
     Solo para la cartera virtual."""
+    fx = fx or {}
     eventos = []
     for ticker in list(c["posiciones"]):
         pos = c["posiciones"][ticker]
@@ -96,7 +104,8 @@ def revisar_ordenes(c: dict, historicos: dict[str, pd.DataFrame], tarifa: Tarifa
             elif obj is not None and fila["High"] >= obj:
                 precio, motivo = obj, "Objetivo alcanzado"
             if precio is not None:
-                vender(c, ticker, pos["acciones"], float(precio), tarifa, f"{fecha:%Y-%m-%d}", motivo)
+                vender(c, ticker, pos["acciones"], float(precio), tarifa, f"{fecha:%Y-%m-%d}", motivo,
+                       fx=fx.get(ticker, pos.get("fx_medio", 1.0)))
                 eventos.append(f"{motivo}: vendidas las acciones de {ticker} a {precio:.2f} el {fecha:%d/%m/%Y}.")
                 break
         else:
@@ -105,12 +114,15 @@ def revisar_ordenes(c: dict, historicos: dict[str, pd.DataFrame], tarifa: Tarifa
     return eventos
 
 
-def valorar(c: dict, precios: dict[str, float]) -> tuple[pd.DataFrame, dict]:
+def valorar(c: dict, precios: dict[str, float], fx: dict[str, float] | None = None) -> tuple[pd.DataFrame, dict]:
+    """Valor en euros de cada posición. `precios` en la divisa del valor; `fx`: euros por unidad."""
+    fx = fx or {}
     filas = []
     for t, pos in c["posiciones"].items():
         precio = precios.get(t)
-        valor = pos["acciones"] * precio if precio else None
-        invertido = pos["acciones"] * pos["precio_medio"] + pos.get("gastos", 0.0)
+        f = fx.get(t, 1.0)
+        valor = pos["acciones"] * precio * f if precio else None
+        invertido = pos["acciones"] * pos["precio_medio"] * pos.get("fx_medio", 1.0) + pos.get("gastos", 0.0)
         filas.append({"ticker": t, "acciones": pos["acciones"], "precio_medio": pos["precio_medio"],
                       "precio": precio, "valor": valor, "invertido": invertido,
                       "resultado": valor - invertido if valor is not None else None,

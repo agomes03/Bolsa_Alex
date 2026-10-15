@@ -28,7 +28,7 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from .costes import Tarifa, itf_pct
+from .costes import Tarifa, acciones_asequibles, itf_pct
 from .indicadores import calcular_todo
 from .prediccion import serie_probabilidad
 from .tickers import indice_de_referencia, sector_de
@@ -233,7 +233,7 @@ def simular(u: Universo, p: Parametros, tarifa: Tarifa, capital: float = 10_000.
     def vender(j: int, precio: float, t: int, motivo: str):
         nonlocal efectivo, gastos_total
         importe = acc[j] * precio
-        coste = tarifa.coste(importe)
+        coste = tarifa.coste(importe, u.tickers[j])
         efectivo += importe - coste
         gastos_total += coste
         invertido = acc[j] * entrada[j] + coste_ent[j]
@@ -274,14 +274,13 @@ def simular(u: Universo, p: Parametros, tarifa: Tarifa, capital: float = 10_000.
                 if riesgo_acc <= 0:
                     continue
                 itf = itf_t[j]
-                n = math.floor(min(patrimonio * p.riesgo_pct / 100 / riesgo_acc,
-                                   patrimonio / p.max_posiciones / precio,
-                                   max(efectivo - tarifa.minimo - tarifa.canon_fijo, 0)
-                                   / (precio * (1 + itf + tarifa.pct / 100))))
+                n = min(math.floor(min(patrimonio * p.riesgo_pct / 100 / riesgo_acc,
+                                        patrimonio / p.max_posiciones / precio)),
+                        acciones_asequibles(efectivo, precio, u.tickers[j], tarifa, itf * 100))
                 if n < 1:
                     continue
                 importe = n * precio
-                coste = tarifa.coste(importe) + importe * itf
+                coste = tarifa.coste(importe, u.tickers[j]) + importe * itf
                 if importe + coste > efectivo:
                     continue
                 efectivo -= importe + coste
@@ -352,7 +351,7 @@ def comprar_y_mantener(u: Universo, tarifa: Tarifa, capital: float, inicio: int,
     acc = np.zeros(len(precios))
     efectivo = capital
     for j in np.nonzero(ok)[0]:
-        coste = tarifa.coste(parte) + parte * itf_pct(u.tickers[j]) / 100
+        coste = tarifa.coste(parte, u.tickers[j]) + parte * itf_pct(u.tickers[j]) / 100
         acc[j] = (parte - coste) / precios[j]
         efectivo -= parte
     valores = efectivo + (np.nan_to_num(u.C[inicio:fin]) * acc).sum(axis=1)
