@@ -114,37 +114,31 @@ def contexto() -> str:
 
 
 def pagina_chat():
-    st.title("💬 Pregunta a Claude")
-    st.caption("Dudas técnicas de bolsa respondidas por Claude con el contexto de tu cartera y del mercado de hoy. "
-               "Puede consultar al momento los datos de cualquier valor.")
+    clave = clave_api()
+    st.title("💬 Pregunta")
+    if clave:
+        st.caption("Dudas de bolsa respondidas por Claude con el contexto de tu cartera y del mercado de hoy.")
+    else:
+        st.caption("**Gratis.** El asistente de la app te responde con datos reales de cualquier valor que nombres "
+                   "(precio, tendencia, RSI, PER, veredicto), de tu cartera y del diccionario. Para preguntas más "
+                   "abiertas, te deja la pregunta preparada con tu contexto para pegarla en **claude.ai**, que tiene "
+                   "plan gratuito.")
     st.session_state.setdefault("chat_historia", [])
     st.session_state.setdefault("chat_gasto", 0.0)
-    clave = clave_api()
 
-    with st.expander("⚙️ Ajustes y coste" + ("" if clave else " · sin conectar"), expanded=not clave):
-        st.radio("Modelo", list(chat.MODELOS), format_func=lambda m: chat.MODELOS[m]["nombre"],
-                          key="chat_modelo", horizontal=True)
-        st.caption("Coste orientativo por pregunta: Opus 5.5, unos 2-5 céntimos de dólar; Haiku 5.5, menos de "
-                   "medio céntimo. Lo ves debajo de cada respuesta.")
+    with st.expander("⚙️ Opcional: conectar la API de Claude (de pago)" if not clave else "⚙️ Ajustes y coste"):
         if not clave:
             st.markdown(
-                "**Para conectar Claude** necesitas una clave de la API de Anthropic. **Es aparte de tu suscripción "
-                "de claude.ai** (que no incluye la API, ni en el plan gratuito ni en los de pago):\n"
-                "1. Entra en **console.anthropic.com**, ve a **Billing** y recarga un saldo pequeño (por ejemplo, "
-                "5 $). Pon un **límite de gasto** mensual en *Limits* para no llevarte sorpresas.\n"
-                "2. En **API keys**, crea una clave.\n"
-                "3. En Streamlit → tu app → **Settings → Secrets**, añade debajo de lo que ya tienes:\n"
-                "   ```\n   [anthropic]\n   api_key = \"sk-ant-...\"\n   ```\n"
-                "Sin clave (o si se acaba el saldo), el chat sigue funcionando en **modo sin conexión**: responde "
-                "con el diccionario y las guías de la app y te prepara la pregunta para pegarla en claude.ai, "
-                "que sí tiene plan gratuito.")
-            tecleada = st.text_input("O pega aquí la clave solo para esta sesión (no se guarda)", type="password")
-            if tecleada.strip():
-                st.session_state["_clave_api"] = tecleada.strip()
-                st.rerun()
+                "No hace falta: la app funciona gratis sin esto. Solo si algún día quieres que Claude responda "
+                "**dentro** de la app: la API se paga por uso (unos céntimos por pregunta) y va aparte de "
+                "claude.ai. Se activa con una clave de console.anthropic.com en Streamlit → Settings → Secrets:\n"
+                "```\n[anthropic]\napi_key = \"sk-ant-...\"\n```")
         else:
-            st.caption(f"Conectado a la API de Anthropic. Gasto en esta sesión: ≈ {num(st.session_state['chat_gasto'], 3)} $.")
-        if st.session_state["chat_historia"] and st.button("🗑️ Borrar la conversación"):
+            st.radio("Modelo", list(chat.MODELOS), format_func=lambda m: chat.MODELOS[m]["nombre"],
+                     key="chat_modelo", horizontal=True)
+            st.caption("Coste orientativo por pregunta: Opus 5.5, unos 2-5 céntimos de dólar; Haiku 5.5, menos de "
+                       f"medio céntimo. Gasto en esta sesión: ≈ {num(st.session_state['chat_gasto'], 3)} $.")
+        if st.session_state.get("chat_vista") and st.button("🗑️ Borrar la conversación"):
             st.session_state["chat_historia"] = []
             st.session_state.pop("chat_vista", None)
             st.rerun()
@@ -179,7 +173,7 @@ def responder(pregunta: str, clave: str | None, modelo: str):
         with st.spinner("Preparando tu contexto..."):
             ctx = contexto()
         if not clave:
-            _sin_conexion(pregunta, ctx, "Modo sin conexión (no hay clave de la API).")
+            _sin_conexion(pregunta, ctx, None)
             return
         hueco = st.empty()
         escrito = []
@@ -212,17 +206,24 @@ def responder(pregunta: str, clave: str | None, modelo: str):
                                               {"role": "assistant", "content": texto or "(sin respuesta)"}]
 
 
-def _sin_conexion(pregunta: str, ctx: str, motivo: str):
-    texto = chat.respuesta_sin_conexion(pregunta)
-    st.info(motivo)
+def _sin_conexion(pregunta: str, ctx: str, motivo: str | None):
+    """Respuesta gratuita de la app y la pregunta preparada para claude.ai."""
+    if motivo:
+        st.info(motivo)
+    with st.spinner("Buscando datos..."):
+        texto = chat.respuesta_gratis(pregunta, ctx, datos_valor)
     st.markdown(texto)
+    st.caption("Asistente gratuito de la app · 0 €")
     para = chat.pregunta_para_claude_ai(pregunta, ctx)
     _bloque_claude_ai(para)
-    st.session_state["chat_vista"].append({"role": "assistant", "content": f"ℹ️ {motivo}\n\n{texto}",
+    st.session_state["chat_vista"].append({"role": "assistant", "content": (f"ℹ️ {motivo}\n\n" if motivo else "")
+                                           + texto, "pie": "Asistente gratuito de la app · 0 €",
                                            "para_claude_ai": para})
 
 
 def _bloque_claude_ai(texto: str):
-    with st.expander("📋 Pregunta preparada para claude.ai (gratis): cópiala y pégala allí"):
+    with st.expander("🤖 ¿Quieres una explicación más completa? Pregúntaselo gratis a Claude en claude.ai"):
+        st.caption("Copia este texto (botón de la esquina del recuadro), abre claude.ai y pégalo. Lleva tu pregunta y "
+                   "el contexto de tu cartera y del mercado, sin nombres ni datos de tu banco.")
         st.code(texto, language=None, wrap_lines=True)
         st.link_button("Abrir claude.ai", "https://claude.ai/new")

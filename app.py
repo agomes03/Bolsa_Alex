@@ -710,7 +710,7 @@ PAGINAS = {
     "simulador": st.Page(pagina_simulador, title="Simulador y modelos", icon="🧪"),
     "calculadoras": st.Page(pagina_calculadoras, title="Calculadoras", icon="🧮"),
     "aprende": st.Page(pagina_aprende, title="Aprende", icon="🎓"),
-    "chat": st.Page(pagina_chat, title="Pregunta a Claude", icon="💬"),
+    "chat": st.Page(pagina_chat, title="Pregunta", icon="💬"),
 }
 st.session_state["_paginas"] = PAGINAS
 nav = st.navigation({

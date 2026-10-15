@@ -124,5 +124,32 @@ def test_contexto_resume_cartera_y_mercado():
                                 "ganancia_pct": -3.7, "stop": 11.0}],
                               {"hallazgos": [{"gravedad": "alta", "titulo": "Indra pesa el 53 %"}]},
                               {"semaforo": "verde", "vix": 17.5}, [{"lectura": "Oro: en tendencia bajista."}])
-    assert "Indra (IDR.MC, Acciones): 76 % · +3.8 % · sin stop" in c and "stop 11.0" in c
+    assert "Indra (IDR.MC, Acciones): 76 % · +3,8 % · sin stop" in c and "stop 11,00" in c
     assert "Indra pesa el 53 %" in c and "VIX 17.5" in c and "Oro" in c
+
+
+DATOS_INDRA = {"ticker": "IDR.MC", "nombre": "Indra", "ultimo_cierre": 62.68, "fecha": "2026-10-15",
+               "variacion_1d_pct": 0.13, "variacion_1m_pct": 1.2, "variacion_1a_pct": 48.9,
+               "tendencia": "alcista (sobre su media de 200 sesiones)", "distancia_al_maximo_1a_pct": -4.0,
+               "volatilidad_anual_pct": 29, "rsi_14": 75,
+               "fundamentales": {"PER": 19.1, "opinión de analistas": "buy", "número de analistas": 16},
+               "app": {"veredicto": "Candidata a comprar", "explicacion": "x", "nota_0_100": 87,
+                       "riesgo_de_caida": "normal"}}
+
+
+def test_asistente_gratis_con_datos_reales_y_cartera():
+    assert chat.valores_en_pregunta("¿Cómo está el RSI de Indra y el oro? ¿Y el bitcoin?") == \
+        ["IDR.MC", "GC=F", "BTC-EUR"]
+    r = chat.respuesta_gratis("¿Cómo está el RSI de Indra?", "", lambda t: DATOS_INDRA)
+    assert "62,68 €" in r and "15/10/2026" in r and "sobrecompra" in r and "comprar (16 analistas)" in r
+    assert "nota 87/100" in r and "**RSI**: Indicador" in r
+    ctx = "Fecha: x\nSu cartera (peso · ganancia desde la compra):\n- Indra (IDR.MC): 53 % · +3,8 %"
+    assert "Indra (IDR.MC): 53 %" in chat.respuesta_gratis("¿Cómo va mi cartera?", ctx, lambda t: None)
+    assert "claude.ai" in chat.respuesta_gratis("xyz qwerty", ctx, lambda t: None)
+
+
+def test_asistente_gratis_sobrevive_a_fallos_de_datos():
+    def falla(t):
+        raise RuntimeError("sin red")
+    r = chat.respuesta_gratis("¿Qué es el PER de Indra?", "", falla)
+    assert "**PER**" in r

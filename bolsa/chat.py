@@ -110,7 +110,8 @@ def contexto_usuario(fecha: str, broker: str, perfil: str | None, cartera: list[
         lineas.append("Su cartera (peso · ganancia desde la compra):")
         for p in sorted(cartera, key=lambda x: -x["valor"]):
             lineas.append(f"- {p['nombre']} ({p['ticker']}, {p['clase']}): {p['valor'] / total * 100:.0f} % · "
-                          f"{p['ganancia_pct']:+.1f} %" + (f" · stop {p['stop']}" if p.get("stop") else " · sin stop"))
+                          + f"{p['ganancia_pct']:+.1f} %".replace(".", ",")
+                          + (f" · stop {_n(p['stop'])}" if p.get("stop") else " · sin stop"))
         lineas.append(f"Valor total aproximado: {total:,.0f} €.".replace(",", "."))
     else:
         lineas.append("No ha importado su cartera.")
@@ -281,12 +282,130 @@ def respuesta_sin_conexion(pregunta: str) -> str:
     return "\n\n".join(partes)
 
 
+# Activos que se reconocen por su nombre en la pregunta (además de las empresas de la app).
+ACTIVOS_POR_NOMBRE = {"oro": "GC=F", "gold": "GC=F", "plata": "SI=F", "bitcoin": "BTC-EUR", "btc": "BTC-EUR",
+                      "ethereum": "ETH-EUR", "ibex": "^IBEX", "ibex 35": "^IBEX", "s&p": "^GSPC", "s&p 500": "^GSPC",
+                      "sp500": "^GSPC", "nasdaq": "^IXIC", "euro stoxx": "^STOXX50E", "dax": "^GDAXI",
+                      "petróleo": "BZ=F", "petroleo": "BZ=F", "brent": "BZ=F", "msci world": "IWDA.AS",
+                      "fondo indexado mundial": "IWDA.AS"}
+PATRON_MI_CARTERA = re.compile(r"\b(mi|mis)\s+(cartera|acciones|dinero|inversi\w*|posici\w*|valores|ahorros)\b")
+
+
+def valores_en_pregunta(pregunta: str, maximo: int = 3) -> list[str]:
+    from .noticias import detectar_empresas
+
+    p = pregunta.lower()
+    tickers = list(detectar_empresas(p))
+    for nombre, t in ACTIVOS_POR_NOMBRE.items():
+        if re.search(rf"(?<![\w]){re.escape(nombre)}(?![\w])", p) and t not in tickers:
+            tickers.append(t)
+    for codigo in re.findall(r"\b[A-Z]{2,5}(?:\.[A-Z]{1,2})\b", pregunta):   # códigos como IDR.MC
+        if codigo not in tickers:
+            tickers.append(codigo)
+    return tickers[:maximo]
+
+
+def _n(x, dec=2) -> str:
+    return f"{x:,.{dec}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+OPINIONES = {"strong_buy": "compra fuerte", "buy": "comprar", "outperform": "mejor que el mercado", "hold": "mantener",
+             "underperform": "peor que el mercado", "sell": "vender", "strong_sell": "venta fuerte", "none": "sin opinión"}
+
+
+def describir_valor(d: dict) -> str:
+    """Los datos de `datos_valor` explicados en lenguaje sencillo."""
+    from .costes import simbolo
+
+    moneda = simbolo(d["ticker"])
+    precio = f"{_n(d['ultimo_cierre'])} {moneda}" if moneda not in ("—", "") else _n(d["ultimo_cierre"])
+    variaciones = [f"{etiqueta} {d[k]:+.1f} %".replace(".", ",") for k, etiqueta in
+                   (("variacion_1d_pct", "último día"), ("variacion_1m_pct", "un mes"), ("variacion_1a_pct", "un año"))
+                   if d.get(k) is not None]
+    lineas = [f"**{d['nombre'].split(' (')[0]}** ({d['ticker']}): último cierre {precio} ({'/'.join(reversed(d['fecha'].split('-')))})"
+              + (f" · {', '.join(variaciones)}." if variaciones else ".")]
+    if d.get("tendencia"):
+        lineas.append(f"- **Tendencia**: {d['tendencia']}.")
+    if d.get("rsi_14") is not None:
+        r = d["rsi_14"]
+        zona = ("sobrecompra: ha subido muy deprisa y a veces se toma un respiro" if r >= 70 else
+                "sobreventa: ha caído muy deprisa y a veces rebota" if r <= 30 else "zona neutral")
+        lineas.append(f"- **RSI**: {_n(r, 0)} → {zona} (más de 70 = sobrecompra, menos de 30 = sobreventa).")
+    if d.get("distancia_al_maximo_1a_pct") is not None:
+        dm = d["distancia_al_maximo_1a_pct"]
+        lineas.append("- **Máximo del año**: " + ("está en máximos." if dm > -2 else f"está un {_n(-dm, 0)} % por debajo."))
+    if d.get("volatilidad_anual_pct"):
+        v = d["volatilidad_anual_pct"]
+        lineas.append(f"- **Volatilidad**: {_n(v, 0)} % al año ("
+                      + ("se mueve más que la bolsa en general, ~15 %" if v > 20 else "parecida o menor que la bolsa")
+                      + ").")
+    f = d.get("fundamentales") or {}
+    partes = []
+    if f.get("PER"):
+        partes.append(f"PER {_n(f['PER'], 1)}")
+    if f.get("rentabilidad por dividendo"):
+        partes.append(f"dividendo {_n(f['rentabilidad por dividendo'] * 100, 1)} %")
+    if f.get("opinión de analistas"):
+        n = f.get("número de analistas")
+        opinion = OPINIONES.get(str(f["opinión de analistas"]).lower(), f["opinión de analistas"])
+        partes.append(f"analistas: {opinion}" + (f" ({n} analistas)" if n else ""))
+    if partes:
+        lineas.append("- **Empresa**: " + ", ".join(partes) + ".")
+    a = d.get("app")
+    if a:
+        lineas.append(f"- **Veredicto de la app**: {a['veredicto']}"
+                      + (f" · nota {a['nota_0_100']}/100" if a.get("nota_0_100") is not None else "")
+                      + (f" · riesgo de caída {a['riesgo_de_caida']}" if a.get("riesgo_de_caida") else "")
+                      + f". {a['explicacion']}")
+    return "\n".join(lineas)
+
+
+def _limites_alternativos(pregunta: str, contexto: str) -> list[str]:
+    """Si preguntas por oro o cripto en tu cartera: cuánto es prudente según tu perfil."""
+    from .activos import LIMITES_ALTERNATIVOS
+
+    p = pregunta.lower()
+    if not any(w in p for w in ("oro", "bitcoin", "cripto", "ethereum", "gold", "btc")):
+        return []
+    perfil = next((x for x in LIMITES_ALTERNATIVOS if f"Perfil inversor: {x}" in contexto), None)
+    limites = LIMITES_ALTERNATIVOS[perfil or "Moderado"]
+    quien = f"tu perfil {perfil.lower()}" if perfil else "un perfil moderado (calcula el tuyo en 🎯 Mi plan)"
+    return [f"**Cuánto es prudente**: para {quien}, como mucho un "
+            f"{limites['Oro y materias primas'] * 100:.0f} % de tu dinero en oro y un "
+            f"{limites['Criptomonedas'] * 100:.0f} % en criptomonedas. Son complementos para diversificar, no el "
+            "núcleo de la cartera (ese papel lo hace un fondo indexado mundial)."]
+
+
+def respuesta_gratis(pregunta: str, contexto: str, datos_valor: Callable[[str], dict] | None = None) -> str:
+    """Asistente gratuito: datos reales de los valores que nombras, tu cartera y el diccionario de la app."""
+    partes = []
+    for t in valores_en_pregunta(pregunta):
+        try:
+            d = datos_valor(t) if datos_valor else None
+        except Exception:  # noqa: BLE001 - sin datos de un valor, se sigue con el resto
+            d = None
+        if d:
+            partes.append(describir_valor(d))
+    if PATRON_MI_CARTERA.search(pregunta.lower()) and contexto:
+        utiles = [x for x in contexto.splitlines() if x.startswith(("- ", "Valor total", "Diagnóstico", "Su cartera",
+                                                                    "No ha importado"))]
+        if utiles:
+            partes.append("**Tu cartera según la app**\n" + "\n".join(utiles).replace("Su cartera", "Tu cartera"))
+        partes += _limites_alternativos(pregunta, contexto)
+    teoria = respuesta_sin_conexion(pregunta)
+    if not teoria.startswith("No tengo"):
+        partes.append(teoria.split("\n\n", 1)[1] if "\n\n" in teoria else teoria)
+    if not partes:
+        return teoria
+    return "\n\n".join(partes)
+
+
 def pregunta_para_claude_ai(pregunta: str, contexto: str) -> str:
     """Texto listo para pegar en claude.ai (plan gratuito) con el mismo enfoque y contexto que el chat."""
     return (f"{SISTEMA}\n\n(No tienes herramientas de datos: si necesitas un precio o un indicador actual, "
             f"dime qué dato buscar.)\n\nMi contexto:\n{contexto}\n\nMi pregunta: {pregunta}")
 
 
-__all__ = ["MODELOS", "MODELO_POR_DEFECTO", "SISTEMA", "HERRAMIENTAS", "Uso", "Resultado", "contexto_usuario",
+__all__ = ["respuesta_gratis", "describir_valor", "valores_en_pregunta", "MODELOS", "MODELO_POR_DEFECTO", "SISTEMA", "HERRAMIENTAS", "Uso", "Resultado", "contexto_usuario",
            "ejecutar_herramienta", "conversar", "explicar_error", "respuesta_sin_conexion",
            "pregunta_para_claude_ai"]
