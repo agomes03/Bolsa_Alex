@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from bolsa import asesor, bankinter, patrones
+from bolsa import asesor, bankinter, estrategias, patrones
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import MERCADOS, TODAS_LAS_ACCIONES, nombre_de
 from paginas_extra import avisos_resumen
@@ -523,7 +523,7 @@ def pagina_carteras():
             if claves.index(k) == sugerida and perfil_guardado:
                 st.success("👉 Es la que encaja con tu perfil.")
             st.markdown(f"**{c['nombre']}** · perfil {c['perfil'].lower()}")
-            st.caption(c["descripcion"])
+            st.caption(estrategias.CARTERAS[k].descripcion if k in estrategias.CARTERAS else c["descripcion"])
             m, ref = c["metricas"], c["referencia"]
             cols = st.columns(1 if pf.movil else 3)
             cols[0].metric("Rentabilidad anual simulada", pct(m["cagr_pct"], 1), f"todas: {pct(ref['cagr_pct'], 1)}",

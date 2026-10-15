@@ -109,12 +109,13 @@ habían visto y con comisiones incluidas:
 | ¿Lo hará mejor que las demás? | Prácticamente no (AUC 0,51) |
 | **¿Sufrirá una caída de más del 10% el próximo mes?** | **Sí (AUC 0,61)**: con riesgo "muy bajo" ocurrió el 7% de las veces; con "muy alto", el 21% |
 
-| Estrategia (2020-2026, años no vistos) | Rentabilidad/año | Peor caída |
+| Estrategia (2020-2026, años no vistos, comisiones incluidas) | Rentabilidad/año | Peor caída |
 |---|---|---|
 | Momentum 12-1, 10 acciones, rotación mensual | 27,9% | -37% |
+| Momentum 12-1, 20 acciones | 21,9% | -33% |
+| Todas las acciones a partes iguales (referencia) | 15,5% | -34% |
 | Momentum 12-1, 20 acciones, con filtro de mercado | 14,4% | -28% |
 | Baja volatilidad, 20 acciones, con filtro de mercado | 7,9% | **-14%** |
-| Todas las acciones a partes iguales | 7,5% | -28% |
 | Reglas de compra/venta diarias con stop-loss (entrenadas) | 4,2% | -19% |
 
 | Regla de protección (media 200 ± 2%) | Sin regla | Con regla |
@@ -124,6 +125,8 @@ habían visto y con comisiones incluidas:
 
 Por eso la app se apoya en el **riesgo de caída** (para evitar sustos), en **carteras modelo de rotación mensual**
 y en la **regla de protección** para los fondos indexados, y no presume de adivinar si una acción subirá.
+Ojo con la lectura: los filtros de seguridad reducen los sustos, pero en un periodo muy alcista como 2020-2026
+también reducen la ganancia. Ninguna opción gana a la vez más y con menos riesgo en todos los periodos.
 Cuidado: el universo son las grandes empresas de hoy (sesgo de supervivencia), lo que favorece al momentum.
 
 ## Cómo predice (y por qué no promete milagros)

@@ -613,8 +613,8 @@ def pagina_aprende():
 - ✅ **Estimar el riesgo de una caída fuerte**: sí se puede. Las acciones con riesgo "muy alto" sufrieron caídas
   de más del 10% tres veces más a menudo que las de riesgo "muy bajo". La app lo usa para que evites sustos.
 - ✅ **Carteras sencillas revisadas una vez al mes** (📦 Carteras modelo): quedarse con las acciones que más han
-  subido en el último año (momentum) o con las más estables (baja volatilidad) funcionó mejor que comprar y
-  vender cada pocos días con stop-loss.
+  subido en el último año (momentum) ganó más que la media; quedarse con las más estables (baja volatilidad)
+  ganó menos pero con caídas mucho más pequeñas. Ambas funcionaron mejor que comprar y vender cada pocos días.
 - ✅ **Regla de protección para los fondos indexados**: salir solo cuando el índice cae claramente por debajo de
   su media de 200 sesiones redujo casi a la mitad las peores caídas de los últimos 30-100 años.
 

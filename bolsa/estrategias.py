@@ -5,7 +5,8 @@
      último mes). El momentum es uno de los patrones más estudiados de la bolsa (Jegadeesh y Titman, 1993).
    - Equilibrada: las 20 con más momentum, solo si su mercado está en tendencia alcista.
    - Tranquila: las 20 menos volátiles, solo si su mercado está en tendencia alcista
-     ("anomalía de baja volatilidad": rentabilidad parecida a la media con muchos menos sustos).
+     ("anomalía de baja volatilidad"): en mercados muy alcistas gana menos que la media, pero con muchos
+     menos sustos.
 2. Regla de protección para índices/ETF: estar invertido mientras el índice esté por encima de su media de
    200 sesiones y salir solo si cae más de un 2% por debajo (la banda evita entrar y salir a cada rato).
    En la historia del IBEX (desde 1994) ganó algo más que 'comprar y mantener' (6,7% frente a 5,3% al año)
@@ -45,10 +46,12 @@ CARTERAS = {
                               "llegó a perder más de un tercio en algún momento."),
     "equilibrada": CarteraModelo("equilibrada", "Cartera equilibrada (momentum 20 + filtro)", "momentum", 20, True,
                                  "Moderado", "Cada mes, las 20 acciones con más momentum, pero solo de mercados en "
-                                 "tendencia alcista; si el mercado se tuerce, esa parte queda en liquidez."),
+                                 "tendencia alcista; si el mercado se tuerce, esa parte queda en liquidez. Busca "
+                                 "un punto medio entre rentabilidad y sustos."),
     "tranquila": CarteraModelo("tranquila", "Cartera tranquila (baja volatilidad 20 + filtro)", "baja_vol", 20, True,
                                "Conservador", "Cada mes, las 20 acciones más estables (las que menos se mueven), solo "
-                               "de mercados en tendencia alcista. Gana parecido a la media con muchos menos sustos."),
+                               "de mercados en tendencia alcista. En años muy alcistas gana menos que la media, pero "
+                               "sus caídas han sido mucho más pequeñas."),
 }
 CARTERA_POR_PERFIL = {c.perfil: c for c in CARTERAS.values()}
 
