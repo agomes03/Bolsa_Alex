@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
@@ -119,8 +122,7 @@ def pagina_hoy():
 
 # --------------------------------------------------------------------------- 🧭 Mi plan
 def pagina_plan():
-    pf = perfil()
-    st.title("🧭 Mi plan: dónde invertir")
+    st.title("🎯 Mi plan: dónde invertir")
     st.caption("Responde 6 preguntas y la app te propone un reparto concreto en euros, con productos que puedes "
                "comprar en Bankinter, y te enseña qué podría pasar con él.")
     d = datos_usuario()
@@ -454,3 +456,81 @@ def bloque_historial_ideas():
 
 def tickers_para_seleccion() -> list[str]:
     return list(TODAS_LAS_ACCIONES)
+
+
+# --------------------------------------------------------------------------- laboratorio
+RUTA_LAB = Path(__file__).resolve().parent / "informe" / "experimentos.json"
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _leer_lab(mtime: float) -> dict | None:
+    try:
+        return json.loads(RUTA_LAB.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def cargar_laboratorio() -> dict | None:
+    return _leer_lab(RUTA_LAB.stat().st_mtime) if RUTA_LAB.exists() else None
+
+
+def nivel_auc(auc: float | None) -> str:
+    if auc is None:
+        return "—"
+    if auc >= 0.65:
+        return "🟢 Bastante predecible"
+    if auc >= 0.58:
+        return "🟡 Algo predecible"
+    if auc >= 0.53:
+        return "🟠 Muy poco"
+    return "🔴 Azar"
+
+
+def bloque_laboratorio():
+    lab = cargar_laboratorio()
+    if not lab:
+        return
+    pf = perfil()
+    st.subheader("🔬 Laboratorio: qué funciona de verdad (datos reales, años no vistos)")
+    st.caption(f"Última revisión: {lab.get('fecha', '—')}. Se repite automáticamente cada mes con datos nuevos.")
+    filas = []
+    for nombre, m in lab.get("modelos", {}).items():
+        filas.append({"Pregunta": m.get("pregunta", nombre), "¿Se puede predecir?": nivel_auc(m.get("auc")),
+                      "AUC": round(m["auc"], 3) if m.get("auc") is not None else None,
+                      "Ocurre si el modelo dice 'poco probable'": f"{m['tramo_bajo'] * 100:.0f}%",
+                      "Ocurre si dice 'muy probable'": f"{m['tramo_alto'] * 100:.0f}%"})
+    if filas:
+        st.dataframe(pd.DataFrame(filas), hide_index=True, width="stretch")
+        st.caption("AUC: 0,50 = lanzar una moneda; 0,55-0,60 ya es útil en bolsa; más de 0,65 es una señal fuerte. "
+                   "Las columnas de la derecha dicen con qué frecuencia ocurrió de verdad lo que el modelo predecía.")
+    rot = pd.DataFrame(lab.get("rotacion", []))
+    if not rot.empty:
+        st.markdown("**Carteras mensuales: quedarse cada mes con las N mejores según cada criterio**")
+        rot = rot.sort_values("sharpe", ascending=False)
+        tabla = pd.DataFrame({
+            "Criterio": rot["senal"], "N": rot["n"], "Filtro mercado": rot["filtro_mercado"].map({True: "sí", False: "no"}),
+            "Rentab. anual %": rot["cagr_pct"].round(1), "Peor caída %": rot["max_caida_pct"].round(1),
+            "Rentab./riesgo": rot["sharpe"].round(2), "Comisiones €": rot["gastos"].round(0)})
+        if pf.movil:
+            tabla = tabla[["Criterio", "N", "Rentab. anual %", "Peor caída %"]]
+        st.dataframe(tabla, hide_index=True, width="stretch", height=380)
+        ref = rot[rot["senal"] == "Todas a partes iguales"]
+        if len(ref):
+            r = ref.iloc[0]
+            st.caption(f"Referencia (todas las acciones a partes iguales): {r['cagr_pct']:.1f}% al año con una peor "
+                       f"caída de {r['max_caida_pct']:.0f}%. Periodo {r['desde']} → {r['hasta']}. Rentab./riesgo = "
+                       "rentabilidad dividida por la volatilidad (más alto = mejor relación ganancia/sustos).")
+    idx = lab.get("indices", {})
+    if idx:
+        st.markdown("**Índices: ¿protege salir cuando el índice cae por debajo de su media?** (historia completa)")
+        filas = []
+        for t, variantes in idx.items():
+            for v in variantes:
+                filas.append({"Índice": nombre_de(t), "Regla": f"media {v['media']}" + (f" ±{v['banda']:.0%}" if v["banda"] else ""),
+                              "Mantener %/año": round(v["mantener"]["cagr_pct"], 1),
+                              "Mantener peor caída": f"{v['mantener']['max_caida_pct']:.0f}%",
+                              "Con filtro %/año": round(v["filtro"]["cagr_pct"], 1),
+                              "Con filtro peor caída": f"{v['filtro']['max_caida_pct']:.0f}%",
+                              "Tiempo invertido": f"{v['tiempo_invertido']:.0%}",
+                              "Desde": v["mantener"]["desde"][:4]})
+        st.dataframe(pd.DataFrame(filas), hide_index=True, width="stretch")

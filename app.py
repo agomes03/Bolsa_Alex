@@ -14,12 +14,14 @@ from plotly.subplots import make_subplots
 
 from bolsa import costes, noticias, prediccion, senales
 from bolsa.indicadores import calcular_todo
-from bolsa.tickers import EEUU, ETFS, IBEX35, INDICES, TERMOMETROS, TODAS_LAS_ACCIONES, nombre_de, sector_de
-from paginas_extra import (acciones_rapidas, avisos_resumen, pagina_bankinter, pagina_cartera_virtual,
-                           pagina_simulador)
+from bolsa.tickers import (IBEX35, INDICES, MERCADOS, TERMOMETROS, TODAS_LAS_ACCIONES, mercado_de, nombre_de,
+                          sector_de)
+from paginas_extra import acciones_rapidas, pagina_bankinter, pagina_cartera_virtual, pagina_simulador
+from paginas_hoy import (bloque_fases, bloque_modelo_conjunto, bloque_que_puede_pasar_accion, pagina_hoy,
+                         pagina_plan, pagina_radar_global)
 from ui_comun import (Perfil, cargar_fundamentales, cargar_fundamentales_varios, cargar_historico,
-                      cargar_noticias, cargar_predicciones, cargar_varios, datos_usuario, es_movil,
-                      estrategia_actual, eur, mercado_alcista_para, moneda_de, noticias_empresa, pct,
+                      cargar_informe, cargar_noticias, cargar_predicciones, cargar_varios, datos_usuario, es_movil,
+                      estrategia_actual, eur, fila_informe, mercado_alcista_para, moneda_de, noticias_empresa, pct,
                       predicciones_radar)
 
 st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide",
@@ -215,9 +217,8 @@ def bloque_bankinter(ticker: str, ev: senales.Evaluacion, n_acciones: int):
 
 # --------------------------------------------------------------------------- páginas
 def pagina_resumen():
-    st.title("🏠 Resumen del día")
+    st.title("🌍 Mercados")
     st.info(AVISO)
-    avisos_resumen()
 
     with st.spinner("Descargando cotizaciones..."):
         hist = cargar_varios(tuple(list(INDICES) + list(TERMOMETROS)))
@@ -292,6 +293,8 @@ def pagina_resumen():
     for n in lista[:5]:
         tarjeta_noticia(n)
 
+    bloque_fases(cargar_informe())
+
 
 def pagina_noticias():
     st.title("📰 Noticias que mueven el mercado")
@@ -340,11 +343,17 @@ def pagina_analizar():
     st.caption("Revisa tendencia, si está cara o barata, impulso, datos de la empresa, opinión de los analistas, "
                "noticias y un modelo estadístico de predicción, y te lo explica en lenguaje claro.")
 
-    grupos = {"IBEX 35 (España)": IBEX35, "EEUU": EEUU, "ETF (fondos indexados)": ETFS}
+    pre = st.session_state.pop("analizar_ticker", None)
+    if pre in TODAS_LAS_ACCIONES:
+        st.session_state["an_mercado"] = mercado_de(pre)
+        st.session_state["an_empresa"] = pre
     c1, c2 = st.columns([1, 2])
-    grupo = c1.selectbox("Mercado", list(grupos))
-    ticker = c2.selectbox("Empresa", list(grupos[grupo]), format_func=lambda t: f"{nombre_de(t)} ({t})")
-    otro = st.text_input("…u otro ticker de Yahoo Finance (ej. ASML.AS, KO, SAP.DE)", "").strip().upper()
+    grupo = c1.selectbox("Mercado", list(MERCADOS), key="an_mercado")
+    opciones = list(MERCADOS[grupo])
+    if st.session_state.get("an_empresa") not in opciones:
+        st.session_state.pop("an_empresa", None)
+    ticker = c2.selectbox("Empresa", opciones, key="an_empresa", format_func=lambda t: f"{nombre_de(t)} ({t})")
+    otro = st.text_input("…u otro ticker de Yahoo Finance (ej. KO, SAP.DE, 7203.T)", "").strip().upper()
     if otro:
         ticker = otro
 
@@ -391,6 +400,7 @@ def pagina_analizar():
         st.warning(a)
 
     st.subheader("🔮 Predicción")
+    bloque_modelo_conjunto(ticker, fila_informe(ticker))
     if preds:
         bloque_predicciones(ticker, df, preds)
     else:
@@ -437,6 +447,11 @@ def pagina_analizar():
             bloque_bankinter(ticker, ev, n_riesgo)
         acciones_rapidas(ticker, ev, n_riesgo)
 
+    st.subheader("🌦️ Qué le puede pasar a tu dinero")
+    importe_ref = (costes.tamano_por_riesgo(capital, riesgo, ev.plan.entrada, ev.plan.stop) * ev.precio
+                   if ev.plan else 0) or 1_000.0
+    bloque_que_puede_pasar_accion(ticker, df, importe_ref)
+
     st.subheader("🏢 La empresa en números")
     bloque_fundamentales(ticker, fund)
 
@@ -466,6 +481,8 @@ def pagina_analizar():
 
 
 def pagina_radar():
+    if pagina_radar_global():
+        return
     st.title("📡 Radar del IBEX 35")
     st.caption("Analiza las 35 empresas a la vez (tendencia, impulso, noticias, analistas y modelo estadístico) "
                "y las ordena por puntuación. Úsalo para encontrar candidatas y luego estúdialas en '🔍 Analizar'.")
@@ -602,13 +619,24 @@ def pagina_aprende():
    en años que no ha visto, si habría ganado dinero frente a simplemente comprar y mantener.
 2. **🎮 Cartera virtual**: crea el **robot** y practica tú también con dinero ficticio durante unas semanas.
 
-**Rutina (10 minutos):**
-1. **🏠 Resumen**: semáforo, previsión de los índices y avisos de tu cartera de Bankinter.
+**Rutina (5-10 minutos):**
+1. **🧭 Hoy**: semáforo, resumen en pocas palabras, ideas del día, qué puede pasar y avisos de tu cartera.
+   Se actualiza solo cada día laborable con los datos del cierre.
 2. **📰 Noticias**: lee las 3-5 más influyentes y su "por qué importa".
 3. **📡 Radar**: busca empresas con puntuación alta (≥ 70) y fiabilidad 🟢/🟡.
 4. **🔍 Analizar**: entra en la candidata, lee motivos, predicción, analistas y el plan.
 5. **Bankinter**: copia la **orden lista** que te prepara la app (orden limitada + stop-loss).
 6. **🏦 Mi Bankinter**: registra la compra. La app la vigilará y te dirá cuándo subir el stop o vender.
+
+### 3 bis. ¿De dónde salen las recomendaciones?
+- Cada noche un proceso automático descarga 10 años de datos de **unas 130 empresas** (España, Europa y EEUU),
+  los grandes índices mundiales (algunos con casi 100 años de historia) y cientos de noticias.
+- Reentrena los modelos **sin mirar el futuro** y los examina con años que no han visto. Si un modelo no supera
+  al azar, la app lo marca como poco fiable y **no lo usa** para recomendarte nada.
+- Guarda cada idea del día y, un mes después, comprueba si acertó: en **🧪 Simulador y modelos** puedes ver
+  ese historial real, que es la prueba más honesta de todas.
+- **🎯 Mi plan** te dice dónde invertir según tu perfil: la mayor parte en fondos indexados (lo que mejor
+  funciona para casi todo el mundo) y una parte pequeña en acciones individuales diversificadas.
 
 ### 4. Diccionario rápido
 | Término | Qué significa |
@@ -652,15 +680,24 @@ Abre el enlace de la app en el navegador del móvil y usa **"Añadir a pantalla 
 """)
 
 
-nav = st.navigation([
-    st.Page(pagina_resumen, title="Resumen", icon="🏠", default=True),
-    st.Page(pagina_noticias, title="Noticias", icon="📰"),
-    st.Page(pagina_analizar, title="Analizar", icon="🔍"),
-    st.Page(pagina_radar, title="Radar IBEX", icon="📡"),
-    st.Page(pagina_bankinter, title="Mi Bankinter", icon="🏦"),
-    st.Page(pagina_cartera_virtual, title="Cartera virtual", icon="🎮"),
-    st.Page(pagina_simulador, title="Simulador", icon="🧪"),
-    st.Page(pagina_calculadoras, title="Calculadoras", icon="🧮"),
-    st.Page(pagina_aprende, title="Aprende", icon="🎓"),
-], position="top")
+PAGINAS = {
+    "hoy": st.Page(pagina_hoy, title="Hoy", icon="🧭", default=True),
+    "plan": st.Page(pagina_plan, title="Mi plan", icon="🎯"),
+    "analizar": st.Page(pagina_analizar, title="Analizar", icon="🔍"),
+    "radar": st.Page(pagina_radar, title="Radar", icon="📡"),
+    "noticias": st.Page(pagina_noticias, title="Noticias", icon="📰"),
+    "mercados": st.Page(pagina_resumen, title="Mercados", icon="🌍"),
+    "bankinter": st.Page(pagina_bankinter, title="Mi Bankinter", icon="🏦"),
+    "virtual": st.Page(pagina_cartera_virtual, title="Cartera virtual", icon="🎮"),
+    "simulador": st.Page(pagina_simulador, title="Simulador y modelos", icon="🧪"),
+    "calculadoras": st.Page(pagina_calculadoras, title="Calculadoras", icon="🧮"),
+    "aprende": st.Page(pagina_aprende, title="Aprende", icon="🎓"),
+}
+st.session_state["_paginas"] = PAGINAS
+nav = st.navigation({
+    "Inicio": [PAGINAS["hoy"], PAGINAS["plan"]],
+    "Invertir": [PAGINAS["analizar"], PAGINAS["radar"], PAGINAS["noticias"], PAGINAS["mercados"]],
+    "Mis carteras": [PAGINAS["bankinter"], PAGINAS["virtual"]],
+    "Aprender y probar": [PAGINAS["simulador"], PAGINAS["calculadoras"], PAGINAS["aprende"]],
+}, position="top")
 nav.run()

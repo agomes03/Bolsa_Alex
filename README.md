@@ -4,16 +4,16 @@ Una app sencilla (en español) que te ayuda a invertir en bolsa con el **broker 
 
 | Sección | Qué hace |
 |---|---|
-| 🏠 **Resumen del día** | IBEX 35, Euro Stoxx 50, DAX, S&P 500 y Nasdaq, VIX, euro/dólar y petróleo, más un **semáforo** (verde / ámbar / rojo) que dice si es buen momento para invertir. |
-| 📰 **Noticias** | Junta las últimas noticias de **19 fuentes** en español e inglés (Expansión, elEconomista, Cinco Días, El País, El Confidencial, Europa Press, La Vanguardia, Investing, Google News, CNBC, MarketWatch, Yahoo Finance). Detecta cuántos medios publican la misma noticia. Las ordena por **impacto** (tipos de interés, BCE/Fed, inflación, aranceles, resultados, OPAs...), dice si son **positivas o negativas** y te explica **por qué importan**. |
-| 🔍 **Analizar una acción** | Da una puntuación de 0 a 100 y un veredicto (*Zona de compra*, *Compra escalonada*, *Esperar*, *Evitar*), explicando cada motivo. Te propone un **plan**: precio de compra, **stop-loss**, objetivo y **cuántas acciones comprar** según el dinero que quieras arriesgar. Incluye datos de la empresa (PER, dividendo, márgenes), **precio objetivo de los analistas**, noticias específicas y los pasos para hacerlo en la app de Bankinter. |
-| 🔮 **Predicción** | Probabilidad de subida y rango de precio probable a 1 semana, 1 mes y 3 meses, con su **porcentaje de acierto real** medido con datos pasados. |
-| 📡 **Radar del IBEX 35** | Analiza las 35 empresas a la vez y las ordena por puntuación. |
-| 🧪 **Simulador** | Prueba la estrategia con **dinero virtual** sobre 10 años de datos reales (operando día a día sin ver el futuro, con comisiones y stop-loss) y la **entrena**: prueba decenas de combinaciones de reglas y se queda con la de menor error de inversión, validándola en años que no ha visto (*walk-forward*). |
-| 🎮 **Cartera virtual** | Practica con dinero ficticio a precios reales (los stop-loss y objetivos se ejecutan solos) y crea un **robot** que opera solo desde hoy: una prueba en tiempo real, sin trampas. |
-| 🏦 **Mi Bankinter** | Copiloto de tu broker: registras o **importas** (Excel/CSV) tus posiciones de Bankinter y la app las vigila, te avisa (stop tocado, tendencia rota, subir stop, resultados próximos) y te deja escrita la **orden exacta** para copiar en Bankinter. |
-| 🧮 **Calculadoras** | Comisiones + Impuesto de Transacciones Financieras, IRPF al vender, e interés compuesto invirtiendo cada mes. |
-| 🎓 **Aprende** | Lo básico explicado fácil: diccionario, reglas de oro y calendario de eventos. **Empieza por aquí.** |
+| 🧭 **Hoy** | Pantalla de inicio: semáforo del mercado, resumen en pocas palabras, **ideas del día** (diversificadas por sector), **qué puede pasar** según la historia de los índices, noticias clave y avisos de tu cartera. Abre al instante porque usa el informe diario. |
+| 🎯 **Mi plan** | Asesor: 6 preguntas → tu perfil (conservador, moderado o dinámico) y un **reparto concreto en euros** (monetario/Letras, bonos, ETF mundial y unas pocas acciones), con órdenes para Bankinter, escenarios a 1 año y pruebas de estrés en crisis reales. |
+| 🔍 **Analizar** | Puntuación de 0 a 100 explicada, modelo conjunto, predicción por situaciones parecidas, plan con stop-loss y tamaño de posición, qué le puede pasar a tu dinero, datos de la empresa, analistas y noticias. |
+| 📡 **Radar** | Todas las empresas (IBEX, Continuo, Europa, EEUU, ETF) ordenadas por puntuación, con filtros. Toca una fila para analizarla. |
+| 📰 **Noticias** | 19 fuentes en español e inglés, ordenadas por impacto y explicadas. |
+| 🌍 **Mercados** | Índices, termómetros (VIX, euro/dólar, petróleo), fase de cada mercado con estadísticas desde los años 90 y peores caídas de la historia. |
+| 🏦 **Mi Bankinter** | Copiloto de tu broker: importa o registra tus posiciones, la app las vigila, te avisa y te prepara las órdenes; además, qué le puede pasar a tu cartera. |
+| 🎮 **Cartera virtual** | Practica con dinero ficticio y crea un robot que opera solo desde hoy. |
+| 🧪 **Simulador y modelos** | Resultados diarios con todas las empresas, acierto real de las ideas pasadas, laboratorio de experimentos, y simulación/entrenamiento propios. |
+| 🧮 **Calculadoras** · 🎓 **Aprende** | Costes, impuestos, interés compuesto y lo básico explicado fácil. |
 
 > ⚠️ **Es una herramienta educativa, no asesoramiento financiero.** Ningún programa puede garantizar
 > beneficios ni adivinar el futuro. Lo que sí hace es ayudarte a no comprar en mal momento, a tener
@@ -106,6 +106,28 @@ fecha (validación *walk-forward*) y compara su acierto con el de decir siempre 
 
 Nadie puede predecir la bolsa con precisión; en bolsa, acertar de forma sostenida un 55-60% con el riesgo
 controlado ya es muy bueno. Lo importante es que siempre sepas cuánto fiarte.
+
+## Actualización diaria automática (GitHub Actions)
+`.github/workflows/actualizar.yml` se ejecuta solo de lunes a viernes a las 22:15 UTC (tras el cierre de Wall
+Street) y los sábados (reentrenamiento semanal de la estrategia). Ejecuta `scripts/actualizar.py`, que:
+
+1. Descarga 10 años de unas 130 empresas, los índices (IBEX desde 1993, S&P 500 desde 1927) y las noticias.
+2. Reentrena el **modelo conjunto** con todas las empresas y lo valida año a año sin mirar el futuro.
+3. Puntúa cada valor, elige las **ideas del día** y calcula fases de mercado y escenarios.
+4. Guarda `informe/informe.json` en el repositorio (la app lo lee al instante) y archiva las ideas y el tono de
+   las noticias para medir su **acierto real** con el paso del tiempo.
+
+Puedes lanzarla a mano en GitHub → *Actions* → *Actualización diaria* → *Run workflow*. Consume unos pocos
+minutos al día del cupo gratuito de GitHub Actions.
+
+**Avisos al móvil por Telegram (opcional):** crea un bot con @BotFather y añade en GitHub → *Settings →
+Secrets and variables → Actions* los secretos `TELEGRAM_TOKEN` y `TELEGRAM_CHAT_ID`. Si además añades
+`GIST_TOKEN` y `GIST_ID` (los mismos del guardado en la nube), el mensaje diario incluirá avisos de tu cartera
+de Bankinter (stop tocado, subir stop, tendencia rota...).
+
+**Laboratorio** (`.github/workflows/experimentos.yml`, mensual o a mano): compara con datos reales qué se puede
+predecir (subidas, hacerlo mejor que las demás, caídas fuertes) y qué carteras funcionan; los resultados se ven
+en la app (🧪 Simulador y modelos).
 
 ## Simulador y entrenamiento (`bolsa/simulador.py`)
 - **Sin mirar el futuro**: cada día se decide con el cierre anterior y se ejecuta en la apertura; la

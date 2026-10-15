@@ -118,12 +118,28 @@ def pagina_simulador():
             "- ⚠️ Se usan las empresas que están HOY en el índice (las que salieron por ir mal no aparecen), "
             "lo que hace los resultados algo optimistas.\n"
             "- ⚠️ No incluye impuestos sobre las ganancias (IRPF).")
+    t0, t1, t2 = st.tabs(["🌍 Resultados diarios (todas las empresas)", "▶️ Probar aquí",
+                          "🏋️ Entrenar aquí"])
+    with t0:
+        from paginas_hoy import bloque_entrenamiento_diario, bloque_historial_ideas, bloque_laboratorio
+        bloque_entrenamiento_diario()
+        bloque_historial_ideas()
+        bloque_laboratorio()
+    if not st.session_state.get("sim_local"):
+        with t1:
+            st.caption("Simula aquí mismo con el grupo de acciones que elijas (descarga 10 años de datos: tarda "
+                       "un poco la primera vez).")
+            if st.button("Cargar datos y simular", key="sim_local_btn"):
+                st.session_state["sim_local"] = True
+                st.rerun()
+        with t2:
+            st.caption("Pulsa 'Cargar datos y simular' en la pestaña anterior para entrenar aquí.")
+        return
     u = universo_con_barra(universo)
     if u is None:
         return
     st.caption(f"{len(u.tickers)} acciones · datos de {u.fechas[u.inicio]:%d/%m/%Y} a {u.fechas[-1]:%d/%m/%Y}")
 
-    t1, t2 = st.tabs(["▶️ Probar la estrategia", "🏋️ Entrenar (minimizar errores)"])
     with t1:
         guardada = datos_usuario().get("estrategia")
         opciones = ["Reglas entrenadas (las que usa la app)", "Reglas por defecto"] if guardada else ["Reglas por defecto"]
@@ -495,6 +511,11 @@ def pagina_bankinter():
         st.subheader("Qué hacer con cada posición")
         for f in filas:
             posicion_detalle(f, cr)
+
+        st.subheader("🌦️ Qué le puede pasar a tu cartera")
+        from paginas_hoy import bloque_que_puede_pasar
+        pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] for f in filas if f["precio"]}
+        bloque_que_puede_pasar(pesos, total, 0.0, 0)
     else:
         st.caption("Aún no has registrado posiciones. Añádelas a mano o importa el Excel de Bankinter.")
 
