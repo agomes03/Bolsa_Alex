@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
+
 from bolsa import costes
 from ui_comun import alto_grafico, eur, perfil, reducir
 
@@ -24,8 +25,8 @@ def pagina_calculadoras():
         ref = tipos_valor[tipo]
         cc = costes.coste_compra(importe, ref, tarifa)
         iv = costes.coste_ida_y_vuelta(importe, ref, tarifa)
-        c = st.columns(1 if movil else 3)
-        c[0].metric("Al comprar", eur(cc["total"]), f"{cc['pct']:.2f} %".replace(".", ","), delta_color="off")
+        c = st.columns(2 if movil else 3)
+        c[0].metric("Al comprar", eur(cc["total"]), f"{cc['pct']:.2f} %".replace(".", ","), delta_color="off", delta_arrow="off")
         c[1 % len(c)].metric("Al vender", eur(iv["venta"]))
         c[2 % len(c)].metric("Custodia (1 año)", eur(iv["custodia"]))
         detalle = [f"comisión {eur(cc['comision'])}"]
@@ -45,7 +46,7 @@ def pagina_calculadoras():
         venta = st.number_input("Precio total de venta (€)", 0.0, 10_000_000.0, 1300.0, 50.0)
         g = venta - compra
         imp = costes.impuesto_ganancia(g)
-        c = st.columns(1 if movil else 3)
+        c = st.columns(2 if movil else 3)
         c[0].metric("Ganancia", eur(g))
         c[1 % len(c)].metric("IRPF aproximado", eur(imp))
         c[2 % len(c)].metric("Te queda limpio", eur(g - imp))

@@ -74,7 +74,7 @@ def tarjetas_metricas(m: dict, titulo: str, capital: float, contenedor=None):
         st.markdown(f"**{titulo}**")
         st.metric("Capital final", eur(m["capital_final"]), pct(m["rentabilidad_pct"], 1))
         st.metric("Rentabilidad anual media", pct(m["cagr_pct"], 1))
-        st.metric("Peor caída desde máximos", pct(m["max_caida_pct"], 1), delta_color="off",
+        st.metric("Peor caída desde máximos", pct(m["max_caida_pct"], 1), delta_color="off", delta_arrow="off",
                   help="El mayor susto: cuánto llegó a bajar el dinero desde su punto más alto.")
         if m.get("operaciones"):
             st.caption(f"{m['operaciones']} operaciones · ganadoras {m['acierto_pct']:.0f}% · "
@@ -471,6 +471,17 @@ def revisar_cartera_real() -> list[dict]:
     return filas
 
 
+def pesos_cartera_real() -> dict[str, float]:
+    """Parte de tu dinero (cartera + ahorros apuntados) en cada valor que tienes. Vacío si no hay cartera."""
+    try:
+        filas = revisar_cartera_real()
+    except Exception:  # noqa: BLE001 - sin datos, sin pesos
+        return {}
+    valores = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
+    total = sum(valores.values()) + max(datos_usuario().get("otros_ahorros", 0.0), 0.0)
+    return {t: v / total for t, v in valores.items()} if total > 0 else {}
+
+
 ICONO_NIVEL = {"vender": "🔴", "vigilar": "🟠", "poner_stop": "🟡", "subir_stop": "🟢⬆️", "mantener": "🟢",
                "sin_datos": "⚪"}
 
@@ -504,14 +515,14 @@ def asesor_hoy(inf: dict | None):
         cambio = sum(p["acciones"] * p["precio"] * p["fx"] * (1 - 1 / (1 + f["var_1d"]))
                      for p, f in zip(posiciones, [f for f in filas if f["precio"]]) if f.get("var_1d") is not None)
         invertido = sum(p["acciones"] * p["precio_medio"] * p["fx_medio"] for p in posiciones)
-        c = st.columns(3 if not pf.movil else 1)
-        c[0].metric("Tu dinero invertido vale", eur(valor), f"{eur(cambio)} en la última sesión", delta_color="normal")
+        c = st.columns(3 if not pf.movil else 2)
+        c[0].metric("Tu dinero invertido vale", eur(valor), f"{num(cambio, 0)} € en la sesión", delta_color="normal")
         c[1 % len(c)].metric("Ganancia o pérdida total", eur(valor - invertido),
                              pct((valor / invertido - 1) * 100, 1) if invertido else None)
         if dg.get("clases"):
             principal = max(dg["clases"].items(), key=lambda x: x[1])
             c[2 % len(c)].metric("Reparto", f"{principal[1] * 100:.0f} % {principal[0].lower()}",
-                                 TITULO_SEMAFORO.get(dg["semaforo"], ""), delta_color="off")
+                                 TITULO_SEMAFORO.get(dg["semaforo"], ""), delta_color="off", delta_arrow="off")
         try:
             proximos_div = dividendos.calendario(resumenes_dividendos(filas), dias=10)
         except Exception:  # noqa: BLE001 - sin datos de dividendos, el resto sigue
@@ -634,29 +645,39 @@ def pagina_bankinter():
         if pf.movil:
             tabla = tabla[["", "Activo", "Ganancia (%)", "Valor (€)"]]
         st.dataframe(tabla, hide_index=True, width="stretch")
-        comparado = bloque_diagnostico(filas)
-
-        bloque_dividendos(filas)
-        bloque_comparativa(filas)
-
-        st.subheader("Qué hacer con cada posición")
-        for f in filas:
-            posicion_detalle(f, cr)
-
-        if not comparado:
-            st.subheader("🌦️ Qué le puede pasar a tu cartera")
-            from paginas_hoy import bloque_que_puede_pasar
-            pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
-            bloque_que_puede_pasar(pesos, total, 0.0, 0)
+        p_hacer, p_diag, p_div, p_comp, p_anadir = st.tabs(["📋 Qué hacer", "🩺 Diagnóstico", "💶 Dividendos",
+                                                             "📊 Comparar", "➕ Añadir"])
+        with p_hacer:
+            for f in filas:
+                posicion_detalle(f, cr)
+            bloque_telegram()
+        with p_diag:
+            comparado = bloque_diagnostico(filas)
+            if not comparado:
+                st.subheader("🌦️ Qué le puede pasar a tu cartera")
+                from paginas_hoy import bloque_que_puede_pasar
+                pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
+                bloque_que_puede_pasar(pesos, total, 0.0, 0)
+        with p_div:
+            bloque_dividendos(filas)
+        with p_comp:
+            bloque_comparativa(filas)
+        with p_anadir:
+            bloque_anadir(cr)
     else:
         st.caption("Aún no has registrado posiciones. Impórtalas de tu banco o añádelas a mano.")
+        bloque_anadir(cr)
+        bloque_telegram()
 
     palabras_de_la_pagina(["Concentración", "Diversificación", "Sector", "Volatilidad", "Caída máxima", "Stop-loss",
                            "Dividendo", "Fecha ex-dividendo", "Retención", "Ganancia patrimonial", "Base del ahorro",
                            "Compensación de pérdidas", "Regla de los 2 meses", "Fondo indexado", "Rebalanceo"])
-    bloque_telegram()
 
-    st.subheader("➕ Añadir posiciones")
+
+def bloque_anadir(cr: dict):
+    """Añadir posiciones: archivo del banco, tabla pegada o a mano; y copia de seguridad."""
+    pf = perfil()
+    st.markdown("#### ➕ Añadir posiciones")
     t2, t3, t1 = st.tabs(["📥 Archivo de tu banco", "📋 Pegar tabla", "✍️ A mano"])
     with t2:
         st.markdown(
@@ -749,10 +770,10 @@ def bloque_dividendos(filas: list[dict]):
     st.subheader("💶 Dividendos")
     valor = sum(f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"])
     bruto = sum(r["bruto_ano"] for r in lista)
-    c = st.columns(3 if not perfil().movil else 1)
+    c = st.columns(3 if not perfil().movil else 2)
     c[0].metric("Al año (bruto)", eur(bruto), help="Lo pagado por tus acciones en los últimos 12 meses.")
     c[1 % len(c)].metric("Te quedan (neto)", eur(sum(r["neto_ano"] for r in lista)),
-                         "tras la retención del 19 %", delta_color="off")
+                         "tras la retención del 19 %", delta_color="off", delta_arrow="off")
     c[2 % len(c)].metric("Rentabilidad por dividendo", pct(bruto / valor * 100, 2, False) if valor else "—")
     st.dataframe(pd.DataFrame([{
         "Empresa": r["nombre"], "Por acción (12 meses)": num(r["por_accion_ano"], 3),
@@ -817,15 +838,17 @@ def bloque_plan_fiscal(dg: dict, posiciones: list[dict]):
         guardar_datos()
     plan = reequilibrio.planificar(dg["propuesta"], dg["liberado"], dg["destino"], otras_ganancias_ano=otras)
     (st.success if plan["ahorro"] > 0 else st.info)(plan["motivo"])
-    k = st.columns(2)
-    k[0].metric("IRPF vendiendo todo ahora", eur(plan["irpf_todo_ahora"]))
-    k[1].metric("IRPF con este plan", eur(plan["irpf_plan"]),
-                f"−{eur(plan['ahorro'])}" if plan["ahorro"] > 0 else None, delta_color="inverse")
+    if plan["ahorro"] > 0:
+        k = st.columns(2)
+        k[0].metric("IRPF vendiendo todo ahora", eur(plan["irpf_todo_ahora"]))
+        k[1].metric("IRPF con este plan", eur(plan["irpf_plan"]), f"-{eur(plan['ahorro'])}", delta_color="inverse")
+    else:
+        st.metric("IRPF aproximado de estas ventas", eur(plan["irpf_plan"]))
     for i, paso in enumerate(plan["pasos"], 1):
         with st.container(border=True):
             st.markdown(f"**Paso {i} · {paso['cuando']}** — IRPF de ese año por estas ventas: ≈ {eur(paso['irpf'])}")
             st.dataframe(pd.DataFrame([{"Vender": v["nombre"], "Títulos": v["acciones"], "Importe": eur(v["importe"]),
-                                        "Ganancia (+) / pérdida (−)": eur(v["ganancia"])} for v in paso["ventas"]]),
+                                        "Resultado": eur(v["ganancia"])} for v in paso["ventas"]]),
                          hide_index=True, width="stretch")
             st.caption(paso["nota"])
     if plan["aportaciones"]:
@@ -883,7 +906,7 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     mayor = dg["empresas"][0]
     m = st.columns(2 if pf.movil else 4)
     m[0].metric("Estado", TITULO_SEMAFORO[dg["semaforo"]])
-    m[1].metric("Mayor peso", f"{mayor['peso'] * 100:.0f} %".replace(".", ","), mayor["nombre"], delta_color="off")
+    m[1].metric("Mayor peso", f"{mayor['peso'] * 100:.0f} %".replace(".", ","), mayor["nombre"], delta_color="off", delta_arrow="off")
     m[2 % len(m)].metric("Equivale a", f"{num(dg['n_efectivo'], 1)} empresas",
                          help="1 / suma de los pesos al cuadrado: cuántas empresas a partes iguales tendrían el "
                               "mismo riesgo de concentración. Lo prudente es 5 o más (un fondo indexado: más de 1.000).")
@@ -908,12 +931,14 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
         return False
     st.markdown("#### 🧭 Propuesta: repartir el riesgo")
     st.write(f"Para que ninguna empresa pase del {diagnostico.MAX_EMPRESA * 100:.0f} % de tu dinero, venderías:")
-    st.dataframe(pd.DataFrame([{
-        "Empresa": v["nombre"], "Vender": f"{v['acciones']} {'acción' if v['acciones'] == 1 else 'acciones'}",
-        "Importe": eur(v["importe"]), "Ganancia (+) o pérdida (−) a declarar": eur(v["ganancia"]),
-        "Peso después": f"{v['queda_peso'] * 100:.0f} %"} for v in dg["propuesta"]]),
-        hide_index=True, width="stretch")
-    k = st.columns(1 if pf.movil else 3)
+    propuesta = pd.DataFrame([{
+        "Empresa": v["nombre"], "Vender (títulos)": v["acciones"], "Importe": eur(v["importe"]),
+        "Resultado a declarar": eur(v["ganancia"]), "Peso después": f"{v['queda_peso'] * 100:.0f} %"}
+        for v in dg["propuesta"]])
+    if pf.movil:
+        propuesta = propuesta[["Empresa", "Vender (títulos)", "Importe"]]
+    st.dataframe(propuesta, hide_index=True, width="stretch")
+    k = st.columns(2 if pf.movil else 3)
     k[0].metric("Comisiones de venta", eur(dg["costes_venta"]))
     k[1 % len(k)].metric("IRPF aproximado", eur(dg["impuesto"]),
                          help="Sobre la ganancia neta de estas ventas (las pérdidas compensan las ganancias). "

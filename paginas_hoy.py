@@ -8,10 +8,10 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from bolsa import asesor, bankinter, costes, estrategias, patrones
+from bolsa import asesor, bankinter, costes, diagnostico, estrategias, patrones
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
-from paginas_extra import asesor_hoy
+from paginas_extra import asesor_hoy, pesos_cartera_real
 from paginas_seguimiento import bloque_pendientes
 from ui_comun import (palabras_de_la_pagina, reducir, conclusion_noticia, cargar_informe, cargar_varios, datos_usuario, dias_informe, eur, fecha, guardar_datos,
                       hora_espana, ir_a, moneda_de, num, pct, perfil)
@@ -69,12 +69,18 @@ def precio_eur(r: dict) -> float | None:
     return r["precio"] if costes.divisa(r["ticker"]) == "EUR" else None
 
 
-def tarjeta_idea(r: dict, clave: str):
+def tarjeta_idea(r: dict, clave: str, peso: float = 0.0):
+    """`peso`: parte de tu dinero que ya está en este valor (0 si no lo tienes)."""
     m = moneda_de(r["ticker"])
     etiqueta, color, _ = asesor.veredicto(r)
     with st.container(border=True):
         st.markdown(f"**{r['nombre']}** · {r['sector']}")
-        st.markdown(f":{color}[**{etiqueta}**] · nota **{r.get('nota', '—')}**/100")
+        if peso > diagnostico.MAX_EMPRESA:
+            st.markdown(f":orange[**Ya tienes demasiada**] · pesa el {peso * 100:.0f} % de tu dinero: no compres "
+                        "más aunque tenga buena nota.")
+        else:
+            st.markdown(f":{color}[**{etiqueta}**] · nota **{r.get('nota', '—')}**/100"
+                        + (f" · ya la tienes ({peso * 100:.0f} %)" if peso > 0 else ""))
         partes = [f"{eur(r['precio'], m)}", f"último año {pct((r.get('momentum') or 0) * 100, 0)}"]
         if r.get("riesgo_nivel"):
             partes.append(f"riesgo de caída {ICONO_RIESGO[r['riesgo_nivel']]}")
@@ -119,11 +125,19 @@ def pagina_hoy():
     st.caption("Las acciones españolas con mejor nota, de sectores distintos, con su mercado al alza, sin riesgo alto "
                "de caída y sin resultados inminentes. En Bankinter cuestan de 0 a 8 € por operación.")
     ideas = [por_ticker[t] for t in inf.get("ideas_es", []) if t in por_ticker]
+    pesos = pesos_cartera_real()
+    # Las que ya tienes de sobra, al final: no son ideas para ti hoy.
+    ideas.sort(key=lambda r: pesos.get(r["ticker"], 0.0) > diagnostico.MAX_EMPRESA)
     if ideas:
+        visibles = ideas[:3] if pf.movil else ideas
         cols = st.columns(1 if pf.movil else min(len(ideas), 3))
-        for i, r in enumerate(ideas):
+        for i, r in enumerate(visibles):
             with cols[i % len(cols)]:
-                tarjeta_idea(r, "es")
+                tarjeta_idea(r, "es", pesos.get(r["ticker"], 0.0))
+        if len(ideas) > len(visibles):
+            with st.expander(f"Ver {len(ideas) - len(visibles)} ideas más"):
+                for r in ideas[len(visibles):]:
+                    tarjeta_idea(r, "es", pesos.get(r["ticker"], 0.0))
     else:
         st.info("Hoy ninguna acción española cumple todas las condiciones. No pasa nada: sigue con tu aportación "
                 "mensual al fondo indexado (🎯 Mi plan).")
@@ -160,13 +174,19 @@ def pagina_hoy():
     st.subheader("📰 Lo más importante")
     st.caption("Con la conclusión sencilla de cada una: dónde repercute y qué oportunidad o riesgo genera. Todas en "
                "📰 Noticias.")
+    vistas = set()
     for n in inf["noticias"]["top"][:3]:
         icono = {1: "🟢", -1: "🔴", 0: "⚪"}[n["sentimiento"]]
         st.markdown(f"{icono} [{n['titulo']}]({n['enlace']})")
         c = conclusion_noticia(n["titulo"], n.get("resumen", ""), n.get("empresas", []), n["sentimiento"])
-        if c:
-            st.markdown(f"<small>{c['icono']} **{c['titulo']}**: {c['oportunidad']}"
-                        + (f" **{c['te_afecta']}**" if c["te_afecta"] else "") + "</small>", unsafe_allow_html=True)
+        if c and (c["titulo"], c["oportunidad"]) in vistas:
+            st.caption("↑ Misma lectura que la noticia anterior.")
+        elif c:
+            vistas.add((c["titulo"], c["oportunidad"]))
+            donde = c["donde"].split(". ")[0].split(" · ")[0]
+            st.markdown(f"<small>{c['icono']} **{c['titulo']}** · {donde}: {c['oportunidad']}"
+                        + (f" 📌 **{c['te_afecta']}**" if c["te_afecta"] else "") + "</small>",
+                        unsafe_allow_html=True)
         elif n["explicaciones"]:
             st.caption("💡 " + n["explicaciones"][0])
 
@@ -287,7 +307,7 @@ def bloque_que_puede_pasar(pesos: dict[str, float], importe: float, mensual: flo
     if not esc:
         st.caption("No hay historia suficiente para calcular escenarios.")
         return
-    c = st.columns(1 if pf.movil else 3)
+    c = st.columns(2 if pf.movil else 3)
     c[0].metric("Año malo (1 de cada 20)", eur(importe * (1 + esc["p5"])), pct(esc["p5"] * 100, 1))
     c[1 % len(c)].metric("Año normal", eur(importe * (1 + esc["p50"])), pct(esc["p50"] * 100, 1))
     c[2 % len(c)].metric("Año bueno (1 de cada 20)", eur(importe * (1 + esc["p95"])), pct(esc["p95"] * 100, 1))
@@ -374,11 +394,11 @@ def bloque_que_puede_pasar_accion(ticker: str, df: pd.DataFrame, importe: float)
     if not esc:
         return
     st.caption(f"Con {eur(importe)} invertidos durante 1 año, según {esc['anos_historia']} años de su historia:")
-    c = st.columns(1 if pf.movil else 3)
-    c[0].metric("Año malo (1 de cada 20)", pct(esc["p5"] * 100, 0), eur(importe * esc["p5"]), delta_color="off")
-    c[1 % len(c)].metric("Año normal", pct(esc["p50"] * 100, 0), eur(importe * esc["p50"]), delta_color="off")
+    c = st.columns(2 if pf.movil else 3)
+    c[0].metric("Año malo (1 de cada 20)", pct(esc["p5"] * 100, 0), eur(importe * esc["p5"]), delta_color="off", delta_arrow="off")
+    c[1 % len(c)].metric("Año normal", pct(esc["p50"] * 100, 0), eur(importe * esc["p50"]), delta_color="off", delta_arrow="off")
     c[2 % len(c)].metric("Año bueno (1 de cada 20)", pct(esc["p95"] * 100, 0), eur(importe * esc["p95"]),
-                         delta_color="off")
+                         delta_color="off", delta_arrow="off")
     if estres:
         st.caption("En crisis reales: " + " · ".join(f"{e['crisis']}: {pct(e['cambio'] * 100, 0)}" for e in estres))
 
@@ -405,7 +425,10 @@ def bloque_fases(inf: dict | None):
                               "Lo normal": f"{pct(s['p10'] * 100, 0)} a {pct(s['p90'] * 100, 0)}",
                               "Peor caso": pct(s["peor"] * 100, 0), "Casos": s["casos"]})
             if filas:
-                st.dataframe(pd.DataFrame(filas), hide_index=True, width="stretch")
+                tabla = pd.DataFrame(filas)
+                if perfil().movil:
+                    tabla = tabla[["Plazo", "Subió (esta fase)", "Peor caso"]]
+                st.dataframe(tabla, hide_index=True, width="stretch")
     with st.expander("📉 Las peores caídas de la historia y cuánto tardaron en recuperarse"):
         for t in ("^IBEX", "^GSPC"):
             caidas = mer.get("peores_caidas", {}).get(t, [])
@@ -459,20 +482,20 @@ def bloque_un_modelo(mod: dict, titulo: str, riesgo: bool = False):
     pf = perfil()
     mm = mod["metricas"]
     st.subheader(titulo)
-    c = st.columns(1 if pf.movil else 3)
-    c[0].metric("AUC (0,5 = azar)", f"{mm['auc']:.3f}", nivel_auc(mm["auc"]), delta_color="off")
+    c = st.columns(2 if pf.movil else 3)
+    c[0].metric("AUC (0,5 = azar)", f"{mm['auc']:.3f}", nivel_auc(mm["auc"]), delta_color="off", delta_arrow="off")
     if riesgo:
         cal = pd.DataFrame(mod["calibracion"])
         c[1 % len(c)].metric("Caídas con riesgo 'muy bajo'", f"{cal['sube'].iloc[0] * 100:.0f}%")
         c[2 % len(c)].metric("Caídas con riesgo 'muy alto'", f"{cal['sube'].iloc[-1] * 100:.0f}%",
-                             f"media {mm['tasa_subidas'] * 100:.0f}%", delta_color="off")
+                             f"media {mm['tasa_subidas'] * 100:.0f}%", delta_color="off", delta_arrow="off")
         st.caption("Frecuencia real con la que la acción llegó a caer más de un 10% en el mes siguiente, según el "
                    "riesgo que había estimado el modelo, en años que no había visto.")
     else:
         c[1 % len(c)].metric("Acierto de dirección a 1 mes", f"{mm['acierto'] * 100:.1f}%",
-                             f"azar {mm['referencia'] * 100:.1f}%", delta_color="off")
+                             f"azar {mm['referencia'] * 100:.1f}%", delta_color="off", delta_arrow="off")
         c[2 % len(c)].metric("20% mejor valoradas (al mes)", pct(mm["mejores_mes"] * 100, 2),
-                             f"todas {pct(mm['todos_mes'] * 100, 2)}", delta_color="off")
+                             f"todas {pct(mm['todos_mes'] * 100, 2)}", delta_color="off", delta_arrow="off")
     st.caption(f"{mm['casos']:,} casos de {mm['acciones']} valores ({mm['desde']} → {mm['hasta']}). ".replace(",", ".")
                + f"Fiabilidad: **{mod['fiabilidad']}**.")
     cal = pd.DataFrame(mod["calibracion"])
@@ -504,13 +527,13 @@ def mostrar_cartera(k: str, c: dict, por_ticker: dict, sugerida: bool):
         st.success("👉 Es la que encaja con tu perfil (🎯 Mi plan).")
     st.caption(estrategias.CARTERAS[k].descripcion if k in estrategias.CARTERAS else c["descripcion"])
     m, ref = c["metricas"], c["referencia"]
-    cols = st.columns(1 if pf.movil else 3)
+    cols = st.columns(2 if pf.movil else 3)
     cols[0].metric("Rentabilidad al año (simulada)", pct(m["cagr_pct"]), f"todas: {pct(ref['cagr_pct'])}",
-                   delta_color="off")
+                   delta_color="off", delta_arrow="off")
     cols[1 % len(cols)].metric("Peor caída", pct(m["max_caida_pct"], 0), f"todas: {pct(ref['max_caida_pct'], 0)}",
-                               delta_color="off")
+                               delta_color="off", delta_arrow="off")
     cols[2 % len(cols)].metric("Comisiones pagadas", eur(m["gastos"]), f"{m['operaciones']} operaciones",
-                               delta_color="off")
+                               delta_color="off", delta_arrow="off")
     curvas = pd.DataFrame({"Esta cartera": pd.Series(c["curva"]["valores"], index=pd.to_datetime(c["curva"]["fechas"])),
                            "Todas a partes iguales": pd.Series(c["curva_referencia"]["valores"],
                                                                index=pd.to_datetime(c["curva_referencia"]["fechas"]))})

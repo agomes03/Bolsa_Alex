@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ui_comun import aviso_datos_antiguos, control_acceso
+from ui_comun import aviso_datos_antiguos, barra_movil, control_acceso, estilos
 
 st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide",
                    initial_sidebar_state="collapsed")
+estilos()
 control_acceso()
 
 from barra_lateral import barra_lateral  # noqa: E402  (después de la contraseña: no se carga nada sin acceso)
@@ -48,13 +49,16 @@ PAGINAS = {
     "acierto": st.Page(pagina_acierto, title="¿Acierta la app?", icon="✅"),
 }
 st.session_state["_paginas"] = PAGINAS
-nav = st.navigation({
+GRUPOS = {
     "Inicio": [PAGINAS["hoy"], PAGINAS["plan"], PAGINAS["chat"]],
     "Invertir": [PAGINAS["analizar"], PAGINAS["radar"], PAGINAS["carteras"], PAGINAS["noticias"],
                  PAGINAS["mercados"]],
     "Mis carteras": [PAGINAS["bankinter"], PAGINAS["seguimiento"], PAGINAS["virtual"]],
     "Aprender y probar": [PAGINAS["acierto"], PAGINAS["simulador"], PAGINAS["calculadoras"], PAGINAS["aprende"]],
-}, position="top")
+}
+nav = st.navigation(GRUPOS, position="top")
+if st.session_state["_perfil"].movil:
+    barra_movil(GRUPOS)
 _hueco_aviso = st.empty()
 nav.run()
 aviso_datos_antiguos(_hueco_aviso)

@@ -113,3 +113,18 @@ def test_isin_de_etf_conocido_va_a_la_cotizacion_en_euros():
                                lambda q: {"symbol": "IWDA.L", "name": "x", "type": "ETF"})
     assert df.iloc[0]["ticker"] == "IWDA.AS"
     assert "tipos de interés" in activos.lectura("Monetario", {"var_1a": 2.0}, "Monetario y liquidez")
+
+
+def test_consejos_repetidos_se_agrupan_en_una_linea():
+    posiciones = [{"ticker": t, "nombre": n, "nivel": "poner_stop", "consejo": "x", "stop_sugerido": s}
+                  for t, n, s in [("SAN.MC", "Banco Santander", 11.07), ("ITX.MC", "Inditex", 53.3),
+                                  ("IDR.MC", "Indra", 59.6)]]
+    dg = {"clases": {}, "hallazgos": [
+        {"gravedad": "alta", "titulo": "Indra pesa el 53 % de tu dinero", "texto": "x"},
+        {"gravedad": "media", "titulo": "Inditex pesa el 31 % de tu dinero", "texto": "x"}]}
+    plan = asesor_diario.plan_del_dia(dg, posiciones, {}, [], hoy=date(2026, 10, 15))
+    titulos = [a["titulo"] for a in plan]
+    assert "Sin stop-loss: Banco Santander, Inditex e Indra" in titulos
+    assert "Indra (53 %) e Inditex (31 %) pesan demasiado" in titulos
+    assert len(plan) == 2
+    assert "Indra a 59,60" in plan[[a["titulo"] for a in plan].index("Sin stop-loss: Banco Santander, Inditex e Indra")]["texto"]

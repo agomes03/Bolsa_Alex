@@ -7,6 +7,7 @@ Si no hay nada importante, lo dice: no hacer nada también es una decisión prof
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 NOMBRE_INDICE = {"^IBEX": "IBEX 35", "^GSPC": "S&P 500", "^STOXX50E": "Euro Stoxx 50"}
@@ -14,6 +15,32 @@ NOMBRE_INDICE = {"^IBEX": "IBEX 35", "^GSPC": "S&P 500", "^STOXX50E": "Euro Stox
 
 def _accion(prioridad: int, icono: str, titulo: str, texto: str, pagina: str | None = None) -> dict:
     return {"prioridad": prioridad, "icono": icono, "titulo": titulo, "texto": texto, "pagina": pagina}
+
+
+def _lista(nombres: list[str]) -> str:
+    """«A, B y C» (con «e» delante de palabras que empiezan por «i»: «Inditex e Indra»)."""
+    if len(nombres) <= 1:
+        return "".join(nombres)
+    ultimo = nombres[-1]
+    y = "e" if ultimo[:1].lower() in ("i", "í") or ultimo[:2].lower() in ("hi", "hí") else "y"
+    return ", ".join(nombres[:-1]) + f" {y} {ultimo}"
+
+
+def _num(x: float) -> str:
+    return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _agrupar(nivel: str, grupo: list[dict]) -> tuple[str, str]:
+    nombres = [p.get("nombre") or p["ticker"] for p in grupo]
+    if nivel == "poner_stop" and all(p.get("stop_sugerido") for p in grupo):
+        niveles = " · ".join(f"{n} a {_num(p['stop_sugerido'])}" for n, p in zip(nombres, grupo))
+        return (f"Sin stop-loss: {_lista(nombres)}",
+                f"Crea en tu bróker una orden Stop de venta para cada una ({niveles}). Así limitas lo que puedes "
+                "perder si caen con fuerza.")
+    titulos = {"vender": "Vender o reducir", "vigilar": "Vigilar de cerca", "poner_stop": "Sin stop-loss",
+               "subir_stop": "Subir el stop-loss"}
+    return (f"{titulos[nivel]}: {_lista(nombres)}",
+            " ".join(f"**{n}:** {p.get('consejo', '')}" for n, p in zip(nombres, grupo)))
 
 
 def plan_del_dia(diagnostico: dict | None, posiciones: list[dict], informe: dict | None,
@@ -39,17 +66,29 @@ def plan_del_dia(diagnostico: dict | None, posiciones: list[dict], informe: dict
         acciones.append(_accion(2, "🔴", "Mercado en fase débil",
                                 "Si vas a comprar, hazlo poco a poco (en 3-4 veces) en lugar de todo de golpe.", "hoy"))
 
-    # 2. Cada posición
+    # 2. Cada posición (varias con el mismo consejo, en una sola línea)
     urgentes = {"vender": 1, "vigilar": 1, "poner_stop": 2, "subir_stop": 2}
-    for p in posiciones:
-        nivel = p.get("nivel")
-        if nivel in urgentes:
-            iconos = {"vender": "🔴", "vigilar": "🟠", "poner_stop": "🟡", "subir_stop": "⬆️"}
-            acciones.append(_accion(urgentes[nivel], iconos[nivel], p.get("nombre") or p["ticker"], p.get("consejo", ""),
-                                    "bankinter"))
+    iconos = {"vender": "🔴", "vigilar": "🟠", "poner_stop": "🟡", "subir_stop": "⬆️"}
+    for nivel in urgentes:
+        grupo = [p for p in posiciones if p.get("nivel") == nivel]
+        if len(grupo) == 1:
+            p = grupo[0]
+            acciones.append(_accion(urgentes[nivel], iconos[nivel], p.get("nombre") or p["ticker"],
+                                    p.get("consejo", ""), "bankinter"))
+        elif grupo:
+            acciones.append(_accion(urgentes[nivel], iconos[nivel], *_agrupar(nivel, grupo), "bankinter"))
 
-    # 3. Diagnóstico de la cartera (lo grave primero, como mucho dos de cada tipo)
+    # 3. Diagnóstico de la cartera (lo grave primero; las empresas que pesan demasiado, en una sola línea)
     hallazgos = (diagnostico or {}).get("hallazgos", [])
+    patron = re.compile(r"^(.+) pesa el (\d+ %)")
+    pesos = [m for m in (patron.match(x["titulo"]) for x in hallazgos if x["gravedad"] in ("alta", "media")) if m]
+    if len(pesos) >= 2:
+        acciones.append(_accion(
+            2, "⚖️", f"{_lista([f'{m.group(1)} ({m.group(2)})' for m in pesos])} pesan demasiado",
+            "Lo prudente es que ninguna empresa pase del 20 % de tu dinero: una sola mala noticia te haría mucho daño. "
+            "En 🏦 Mi cartera tienes la propuesta para repartir el riesgo pagando lo mínimo en impuestos.",
+            "bankinter"))
+        hallazgos = [x for x in hallazgos if not patron.match(x["titulo"])]
     for x in [x for x in hallazgos if x["gravedad"] == "alta"][:2]:
         acciones.append(_accion(2, "⚖️", x["titulo"], x["texto"], "bankinter"))
     for x in [x for x in hallazgos if x["gravedad"] == "media" and not x["titulo"].startswith("Sin stop")][:1]:

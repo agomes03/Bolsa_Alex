@@ -183,7 +183,7 @@ def tab_aportacion():
     hoy = date.today()
     proxima = aportaciones.proxima(cfg, hoy)
     racha = aportaciones.racha(cfg, hoy)
-    k = st.columns(3 if not perfil().movil else 1)
+    k = st.columns(3 if not perfil().movil else 2)
     k[0].metric("Próxima", "Hoy" if proxima == hoy else proxima.strftime("%d/%m/%Y"))
     k[1 % len(k)].metric("Meses seguidos", racha)
     k[2 % len(k)].metric("Aportado con la app", eur(sum(h["importe"] for h in cfg.get("hechas", []))))
@@ -329,7 +329,7 @@ def tab_renta():
     k[1].metric("Dividendos (bruto)", eur(r["dividendos_brutos"]))
     k[2 % len(k)].metric("Base del ahorro", eur(r["base_ahorro"]))
     k[3 % len(k)].metric("IRPF de esta parte (aprox.)", eur(r["cuota"]),
-                         f"{eur(r['retenciones'])} ya retenidos", delta_color="off")
+                         f"{eur(r['retenciones'])} ya retenidos", delta_color="off", delta_arrow="off")
     pagar = r["a_pagar"]
     st.markdown(f"Con lo ya retenido, esta parte de tu declaración **{'suma unos ' + eur(pagar) + ' a pagar' if pagar > 0 else 'te devuelve unos ' + eur(-pagar)}**"
                 " (se junta con el resto de tu declaración: nómina, etc.).")

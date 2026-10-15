@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import streamlit as st
+
 from bolsa import aprendizaje, costes
 from ui_comun import eur, num, perfil
 

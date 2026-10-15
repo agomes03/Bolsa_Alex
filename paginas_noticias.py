@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
+
 from bolsa import noticias
 from bolsa.tickers import nombre_de
 from ui_comun import cargar_noticias, conclusion_noticia, mostrar_conclusion, perfil

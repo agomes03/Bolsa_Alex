@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
+
 from bolsa.tickers import CATALOGO, nombre_de
 from paginas_hoy import bloque_fases
 from ui_comun import cargar_activos, cargar_informe, cargar_varios, ir_a, num, palabras_de_la_pagina, pct, perfil
@@ -105,18 +106,21 @@ def tabla_mercado(grupo: str, filas: list[dict]):
         "Activo": f"{BANDERAS.get(f['ticker'], '')} {nombre_de(f['ticker'])}".strip(),
         "Último": round(f["precio"], _decimales(f["ticker"])),
         "V. diaria": round(f["var_abs"], _decimales(f["ticker"])) if f["var_abs"] is not None else None,
-        "V. diaria %": round(f["var_1d"], 2) if f["var_1d"] is not None else None,
+        "Hoy %": round(f["var_1d"], 2) if f["var_1d"] is not None else None,
         "1 año %": round(f["var_1a"], 1) if f["var_1a"] is not None else None,
         "Fecha": f["fecha"]} for f in filas])
     if movil:
-        vista = vista[["", "Activo", "Último", "V. diaria %"]]
+        vista = vista[["", "Activo", "Último", "Hoy %"]]
     estilo = vista.style.map(lambda v: "color: #16a34a" if isinstance(v, (int, float)) and v > 0 else
                              "color: #dc2626" if isinstance(v, (int, float)) and v < 0 else "",
-                             subset=[c for c in ("V. diaria", "V. diaria %", "1 año %") if c in vista.columns])
+                             subset=[c for c in ("V. diaria", "Hoy %", "1 año %") if c in vista.columns])
     sel = st.dataframe(estilo, hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row",
                        key=f"mk_tabla_{grupo}",
-                       column_config={"Último": st.column_config.NumberColumn(format="localized"),
-                                      "V. diaria": st.column_config.NumberColumn(format="localized")})
+                       column_config={"": st.column_config.TextColumn(width=28),
+                                      "Activo": st.column_config.TextColumn(width="medium"),
+                                      "Último": st.column_config.NumberColumn(format="localized"),
+                                      "V. diaria": st.column_config.NumberColumn(format="localized"),
+                                      "Hoy %": st.column_config.NumberColumn(format="%.2f %%")})
     st.caption("🟢/🔴: por encima o por debajo de su media de un año (tendencia). Toca una fila para operar o analizar.")
     filas_sel = sel.selection.rows if sel and sel.selection else []
     if not filas_sel:

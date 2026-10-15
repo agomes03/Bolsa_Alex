@@ -1,5 +1,9 @@
 [theme]
 primaryColor = "#ff6600"
 
+[client]
+# Sin el botón «Deploy» ni el menú de desarrollador arriba a la derecha.
+toolbarMode = "minimal"
+
 [browser]
 gatherUsageStats = false

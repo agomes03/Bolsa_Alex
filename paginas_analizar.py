@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
+
 from bolsa import asesor, bankinter, costes, noticias, senales
 from bolsa.activos import clase_de
+from bolsa.diagnostico import MAX_EMPRESA
 from bolsa.indicadores import calcular_todo
 from bolsa.tickers import NO_INVERTIBLES, nombre_de, sector_de, TODOS_LOS_VALORES
-from paginas_extra import bloque_operar
+from paginas_extra import bloque_operar, pesos_cartera_real
 from paginas_hoy import bloque_que_puede_pasar_accion, pagina_radar_global
 from paginas_noticias import tarjeta_noticia
 from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, cargar_informe, eur, fila_informe, fx,
@@ -105,12 +108,12 @@ def plan_de_compra(ticker, ev, fund, f_eur, m, etiqueta, color) -> float:
             iv = costes.coste_ida_y_vuelta(importe, ticker, tarifa, capitalizacion=cap_empresa) if importe else None
             c = st.columns(2 if movil else 4)
             c[0].metric("Comprar", f"{n} {'acción' if n == 1 else 'acciones'}", f"≈ {eur(importe)}",
-                    delta_color="off")
-            c[1].metric("Stop-loss (vender si baja a)", eur(p.stop, m), pct(-p.riesgo_pct), delta_color="off")
+                    delta_color="off", delta_arrow="off")
+            c[1].metric("Stop-loss (vender si baja a)", eur(p.stop, m), pct(-p.riesgo_pct), delta_color="off", delta_arrow="off")
             c[2 % len(c)].metric("Objetivo", eur(p.objetivo, m), pct(p.beneficio_pct))
             if iv:
                 c[3 % len(c)].metric("Costes Bankinter", eur(iv["total"]), f"{pct(iv['pct'], 2, False)} del importe",
-                                     delta_color="off", help="Comprar + vender + 1 año de custodia (si es extranjera).")
+                                     delta_color="off", delta_arrow="off", help="Comprar + vender + 1 año de custodia (si es extranjera).")
             st.markdown(
                 f"Si sale mal y salta el stop, perderías unos **{eur(n * (p.entrada - p.stop) * f_eur)}** "
                 f"(como máximo el {num(riesgo, 1)} % de tus {eur(capital)}). Si llega al objetivo, "
@@ -179,12 +182,12 @@ def pagina_analizar():
         st.write(explicacion)
         if fila and fila.get("nota") is not None:
             st.metric("Nota global", f"{fila['nota']}/100", f"puesto {fila['puesto']} de {fila['de']}",
-                      delta_color="off", help="Su puesto frente a todas las demás acciones combinando lo que ha "
+                      delta_color="off", delta_arrow="off", help="Su puesto frente a todas las demás acciones combinando lo que ha "
                                               "funcionado con datos reales: subida del último año (50 %), "
                                               "tendencia (30 %) y menor riesgo de caída (20 %).")
         if riesgo_modelo:
             st.metric("Riesgo de caer más de un 10 % el próximo mes", pct(riesgo_modelo["prob"] * 100, 0, False),
-                      f"lo normal: {pct(riesgo_modelo['base'] * 100, 0, False)}", delta_color="off")
+                      f"lo normal: {pct(riesgo_modelo['base'] * 100, 0, False)}", delta_color="off", delta_arrow="off")
     with c2:
         mostrar_plotly(grafico(df, "Último año" if not movil else "Últimos 6 meses", ev.plan))
         st.caption("Velas: cada día (verde si subió, roja si bajó). Naranja: media de 50 sesiones (≈3 meses). "
@@ -192,6 +195,12 @@ def pagina_analizar():
                    "por debajo de 30 ha caído muy deprisa.")
     for a in ev.avisos:
         st.warning(a)
+    peso = pesos_cartera_real().get(ticker, 0.0)
+    if peso > MAX_EMPRESA:
+        st.warning(f"⚖️ **Ya tienes demasiada:** {titulo} es el {peso * 100:.0f} % de tu dinero. Aunque hoy tenga buen "
+                   "veredicto, no compres más: lo prudente es que ninguna empresa pase del "
+                   f"{MAX_EMPRESA * 100:.0f} %. Mira en 🏦 Mi cartera cómo repartir el riesgo.")
+        etiqueta, color = "Ya tienes demasiada", "orange"
 
     with st.expander(f"🧠 Por qué (puntuación técnica {ev.puntuacion}/100, explicada paso a paso)"):
         for mo in sorted(ev.motivos, key=lambda x: -abs(x.puntos)):
