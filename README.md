@@ -52,9 +52,24 @@ entrenada de forma permanente, usa un **Gist privado de GitHub** (gratis):
 En el ordenador se guardan en `datos_usuario/datos.json`. En ambos casos puedes descargar y restaurar
 una copia de seguridad desde la propia app.
 
+### 🔒 Que solo tú puedas abrirla (contraseña)
+Si la app es pública, cualquiera con el enlace vería tu cartera. Haz las dos cosas:
+
+1. En Streamlit Cloud → tu app → **Settings → Sharing**, ponla **privada** (solo tu cuenta).
+2. En **Settings → Secrets** añade una contraseña (debajo de lo del gist, si lo tienes):
+   ```toml
+   [app]
+   password = "una-frase-larga-que-solo-sepas-tu"
+   ```
+La app pedirá la contraseña antes de mostrar nada y se bloquea un rato tras 5 intentos fallidos. Sin
+`[app] password`, la barra lateral avisa con «🔓 App sin contraseña».
+
+**Nunca** pegues tokens ni contraseñas en chats, correos o capturas: si lo has hecho, bórralo en GitHub y crea uno
+nuevo.
+
 ## Cómo instalarla en el ordenador
 
-1. Instala **Python 3.10 o superior** desde <https://www.python.org/downloads/>
+1. Instala **Python 3.12 o 3.13** desde <https://www.python.org/downloads/>
    (en Windows marca la casilla *"Add Python to PATH"*).
 2. Descarga este proyecto (botón verde **Code → Download ZIP** en GitHub) y descomprímelo.
 3. Abre una terminal en la carpeta del proyecto y ejecuta:
@@ -208,12 +223,24 @@ Bankinter no ofrece una API pública para que apps de terceros lean la cuenta de
 ## Datos
 - Cotizaciones: Yahoo Finance (gratis, ~15 minutos de retraso). En Yahoo las acciones españolas
   llevan el sufijo `.MC` (por ejemplo `SAN.MC` = Santander); en Bankinter búscalas por el nombre.
+- Si Yahoo no responde, la app usa los últimos datos buenos que guardó (carpeta `.respaldo_datos/`) y avisa
+  arriba con la fecha de esos datos, en vez de quedarse en blanco.
+- Festivos: la app conoce los festivos de la Bolsa española, Xetra, Euronext, Londres, Suiza y Nueva York
+  (`bolsa/festivos.py`), y no da un mercado por abierto en Viernes Santo o Navidad.
 - Noticias: RSS públicos. Si una fuente cambia su dirección, edítala en `bolsa/noticias.py` (`FUENTES_RSS`).
 - Comisiones de Bankinter: los valores por defecto son orientativos. Ajústalos en la barra lateral
   con tu tarifa real (app Bankinter → Broker → Tarifas).
 
 ## Para desarrolladores
 ```bash
-pip install pytest
-python -m pytest
+pip install -r requirements-dev.txt   # versiones exactas, las mismas que en Streamlit Cloud
+python -m pyflakes *.py bolsa tests scripts
+python -m pytest -q
 ```
+- `app.py` solo arranca la app (contraseña, barra lateral y menú). Cada página está en su propio archivo
+  (`paginas_hoy.py`, `paginas_mercados.py`, `paginas_analizar.py`, `paginas_noticias.py`, `paginas_extra.py`
+  para Mi cartera y el simulador, `paginas_virtual.py`, `paginas_chat.py`, `paginas_aprende.py`...), la barra
+  lateral en `barra_lateral.py` y las piezas comunes en `ui_comun.py`. La lógica (sin Streamlit) vive en `bolsa/`.
+- `tests/test_pantallas.py` abre todas las páginas, en ordenador y en móvil, con datos simulados y sin Internet.
+- En cada cambio, GitHub Actions ejecuta pyflakes y todas las pruebas (`.github/workflows/pruebas.yml`).
+- Para actualizar una librería, cambia su versión en `requirements.txt`, ejecuta las pruebas y sube el cambio.
