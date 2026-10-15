@@ -568,7 +568,7 @@ GUIAS: list[Guia] = [
           "Tipo de orden: **Limitada**. Escribe el número de títulos y el precio límite.",
           "Validez: unos días (por ejemplo, una semana). Revisa el **coste estimado** que muestra Bankinter y "
           "confirma con tu firma.",
-          "Cuando se ejecute, **pon el stop-loss enseguida** (siguiente guía) y apunta la compra en 🏦 Mi Bankinter."],
+          "Cuando se ejecute, **pon el stop-loss enseguida** (siguiente guía) y apunta la compra en 🏦 Mi cartera."],
          ["Usar orden «a mercado» en acciones poco negociadas.", "Comprar más del 20 % de tu dinero en una sola "
           "empresa.", "Olvidarte del stop-loss."],
          "En 🔍 Analizar → «Si decides comprar» tienes las órdenes listas para copiar."),
@@ -580,7 +580,7 @@ GUIAS: list[Guia] = [
           "Condición: **«menor o igual que»** el precio de stop (precio de activación).",
           "**Precio límite**: un 2 % por debajo del de activación, para que se venda aunque caiga deprisa.",
           "Títulos: todos los que tienes. Validez: la máxima que permita.",
-          "Apunta el stop en 🏦 Mi Bankinter para que la app lo vigile y te avise si conviene subirlo."],
+          "Apunta el stop en 🏦 Mi cartera para que la app lo vigile y te avise si conviene subirlo."],
          ["Ponerlo tan cerca que salte con el movimiento normal de un día.", "Bajarlo cuando el precio se acerca: "
           "anula su sentido.", "Dejar que caduque sin renovarlo."],
          "Las fichas de órdenes de la app incluyen activación y límite calculados."),
@@ -598,7 +598,7 @@ GUIAS: list[Guia] = [
           "En Bankinter las órdenes stop **no se pueden modificar**: ve a **Órdenes → anula** el stop actual.",
           "Crea uno nuevo con el precio nuevo (activación y límite un 2 % por debajo).",
           "Alternativa: usa una **stop dinámica**, que sube sola y nunca baja.",
-          "Actualiza el stop en 🏦 Mi Bankinter."],
+          "Actualiza el stop en 🏦 Mi cartera."],
          ["Bajar el stop.", "Quedarte sin stop entre anular el viejo y crear el nuevo: hazlo seguido."]),
     Guia("Vender",
          "Salir de una posición de forma ordenada.",
@@ -612,7 +612,7 @@ GUIAS: list[Guia] = [
           "usar esa pérdida en la renta."],
          ["Vender todo en plena caída por miedo.", "Vender las ganadoras demasiado pronto y aguantar las perdedoras "
           "para no «reconocer» la pérdida."],
-         "🏦 Mi Bankinter te dice qué hacer con cada posición y te deja la orden de venta escrita."),
+         "🏦 Mi cartera te dice qué hacer con cada posición y te deja la orden de venta escrita."),
     Guia("Aportar cada mes a un fondo indexado",
          "La forma más sencilla y eficaz de invertir a largo plazo.",
          ["En Bankinter, ve a **Fondos** y busca un fondo indexado al **MSCI World** o al **FTSE All-World** "
@@ -635,8 +635,9 @@ GUIAS: list[Guia] = [
           "dinero por empresa: las comisiones se comen la rentabilidad (mínimo ~1.000 € por empresa en España)."]),
     Guia("Revisar tu cartera con la app",
          "Saber si tu dinero está bien repartido y qué hacer.",
-         ["En Bankinter: **Bróker → Posición global → descargar** (archivo «Posición global.csv»).",
-          "En la app: 🏦 Mi Bankinter → **Importar** y sube el archivo tal cual.",
+         ["En tu banco, descarga tu posición (CSV o Excel) o copia la tabla de tu cartera. En Bankinter: **Bróker → "
+          "Posición global → descargar** («Posición global.csv»).",
+          "En la app: 🏦 Mi cartera → **Archivo de tu banco** (o **Pegar tabla**) y súbelo tal cual.",
           "Indica tu perfil y, si quieres, tus otros ahorros: el **diagnóstico** te dirá si alguna empresa, sector "
           "o país pesa demasiado y te propondrá cambios con su coste e impuestos.",
           "Apunta el stop-loss de cada posición (el archivo no lo incluye).",

@@ -65,7 +65,7 @@ EJERCICIOS: list[Ejercicio] = [
               _diversificada),
     Ejercicio("Ninguna empresa por encima del 20 %",
               "Con 5 o más posiciones, que ninguna pese más del 20 % del total (posiciones más efectivo).",
-              "La regla de concentración que usa el diagnóstico de 🏦 Mi Bankinter.",
+              "La regla de concentración que usa el diagnóstico de 🏦 Mi cartera.",
               _sin_concentracion),
 ]
 

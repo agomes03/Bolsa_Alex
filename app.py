@@ -18,8 +18,8 @@ from bolsa.tickers import INDICES, MERCADOS, TERMOMETROS, TODAS_LAS_ACCIONES, me
 from paginas_extra import bloque_operar, pagina_bankinter, pagina_cartera_virtual, pagina_simulador
 from paginas_hoy import (bloque_fases, bloque_que_puede_pasar_accion, pagina_carteras, pagina_hoy, pagina_plan,
                          pagina_radar_global)
-from ui_comun import (Perfil, cargar_fundamentales, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
-                      datos_usuario, es_movil, eur, fila_informe, fx, mercado_alcista_para, moneda_de,
+from ui_comun import (Perfil, cargar_activos, cargar_fundamentales, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
+                      datos_usuario, es_movil, guardar_datos, eur, fila_informe, fx, mercado_alcista_para, moneda_de,
                       noticias_empresa, num, pct)
 
 st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide",
@@ -47,15 +47,47 @@ with st.sidebar:
     riesgo = st.slider("Máximo que aceptas perder por operación (% de ese dinero)", 0.5, 5.0, 1.0, 0.5,
                        help="Regla de oro de los profesionales: no arriesgar más de un 1-2% del capital "
                             "en una sola operación. Así, aunque falles varias veces seguidas, sigues en el juego.")
-    with st.expander("Tus comisiones en Bankinter"):
-        broker_cero = st.toggle("Tengo el servicio Bróker Cero", value=False,
-                                help="Con Bróker Cero, comprar y vender acciones españolas por Internet cuesta 0 € "
-                                     "(solo pagas los cánones de la bolsa).")
-        canon = st.number_input("Cánones de bolsa en España por operación (€, aprox.)", 0.0, 10.0, 1.0, 0.5)
-        tarifa = costes.Tarifa(broker_cero=broker_cero, canon_nacional=canon)
-        st.caption("Tarifa pública de Bankinter (oct. 2026): acciones españolas 3,95 € hasta 2.000 € y 8 € hasta "
-                   "60.000 € por operación; extranjeras 20 € por operación, +1 % si se cambia de divisa, y una "
-                   "custodia mínima de 24 € al año por valor. Compruébala en Bankinter → Bróker → Tarifas.")
+    _d = datos_usuario()
+    broker = st.selectbox("Tu banco o bróker", costes.BROKERS,
+                          index=costes.BROKERS.index(_d.get("broker", "Bankinter")) if _d.get("broker") in
+                          costes.BROKERS else 0,
+                          help="Se usa para las comisiones y para escribir las órdenes con los pasos de tu bróker.")
+    if broker != _d.get("broker", "Bankinter"):
+        _d["broker"] = broker
+        guardar_datos()
+    bankinter.BROKER = broker
+    with st.expander(f"Tus comisiones en {broker if broker != 'Otro' else 'tu bróker'}"):
+        if broker == "Bankinter":
+            broker_cero = st.toggle("Tengo el servicio Bróker Cero", value=False,
+                                    help="Con Bróker Cero, comprar y vender acciones españolas por Internet cuesta 0 € "
+                                         "(solo pagas los cánones de la bolsa).")
+            canon = st.number_input("Cánones de bolsa en España por operación (€, aprox.)", 0.0, 10.0, 1.0, 0.5)
+            tarifa = costes.Tarifa(broker_cero=broker_cero, canon_nacional=canon)
+            st.caption("Tarifa pública de Bankinter (oct. 2026): acciones españolas 3,95 € hasta 2.000 € y 8 € hasta "
+                       "60.000 € por operación; extranjeras 20 € por operación, +1 % si se cambia de divisa, y una "
+                       "custodia mínima de 24 € al año por valor. Compruébala en Bankinter → Bróker → Tarifas.")
+        else:
+            base = costes.TARIFAS_PRECARGADAS.get(broker, costes.TarifaPersonal(broker))
+            guardada = _d.get("tarifas", {}).get(broker, {})
+            v = {k: float(guardada.get(k, getattr(base, k))) for k in
+                 ("nacional_fija", "internacional_fija", "divisa_pct", "custodia_anual_valor", "canon_nacional")}
+            st.caption("Pon las comisiones de tu tarifa (están en la web de tu banco, apartado «tarifas» o "
+                       "«comisiones» del bróker)." + (" Precargada la de Trade Republic: 1 € por operación."
+                                                      if broker in costes.TARIFAS_PRECARGADAS else ""))
+            v["nacional_fija"] = st.number_input("Por operación en España (€)", 0.0, 100.0, v["nacional_fija"], 0.5)
+            v["internacional_fija"] = st.number_input("Por operación en el extranjero (€)", 0.0, 200.0,
+                                                      v["internacional_fija"], 0.5)
+            v["divisa_pct"] = st.number_input("Cambio de divisa (%)", 0.0, 5.0, v["divisa_pct"], 0.05)
+            v["custodia_anual_valor"] = st.number_input("Custodia por valor extranjero y año (€)", 0.0, 200.0,
+                                                        v["custodia_anual_valor"], 1.0)
+            v["canon_nacional"] = st.number_input("Cánones de bolsa en España (€)", 0.0, 10.0, v["canon_nacional"], 0.5)
+            if v != {k: float(guardada.get(k, getattr(base, k))) for k in v}:
+                _d.setdefault("tarifas", {})[broker] = v
+                guardar_datos()
+            tarifa = costes.TarifaPersonal(broker, nacional_fija=v["nacional_fija"],
+                                           internacional_fija=v["internacional_fija"], divisa_pct=v["divisa_pct"],
+                                           custodia_anual_valor=v["custodia_anual_valor"],
+                                           canon_nacional=v["canon_nacional"])
     st.divider()
     st.caption(f"Cotizaciones de Yahoo Finance (retraso ~15 min). Noticias de {len(noticias.FUENTES_RSS)} "
                "fuentes RSS en español e inglés. Se actualizan solas cada 5-10 minutos.")
@@ -170,6 +202,28 @@ def pagina_resumen():
         col.metric(f"{'🟢' if e['alcista'] else '🔴'} {info['nombre']}", f"{e['precio']:,.0f}".replace(",", "."),
                    pct(e["var_1d"]), help=f"{info['que_es']}\n\n{e['texto']}")
         col.caption(f"1 mes {pct(e['var_1m'], 1)} · 1 año {pct(e['var_1a'], 1)}")
+
+    st.subheader("🪙 Todos los activos: bolsa, fondos, renta fija, oro, petróleo y criptomonedas")
+    st.caption("Tendencia = precio por encima (🟢) o por debajo (🔴) de su media de un año. Volatilidad = cuánto se "
+               "mueve en un año normal: cuanto más alta, más sustos.")
+    lista = cargar_activos()
+    if lista:
+        st.dataframe(pd.DataFrame([{
+            "": "🟢" if a["alcista"] else "🔴" if a["alcista"] is not None else "⚪", "Activo": a["nombre"],
+            "Tipo": a["clase"], "Hoy (%)": round(a["var_1d"], 2) if a["var_1d"] is not None else None,
+            "1 mes (%)": round(a["var_1m"], 1) if a["var_1m"] is not None else None,
+            "1 año (%)": round(a["var_1a"], 1) if a["var_1a"] is not None else None,
+            "Desde su máximo (%)": round(a["desde_maximo"], 1),
+            "Volatilidad (%)": round(a["volatilidad"], 0) if a["volatilidad"] else None} for a in lista]),
+            hide_index=True, width="stretch")
+        with st.expander("📖 Lectura en palabras"):
+            for a in lista:
+                st.markdown(f"- {a['lectura']}")
+            st.caption("Para invertir en ellos desde España: oro con un ETC de oro físico en euros (p. ej. Xetra-Gold, "
+                       "4GLD), bolsa mundial con un fondo indexado, renta fija y monetario con fondos o Letras del "
+                       "Tesoro, y criptomonedas solo con una parte muy pequeña de tu dinero.")
+    else:
+        st.caption("No se han podido descargar los datos de los activos ahora mismo.")
 
     st.subheader("Termómetros")
     cols = st.columns(len(TERMOMETROS))
@@ -611,7 +665,7 @@ def aprende_guias():
 | Que el stop suba solo | **Stop dinámica** | Sube con la cotización y no baja nunca. |
 | Subir un stop | Anular la orden stop y crear otra | En Bankinter las órdenes stop no se modifican. |
 | Aportar cada mes | **Fondos** → fondo indexado → aportación periódica | Sin comisión por aportación (un ETF extranjero cuesta 20 € cada compra). |
-| Revisar tu cartera | Bróker → **Posición global** → descargar | Súbelo en 🏦 Mi Bankinter para el diagnóstico. |
+| Revisar tu cartera | Bróker → **Posición global** → descargar | Súbelo en 🏦 Mi cartera para el diagnóstico. |
 
 **Lo que cuesta en Bankinter** (tarifa pública, octubre 2026; compruébala en Bróker → Tarifas):
 - Acciones españolas: **3,95 €** hasta 2.000 € y **8 €** hasta 60.000 € por operación (**0 €** con Bróker Cero), más
@@ -650,7 +704,7 @@ PAGINAS = {
     "carteras": st.Page(pagina_carteras, title="Carteras modelo", icon="📦"),
     "noticias": st.Page(pagina_noticias, title="Noticias", icon="📰"),
     "mercados": st.Page(pagina_resumen, title="Mercados", icon="🌍"),
-    "bankinter": st.Page(pagina_bankinter, title="Mi Bankinter", icon="🏦"),
+    "bankinter": st.Page(pagina_bankinter, title="Mi cartera", icon="🏦"),
     "virtual": st.Page(pagina_cartera_virtual, title="Cartera virtual", icon="🎮"),
     "simulador": st.Page(pagina_simulador, title="Simulador y modelos", icon="🧪"),
     "calculadoras": st.Page(pagina_calculadoras, title="Calculadoras", icon="🧮"),

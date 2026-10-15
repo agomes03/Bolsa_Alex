@@ -206,6 +206,14 @@ def nombre_de(ticker: str) -> str:
         return INDICES_MUNDIALES[ticker]
     if ticker in TODAS_LAS_ACCIONES:
         return TODAS_LAS_ACCIONES[ticker][0]
+    from .activos import ACTIVOS, CRIPTO, ORO, es_cripto
+
+    if ticker in ORO:
+        return ORO[ticker]
+    if ticker in ACTIVOS:
+        return ACTIVOS[ticker]["nombre"]
+    if es_cripto(ticker):
+        return CRIPTO[ticker.split("-")[0].upper()]
     return ticker
 
 

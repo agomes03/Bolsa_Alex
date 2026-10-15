@@ -36,6 +36,8 @@ def divisa(ticker: str, info: dict | None = None) -> str:
     """Divisa en la que cotiza un valor ('EUR', 'USD', 'GBp'...). Si se conoce, manda la de los datos."""
     if info and info.get("currency"):
         return info["currency"]
+    if ticker.endswith("-EUR"):          # criptomonedas cotizadas en euros (BTC-EUR...)
+        return "EUR"
     if ticker.endswith(SUFIJOS_EURO):
         return "EUR"
     for sufijo, d in SUFIJOS_DIVISA.items():
@@ -57,9 +59,9 @@ def es_nacional(ticker: str) -> bool:
 
 
 def tasa_tobin_pct(ticker: str, capitalizacion: float | None = None) -> float:
-    from .tickers import ETFS
+    from .activos import clase_de
 
-    if ticker in ETFS:
+    if clase_de(ticker) != "Acciones":
         return 0.0
     for sufijo, (pct, minimo) in TASA_TOBIN.items():
         if ticker.endswith(sufijo):
@@ -159,6 +161,53 @@ def acciones_asequibles(efectivo: float, precio: float, ticker: str, tarifa: Tar
     while total(n + 1) <= efectivo:  # la estimación inicial es prudente: aprovechar lo que quepa
         n += 1
     return max(n, 0)
+
+
+@dataclass
+class TarifaPersonal:
+    """Comisiones de cualquier otro banco o bróker (las pone el usuario). Misma interfaz que `Tarifa`."""
+    nombre: str = "Otro bróker"
+    nacional_fija: float = 8.0
+    nacional_pct: float = 0.0
+    internacional_fija: float = 15.0
+    internacional_pct: float = 0.0
+    divisa_pct: float = 0.5
+    custodia_anual_valor: float = 0.0     # por valor extranjero y año
+    canon_nacional: float = 1.0
+    broker_cero: bool = False             # compatibilidad con `Tarifa`
+
+    def comision(self, importe: float, ticker: str) -> float:
+        if importe <= 0:
+            return 0.0
+        if es_nacional(ticker):
+            return self.nacional_fija + importe * self.nacional_pct / 100 + self.canon_nacional
+        return self.internacional_fija + importe * self.internacional_pct / 100
+
+    def cambio_divisa(self, importe: float, ticker: str) -> float:
+        return importe * self.divisa_pct / 100 if divisa(ticker) not in ("EUR", "—") else 0.0
+
+    def coste(self, importe: float, ticker: str) -> float:
+        return self.comision(importe, ticker) + self.cambio_divisa(importe, ticker)
+
+    def custodia_anual(self, valor: float, ticker: str) -> float:
+        return 0.0 if es_nacional(ticker) or valor <= 0 else self.custodia_anual_valor
+
+    def fijo_maximo(self, ticker: str) -> float:
+        return self.nacional_fija + self.canon_nacional if es_nacional(ticker) else self.internacional_fija
+
+    def variable_pct(self, ticker: str) -> float:
+        return (self.nacional_pct if es_nacional(ticker) else self.internacional_pct) + \
+            (self.divisa_pct if divisa(ticker) not in ("EUR", "—") else 0.0)
+
+
+# Bancos y brókers para elegir. Solo hay tarifa precargada donde está comprobada; en el resto el usuario
+# pone sus comisiones (cada banco tiene varias tarifas y cambian a menudo).
+BROKERS = ["Bankinter", "Trade Republic", "CaixaBank", "BBVA", "Banco Santander", "ING", "Kutxabank", "Openbank",
+           "MyInvestor", "Degiro", "Interactive Brokers", "Renta 4", "Sabadell", "Unicaja", "Otro"]
+TARIFAS_PRECARGADAS = {
+    # Trade Republic: 1 € de costes externos por operación, sin custodia ni cambio de divisa (opera en euros).
+    "Trade Republic": TarifaPersonal("Trade Republic", 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+}
 
 
 def tamano_por_riesgo(capital: float, riesgo_max_pct: float, entrada: float, stop: float) -> int:

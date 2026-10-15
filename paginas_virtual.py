@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from bolsa import asesor, cartera, costes, datos, ejercicios, horario, senales
+from bolsa import asesor, bankinter, cartera, costes, datos, ejercicios, horario, senales
 from bolsa.tickers import TODAS_LAS_ACCIONES, nombre_de, sector_de
 from ui_comun import (cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, datos_usuario,
                       estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de, num, pct,
@@ -21,7 +21,7 @@ EXPLICA_TIPO = {
     "mercado": "Se ejecuta ya al precio que haya (o en la apertura si el mercado está cerrado). Rápida, pero no "
                "controlas el precio.",
     "stop": "Se queda dormida hasta que el precio baja a la activación; entonces lanza una venta limitada. Es la "
-            "forma de poner un stop-loss en Bankinter.",
+            "forma de poner un stop-loss en el bróker.",
 }
 
 
@@ -73,7 +73,7 @@ def cartera_manual():
                               "comprometido» del bróker).")
     c[3 % len(c)].metric("Operaciones cerradas", f"{res['ganadoras']}/{res['operaciones_cerradas']} ganadoras")
     st.caption(f"Empezaste con {eur(cv['capital_inicial'])} el {fecha(cv['creada'])}. Precios reales con unos 15 "
-               "minutos de retraso, comisiones de tu tarifa de Bankinter (barra lateral) y las mismas reglas de "
+               "minutos de retraso, comisiones de tu bróker (barra lateral) y las mismas reglas de "
                "ejecución que el bróker.")
 
     bloque_evolucion(cv)
@@ -151,7 +151,7 @@ def bloque_posiciones(cv: dict, tabla: pd.DataFrame, res: dict, info: dict):
     st.dataframe(vista, hide_index=True, width="stretch")
     if vista["Último"].isna().any():
         st.warning("No hay cotización ahora mismo para algún valor: su valoración no se puede calcular.")
-    st.caption("Como en «Posición» de Bankinter. Precios en la divisa de cada valor; importes en euros (la "
+    st.caption("Como la posición de tu bróker. Precios en la divisa de cada valor; importes en euros (la "
                "rentabilidad incluye las comisiones de compra).")
 
     with st.expander("✏️ Cambiar stop-loss u objetivo de una posición"):
@@ -171,7 +171,8 @@ def bloque_posiciones(cv: dict, tabla: pd.DataFrame, res: dict, info: dict):
         elif st.button("Guardar cambios", key=f"v_guardar_{t}"):
             pos["stop"], pos["objetivo"] = (stop or None), (obj or None)
             guardar_datos()
-            st.success("Hecho. En Bankinter tendrías que anular la orden stop y crear otra: allí no se modifican.")
+            st.success("Hecho." + (" En Bankinter tendrías que anular la orden stop y crear otra: allí no se modifican."
+                                    if bankinter.es_bankinter() else ""))
 
 
 # --------------------------------------------------------------------------- órdenes pendientes
@@ -212,7 +213,7 @@ def ficha_cotizacion(ticker: str, diario: pd.DataFrame, q: dict):
     c[0].metric(f"{nombre_de(ticker).split(' (')[0]} · último", eur(q["precio"], m), delta)
     c[1].markdown(f"{'🟢' if estado['abierto'] else '🔴'} {estado['texto']}  \n"
                   f"<small>Precio de las {pd.Timestamp(q['hora']):%H:%M} del {pd.Timestamp(q['hora']):%d/%m} "
-                  f"(≈15 min de retraso; en Bankinter lo verás en tiempo real) · {sector_de(ticker)}</small>",
+                  f"(≈15 min de retraso; en tu bróker lo verás en tiempo real) · {sector_de(ticker)}</small>",
                   unsafe_allow_html=True)
     k = st.columns(3 if pf.movil else 6)
     k[0].metric("Apertura", num(q["apertura"], 3))
@@ -308,7 +309,7 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
         activacion = k[1].number_input(f"Activación ({m})", 0.001, value=float(min(defecto, precio * 0.999)),
                                        format="%.3f", key=f"v_act_{ticker}")
         limite = k[2 % len(k)].number_input(f"Límite ({m})", 0.001, value=round(activacion * 0.98, 3), format="%.3f",
-                                            key=f"v_limst_{ticker}", help="Bankinter lo exige. Un 2 % por debajo de la "
+                                            key=f"v_limst_{ticker}", help="Muchos brókers (Bankinter, por ejemplo) lo exigen. Un 2 % por debajo de la "
                                                                         "activación para que se ejecute aunque caiga deprisa.")
     validez = k[-1].date_input("Válida hasta", date.today() + timedelta(days=0 if tipo == "mercado" else 7),
                                min_value=date.today(), max_value=date.today() + timedelta(days=90),

@@ -142,9 +142,18 @@ def _precio(x: float, ticker: str) -> str:
     return f"{_num(x)} {simbolo(ticker)}"
 
 
+# Bróker del usuario (lo fija la app al arrancar). Los textos de Bankinter cambian si usa otro.
+BROKER = "Bankinter"
+
+
+def es_bankinter() -> bool:
+    return BROKER == "Bankinter"
+
+
 def _cabecera(ticker: str, titulo: str) -> list[str]:
+    donde = BROKER if BROKER != "Otro" else "tu bróker"
     return [f"{titulo} · {nombre_de(ticker)}",
-            f"Buscar en Bankinter: «{nombre_de(ticker).split(' (')[0]}» · {mercado_de(ticker)}"]
+            f"Buscar en {donde}: «{nombre_de(ticker).split(' (')[0]}» · {mercado_de(ticker)}"]
 
 
 def ticket_compra(ticker: str, acciones: int, precio_ref: float, dias_validez: int = 7,
@@ -168,7 +177,7 @@ def ticket_compra(ticker: str, acciones: int, precio_ref: float, dias_validez: i
         if c["itf"]:
             partes.append(f"tasa Tobin {_num(c['itf'])} €")
         lineas.append(f"Coste estimado ... {' + '.join(partes)}")
-    lineas.append("El precio límite es el último cierre: si en Bankinter ves otro precio, usa ese, "
+    lineas.append(f"El precio límite es el último cierre: si en {_donde()} ves otro precio, usa ese, "
                   "pero no pagues más de un 1 % por encima.")
     return "\n".join(lineas)
 
@@ -184,20 +193,26 @@ def ticket_stop(ticker: str, acciones: int, activacion: float, margen: float = 0
         "aunque caiga deprisa)",
         f"Títulos ............... {acciones}",
         "Validez ............... la más larga que permita la app",
-        "En Bankinter las órdenes stop no se pueden modificar: para cambiar el nivel, cancela esta y crea otra.",
-    ])
+    ] + (["En Bankinter las órdenes stop no se pueden modificar: para cambiar el nivel, cancela esta y crea otra."]
+         if es_bankinter() else ["Si tu bróker no permite poner precio límite, usa una orden stop normal."]))
 
 
 def ticket_stop_relacionadas(ticker: str, acciones: int, stop: float, objetivo: float,
                              margen: float = 0.02) -> str:
     """'Stop relacionadas': stop de pérdidas + stop de beneficios; al ejecutarse una, Bankinter cancela la otra."""
-    return "\n".join(_cabecera(ticker, "PROTECCIÓN + OBJETIVO (órdenes «stop relacionadas»)") + [
+    nombre_orden = "órdenes «stop relacionadas»" if es_bankinter() else "orden OCO: «una cancela la otra»"
+    return "\n".join(_cabecera(ticker, f"PROTECCIÓN + OBJETIVO ({nombre_orden})") + [
         f"Títulos ............... {acciones}",
         f"Stop a la baja ........ activación ≤ {_precio(stop, ticker)} · límite {_precio(stop * (1 - margen), ticker)}",
         f"Stop al alza .......... activación ≥ {_precio(objetivo, ticker)} · límite "
         f"{_precio(objetivo * 0.99, ticker)}",
-        "Cuando se ejecuta una de las dos, Bankinter cancela la otra automáticamente.",
+        f"Cuando se ejecuta una de las dos, {_donde()} cancela la otra automáticamente"
+        + ("." if es_bankinter() else " (si tu bróker no tiene este tipo de orden, pon solo el stop-loss)."),
     ])
+
+
+def _donde() -> str:
+    return BROKER if BROKER != "Otro" else "tu bróker"
 
 
 def ticket_venta(ticker: str, acciones: int, precio_ref: float) -> str:
@@ -233,17 +248,18 @@ def consejo_posicion(precio: float, precio_medio: float, stop: float | None, sto
     """(nivel, texto). nivel: 'vender', 'vigilar', 'subir_stop', 'mantener', 'poner_stop'."""
     if stop and precio <= stop:
         return "vender", ("Ha tocado tu stop-loss: según tu plan, toca vender (si tenías la orden stop puesta en "
-                          "Bankinter, ya se habrá vendido; compruébalo en tus órdenes).")
+                          f"{_donde()}, ya se habrá vendido; compruébalo en tus órdenes).")
     if puntuacion is not None and puntuacion < umbral_venta:
         return "vigilar", (f"La puntuación técnica ha bajado a {puntuacion}/100: la tendencia se ha estropeado. "
                            "Plantéate vender o, al menos, acercar el stop.")
     if not stop:
-        return "poner_stop", (f"No tienes stop-loss registrado. Crea en Bankinter una orden Stop de venta con "
+        return "poner_stop", (f"No tienes stop-loss registrado. Crea en {_donde()} una orden Stop de venta con "
                               f"activación en {_num(stop_sugerido)} para limitar pérdidas." if stop_sugerido else
                               "No tienes stop-loss registrado.")
     if stop_sugerido and stop_sugerido > stop * 1.01 and precio > precio_medio:
         return "subir_stop", (f"Vas ganando: sube el stop de {_num(stop)} a {_num(stop_sugerido)} para asegurar "
-                              "parte de la ganancia (en Bankinter: cancela la orden stop actual y crea otra).")
+                              "parte de la ganancia" + (" (en Bankinter: cancela la orden stop actual y crea otra)."
+                                                         if es_bankinter() else "."))
     texto = "Todo en orden: mantener."
     if resultados_pronto:
         texto += " Ojo: presenta resultados en los próximos días."

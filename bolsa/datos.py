@@ -120,6 +120,39 @@ def cotizacion(diario: pd.DataFrame, intradia_df: pd.DataFrame) -> dict | None:
             "sesion": hoy}
 
 
+# Bolsas preferidas al elegir entre varios resultados (para un inversor en euros).
+_PREFERENCIA_BOLSA = {"MCE": 0, "GER": 1, "AMS": 1, "PAR": 1, "MIL": 1, "FRA": 2, "NMS": 3, "NYQ": 3, "NGM": 3,
+                      "LSE": 4}
+
+
+def buscar_simbolo(consulta: str) -> dict | None:
+    """Busca en Yahoo un ISIN o un nombre y devuelve {'symbol', 'name', 'type'} (None si no lo encuentra).
+    Si hay varias bolsas, prefiere la española para ISIN ES, las europeas en euros para fondos y ETF, y la
+    de EEUU para ISIN US."""
+    import yfinance as yf
+
+    try:
+        resultados = yf.Search(consulta, max_results=10, news_count=0).quotes
+    except Exception:  # noqa: BLE001
+        return None
+    resultados = [r for r in resultados or [] if r.get("symbol")]
+    if not resultados:
+        return None
+    pais = consulta[:2].upper() if len(consulta) == 12 else ""
+
+    def orden(r):
+        bolsa = r.get("exchange", "")
+        if pais == "ES":
+            return 0 if bolsa == "MCE" else 5
+        if pais == "US":
+            return 0 if bolsa in ("NMS", "NYQ", "NGM", "NCM", "ASE") else 5
+        return _PREFERENCIA_BOLSA.get(bolsa, 6)
+
+    r = sorted(resultados, key=orden)[0]
+    return {"symbol": r["symbol"], "name": r.get("longname") or r.get("shortname") or "",
+            "type": r.get("quoteType")}
+
+
 CAMPOS_FUNDAMENTALES = [
     "longName", "currency", "marketCap", "trailingPE", "forwardPE", "priceToBook",
     "trailingAnnualDividendYield", "payoutRatio", "returnOnEquity", "profitMargins",

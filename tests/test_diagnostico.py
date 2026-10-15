@@ -61,10 +61,22 @@ def test_diagnostico_perfil_reparte_destino_y_avisa():
 
 def test_diagnostico_cartera_diversificada_sin_ventas():
     tickers = ["SAN.MC", "ITX.MC", "IBE.MC", "REP.MC", "TEF.MC", "AENA.MC", "FER.MC", "ACS.MC"]
-    pos = [_pos(t, 10, 100, 100, stop=90) for t in tickers]
-    d = diagnostico.diagnosticar(pos, otros_ahorros=30_000, perfil="Dinámico", tarifa=costes.Tarifa())
+    pos = [_pos(t, 10, 100, 100, stop=90) for t in tickers] + [_pos("IWDA.AS", 280, 100, 100)]
+    d = diagnostico.diagnosticar(pos, otros_ahorros=4_000, perfil="Dinámico", tarifa=costes.Tarifa())
     assert d["propuesta"] == [] and d["impuesto"] == 0
-    assert not any(h["gravedad"] == "alta" for h in d["hallazgos"])
+    # El fondo indexado pesa el 70 %, pero no es una «empresa»: no hay avisos graves.
+    assert not any(h["gravedad"] in ("alta", "media") for h in d["hallazgos"]), d["hallazgos"]
+    assert any("encaja" in h["titulo"] for h in d["hallazgos"])
+
+
+def test_diagnostico_multiactivo_cripto_y_oro():
+    pos = [_pos("IWDA.AS", 100, 100, 100), _pos("BTC-EUR", 0.05, 50_000, 60_000), _pos("4GLD.DE", 30, 100, 100)]
+    d = diagnostico.diagnosticar(pos, perfil="Moderado", tarifa=costes.Tarifa())
+    assert d["clases"]["Criptomonedas"] == pytest.approx(3000 / 16000)
+    titulos = " ".join(h["titulo"] for h in d["hallazgos"])
+    assert "Criptomonedas" in titulos and "Oro y materias primas" in titulos
+    assert "stop-loss" not in titulos            # a un fondo o al bitcoin no se le pide stop-loss
+    assert d["propuesta"] == []
 
 
 def test_diagnostico_sin_posiciones():

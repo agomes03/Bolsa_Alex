@@ -1,4 +1,4 @@
-"""Páginas de simulación con dinero virtual, entrenamiento de la estrategia y cartera de Bankinter."""
+"""Páginas de simulación con dinero virtual, entrenamiento de la estrategia y tu cartera real (de cualquier banco)."""
 
 from __future__ import annotations
 
@@ -10,11 +10,12 @@ import streamlit as st
 
 import plotly.graph_objects as go
 
-from bolsa import (asesor, bankinter, cartera, costes, diagnostico, estrategias, experimentos, horario, patrones,
-                   senales, simulador)
+from bolsa import (asesor, asesor_diario, bankinter, cartera, costes, diagnostico, estrategias, experimentos, horario, importador,
+                   patrones, senales, simulador)
 from bolsa.simulador import Parametros
+from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
-from ui_comun import (almacen_actual, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
+from ui_comun import (almacen_actual, cargar_activos, enlace, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
                       datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, num,
                       pct, perfil)
 
@@ -115,7 +116,7 @@ def pagina_simulador():
         st.markdown(
             "- ✅ Tendencia, medias, RSI, MACD, ambiente del mercado y el **modelo de predicción** (recalculado "
             "cada semana solo con datos pasados).\n"
-            "- ✅ Comisiones reales de Bankinter (según tu perfil), tasa Tobin, cambio de divisa, stop-loss y "
+            "- ✅ Comisiones reales de tu bróker (las de la barra lateral), tasa Tobin, cambio de divisa, stop-loss y "
             "objetivos. Todo en euros.\n"
             "- ❌ Noticias y analistas: no existe un histórico gratuito de 10 años, así que no se pueden simular.\n"
             "- ⚠️ Se usan las empresas que están HOY en el índice (las que salieron por ir mal no aparecen), "
@@ -261,8 +262,8 @@ def mostrar_entrenamiento(wf: dict, capital: float):
 def pagina_cartera_virtual():
     st.title("🎮 Cartera virtual")
     st.caption("Practica sin arriesgar nada, como si fuera el bróker: precios reales, órdenes limitadas, a mercado "
-               "y stop que se ejecutan cuando el precio llega de verdad, órdenes pendientes y comisiones de "
-               "Bankinter. Cuando lleves unos meses, compara: ¿has ganado más que el robot? ¿y que el IBEX?")
+               "y stop que se ejecutan cuando el precio llega de verdad, órdenes pendientes y las comisiones de "
+               "tu bróker. Cuando lleves unos meses, compara: ¿has ganado más que el robot? ¿y que el IBEX?")
     t1, t2 = st.tabs(["🙋 Mis operaciones virtuales", "🤖 Robot automático"])
     with t1:
         from paginas_virtual import cartera_manual
@@ -413,6 +414,28 @@ def robot_cartera(rb: dict):
 
 
 # --------------------------------------------------------------------------- 🏦 Mi cartera Bankinter
+CONSEJO_CLASE = {
+    "Fondos y ETF": "Fondo o ETF diversificado: no necesita stop-loss. Mantén las aportaciones y revisa el reparto "
+                    "una vez al año.",
+    "Renta fija": "Renta fija: amortigua las caídas de la bolsa. Mantener según tu plan.",
+    "Monetario y liquidez": "Monetario: dinero casi sin riesgo para lo que necesites pronto.",
+    "Oro y materias primas": "Oro o materias primas: protegen en algunas crisis pero no dan rentas. Mantén su peso "
+                             "pequeño (el diagnóstico te avisa si se pasa).",
+    "Criptomonedas": "Criptomoneda: muy volátil (ha caído más de un 70 % varias veces). Mantén su peso pequeño y no "
+                     "compres ni vendas en caliente.",
+}
+
+
+def nombre_posicion(t: str, pos: dict) -> str:
+    n = nombre_de(t)
+    return pos.get("nombre") or n if n == t else n
+
+
+def _var_1d(df: pd.DataFrame) -> float | None:
+    c = df["Close"].dropna()
+    return float(c.iloc[-1] / c.iloc[-2] - 1) if len(c) > 1 else None
+
+
 def revisar_cartera_real() -> list[dict]:
     """Analiza cada posición real y devuelve filas con precio, resultado y consejo."""
     cr = datos_usuario().get("cartera_real")
@@ -424,10 +447,17 @@ def revisar_cartera_real() -> list[dict]:
     funds = cargar_fundamentales_varios(tickers)
     filas = []
     for t, pos in cr["posiciones"].items():
+        clase = pos.get("clase") or clase_de(t)
+        base = {"ticker": t, "pos": pos, "clase": clase, "nombre": nombre_posicion(t, pos)}
         df = hist.get(t)
         if df is None or df.empty:
-            filas.append({"ticker": t, "pos": pos, "precio": None, "nivel": "sin_datos",
-                          "consejo": "No hay cotización para este valor (revisa el ticker).", "ev": None})
+            filas.append({**base, "precio": None, "nivel": "sin_datos", "ev": None, "fx": fx(t) or 1.0,
+                          "consejo": "No hay cotización para este valor (revisa su código)."})
+            continue
+        if clase != "Acciones":
+            filas.append({**base, "precio": float(df["Close"].iloc[-1]), "nivel": "mantener", "ev": None,
+                          "var_1d": _var_1d(df),
+                          "consejo": CONSEJO_CLASE[clase], "fx": fx(t, funds.get(t)) or 1.0})
             continue
         ev = senales.evaluar(t, df, mercado_alcista=mercado_alcista_para(t), fundamentales=funds.get(t),
                              stop_atr=p.stop_atr, ratio_objetivo=p.ratio_objetivo)
@@ -435,13 +465,58 @@ def revisar_cartera_real() -> list[dict]:
         nivel, texto = bankinter.consejo_posicion(
             ev.precio, pos["precio_medio"], pos.get("stop"), stop_sug, ev.puntuacion, p.umbral_venta,
             any("resultados" in a for a in ev.avisos))
-        filas.append({"ticker": t, "pos": pos, "precio": ev.precio, "nivel": nivel, "consejo": texto,
-                      "ev": ev, "stop_sugerido": stop_sug, "fx": fx(t, funds.get(t)) or 1.0})
+        filas.append({**base, "precio": ev.precio, "nivel": nivel, "consejo": texto, "var_1d": _var_1d(df),
+                      "ev": ev, "stop_sugerido": stop_sug, "fx": fx(t, funds.get(t)) or 1.0,
+                      "resultados_pronto": any("resultados" in a for a in ev.avisos)})
     return filas
 
 
 ICONO_NIVEL = {"vender": "🔴", "vigilar": "🟠", "poner_stop": "🟡", "subir_stop": "🟢⬆️", "mantener": "🟢",
                "sin_datos": "⚪"}
+
+
+def asesor_hoy(inf: dict | None):
+    """«🧑‍💼 Tu asesor hoy»: tu dinero y qué hacer hoy, en orden de importancia."""
+    pf = perfil()
+    d = datos_usuario()
+    cr = d.get("cartera_real")
+    with st.container(border=True):
+        st.markdown("#### 🧑‍💼 Tu asesor hoy")
+        if not cr or not cr.get("posiciones"):
+            st.markdown("Importa tu cartera desde **cualquier banco** (Bankinter, CaixaBank, BBVA, Trade Republic, "
+                        "Kutxabank...) en 🏦 Mi cartera y aquí verás cada día cuánto vale tu dinero y qué hacer con él.")
+            enlace("bankinter", "Ir a Mi cartera", "🏦")
+            return
+        try:
+            filas = revisar_cartera_real()
+            activos_hoy = cargar_activos()
+        except Exception as e:  # noqa: BLE001 - la página Hoy nunca debe romperse por la cartera
+            st.caption(f"No se ha podido revisar tu cartera ahora mismo ({e}).")
+            return
+        filas_inf = {r["ticker"]: r for r in (inf or {}).get("ranking", [])}
+        posiciones = [{"ticker": f["ticker"], "acciones": f["pos"]["acciones"], "precio_medio": f["pos"]["precio_medio"],
+                       "fx_medio": f["pos"].get("fx_medio", 1.0), "precio": f["precio"], "fx": f["fx"],
+                       "stop": f["pos"].get("stop"), "clase": f["clase"], "nombre": f["nombre"]}
+                      for f in filas if f["precio"]]
+        dg = diagnostico.diagnosticar(posiciones, d.get("otros_ahorros", 0.0), _perfil_guardado(), pf.tarifa,
+                                      filas_inf)
+        valor = sum(p["acciones"] * p["precio"] * p["fx"] for p in posiciones)
+        cambio = sum(p["acciones"] * p["precio"] * p["fx"] * (1 - 1 / (1 + f["var_1d"]))
+                     for p, f in zip(posiciones, [f for f in filas if f["precio"]]) if f.get("var_1d") is not None)
+        invertido = sum(p["acciones"] * p["precio_medio"] * p["fx_medio"] for p in posiciones)
+        c = st.columns(3 if not pf.movil else 1)
+        c[0].metric("Tu dinero invertido vale", eur(valor), f"{eur(cambio)} en la última sesión", delta_color="normal")
+        c[1 % len(c)].metric("Ganancia o pérdida total", eur(valor - invertido),
+                             pct((valor / invertido - 1) * 100, 1) if invertido else None)
+        if dg.get("clases"):
+            principal = max(dg["clases"].items(), key=lambda x: x[1])
+            c[2 % len(c)].metric("Reparto", f"{principal[1] * 100:.0f} % {principal[0].lower()}",
+                                 TITULO_SEMAFORO.get(dg["semaforo"], ""), delta_color="off")
+        for a in asesor_diario.plan_del_dia(dg, filas, inf, activos_hoy):
+            st.markdown(f"{a['icono']} **{a['titulo']}** — {a['texto']}")
+        enlace("bankinter", "Ver el diagnóstico completo de tu cartera", "🩺")
+        st.caption("Consejos educativos a partir de tus datos y de reglas de gestión prudente; no sustituyen a un "
+                   "asesor financiero registrado en la CNMV.")
 
 
 def avisos_resumen():
@@ -453,18 +528,25 @@ def avisos_resumen():
     avisos = [f for f in filas if f["nivel"] in ("vender", "vigilar", "poner_stop", "subir_stop")]
     if avisos:
         with st.container(border=True):
-            st.markdown(f"**🏦 Tu cartera de Bankinter: {len(avisos)} aviso(s)**")
+            st.markdown(f"**🏦 Tu cartera: {len(avisos)} aviso(s)**")
             for f in avisos:
-                st.markdown(f"{ICONO_NIVEL[f['nivel']]} **{nombre_de(f['ticker'])}**: {f['consejo']}")
+                st.markdown(f"{ICONO_NIVEL[f['nivel']]} **{f['nombre']}**: {f['consejo']}")
 
 
 def pagina_bankinter():
     pf = perfil()
-    st.title("🏦 Mi cartera de Bankinter")
-    st.info("**Cómo trabaja esta app con Bankinter.** Bankinter no permite que apps externas lean tu cuenta ni "
-            "envíen órdenes (no tiene API pública para particulares), así que la app es tu **copiloto**: "
-            "apuntas o importas lo que tienes, la app lo vigila cada día y te dice **qué orden poner en "
-            "Bankinter** (y te la deja escrita para copiarla). Tú das siempre la última orden.")
+    broker = bankinter.BROKER if bankinter.BROKER != "Otro" else "tu banco"
+    st.title("🏦 Mi cartera")
+    with st.expander(f"🔒 Cómo se conecta con {broker} (y por qué no te pide la contraseña)"):
+        st.markdown(
+            f"Ni {broker} ni ningún banco español ofrece a particulares una forma oficial de que otra app lea tus "
+            "inversiones o envíe órdenes. Darle tu usuario y contraseña a una app que no es tu banco es peligroso "
+            "(quien la tenga puede mover tu dinero), va contra las condiciones de tu banco y, con la doble "
+            "verificación, ni siquiera funcionaría bien. Por eso la app es tu **copiloto**:\n"
+            "1. **Descargas** tus posiciones (CSV o Excel) o **copias la tabla** de la web o la app de tu banco.\n"
+            "2. La app las **analiza**: acciones, fondos, ETF, oro, criptomonedas...\n"
+            "3. Cada día te **aconseja** qué hacer y te deja la **orden escrita** para copiarla en tu bróker.\n\n"
+            "Tú das siempre la última orden. Tus datos se guardan solo en tu copia de la app.")
     d = datos_usuario()
     cr = d.setdefault("cartera_real", cartera.nueva(None))
 
@@ -480,7 +562,8 @@ def pagina_bankinter():
             invertido = pos["acciones"] * pos["precio_medio"] * pos.get("fx_medio", 1.0)
             total += valor or 0
             ganancia += (valor - invertido) if valor else 0
-            vista.append({"": ICONO_NIVEL[f["nivel"]], "Empresa": nombre_de(f["ticker"]), "Títulos": pos["acciones"],
+            vista.append({"": ICONO_NIVEL[f["nivel"]], "Activo": f["nombre"], "Tipo": f["clase"],
+                          "Títulos": pos["acciones"],
                           "Precio medio": round(pos["precio_medio"], 2),
                           "Precio actual": round(precio, 2) if precio else None,
                           "Valor (€)": round(valor, 2) if valor else None,
@@ -490,10 +573,10 @@ def pagina_bankinter():
         c = st.columns(2)
         c[0].metric("Valor de tu cartera", eur(total))
         c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia))
-        st.caption("Precios en la divisa de cada valor, como en Bankinter; valores y ganancias en euros. La ganancia "
-                   "en % es la del precio (sin comisiones ni efecto divisa).")
+        st.caption("Precios en la divisa de cada valor, como en tu bróker; valores y ganancias en euros. La "
+                   "ganancia en % es la del precio (sin comisiones ni efecto divisa).")
         if pf.movil:
-            tabla = tabla[["", "Empresa", "Ganancia (%)", "Valor (€)"]]
+            tabla = tabla[["", "Activo", "Ganancia (%)", "Valor (€)"]]
         st.dataframe(tabla, hide_index=True, width="stretch")
         comparado = bloque_diagnostico(filas)
 
@@ -507,64 +590,59 @@ def pagina_bankinter():
             pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
             bloque_que_puede_pasar(pesos, total, 0.0, 0)
     else:
-        st.caption("Aún no has registrado posiciones. Añádelas a mano o impórtalas desde un Excel.")
+        st.caption("Aún no has registrado posiciones. Impórtalas de tu banco o añádelas a mano.")
 
     st.subheader("➕ Añadir posiciones")
-    t1, t2 = st.tabs(["✍️ A mano", "📥 Importar de Bankinter (Excel/CSV)"])
+    t2, t3, t1 = st.tabs(["📥 Archivo de tu banco", "📋 Pegar tabla", "✍️ A mano"])
+    with t2:
+        st.markdown(
+            "En la web o la app de tu banco, entra en tu **cartera de valores / posición** y busca **Exportar**, "
+            "**Descargar** o el icono de Excel. Sirve el CSV o Excel de cualquier banco (Bankinter, CaixaBank, BBVA, "
+            "Santander, ING, Kutxabank, Trade Republic, MyInvestor, Degiro...): la app reconoce columnas como "
+            "*Valor*, *ISIN*, *Títulos/Participaciones/Cantidad* y *Precio medio*.\n\n"
+            "En **Bankinter**: Bróker → **Posición global** → descargar («Posición global.csv»; formato comprobado).")
+        archivo = st.file_uploader("Archivo de posiciones", type=["xlsx", "xls", "csv", "txt"])
+        if archivo:
+            try:
+                leidas = importador.leer_archivo(archivo, archivo.name, resolver=buscar_simbolo)
+            except Exception as e:  # noqa: BLE001
+                st.error(f"No se ha podido leer el archivo: {e}")
+                leidas = pd.DataFrame()
+            revisar_e_importar(leidas, "archivo")
+    with t3:
+        st.markdown("Si tu banco solo enseña la cartera en pantalla (o en PDF), **selecciona la tabla, cópiala y "
+                    "pégala aquí** con la fila de títulos de las columnas.")
+        texto = st.text_area("Tabla copiada", height=150,
+                             placeholder="Valor	ISIN	Títulos	Precio medio\nIBERDROLA	ES0144580Y14	200	12,50")
+        if texto.strip():
+            revisar_e_importar(importador.leer_texto(texto, resolver=buscar_simbolo), "pegado")
     with t1:
         with st.form("alta_real"):
-            ticker = st.selectbox("Empresa", list(TODAS_LAS_ACCIONES), format_func=nombre_de)
-            otro = st.text_input("¿No está en la lista? Su código de Yahoo Finance", "").strip().upper()
+            ticker = st.selectbox("Acción o ETF de la lista", list(TODAS_LAS_ACCIONES), format_func=nombre_de)
+            otro = st.text_input("¿Otro activo? Escribe su ISIN, su código (BTC-EUR, 4GLD.DE...) o su nombre",
+                                 "").strip()
             c = st.columns(2 if pf.movil else 4)
-            n = c[0].number_input("Títulos", 1, 10_000_000, 10)
-            precio = c[1].number_input("Precio medio (el que muestra Bankinter)", 0.0, value=0.0, format="%.4f")
-            f_compra = c[2 % len(c)].date_input("Fecha de compra", date.today())
+            n = c[0].number_input("Cantidad (títulos o participaciones)", 0.0, 1e9, 10.0, format="%.6g")
+            precio = c[1].number_input("Precio medio de compra", 0.0, value=0.0, format="%.4f")
+            f_compra = c[2 % len(c)].date_input("Fecha de compra", date.today(), format="DD/MM/YYYY")
             stop = c[3 % len(c)].number_input("Stop-loss puesto (0 si no tienes)", 0.0, value=0.0)
             if st.form_submit_button("Guardar posición", type="primary"):
-                t = otro or ticker
-                err = cartera.comprar(cr, t, int(n), precio, pf.tarifa, f_compra.isoformat(), stop or None,
+                t, nombre, tipo = ticker, "", None
+                if otro:
+                    hallado = buscar_simbolo(otro) if (importador.es_isin(otro) or " " in otro
+                                                       or len(otro) > 12) else None
+                    if hallado:
+                        t, nombre, tipo = hallado["symbol"], hallado["name"], hallado.get("type")
+                    else:
+                        t = importador.ticker_cripto(otro) or otro.upper()
+                err = cartera.comprar(cr, t, _cantidad(n), precio, pf.tarifa, f_compra.isoformat(), stop or None,
                                       nota="Registrada a mano", fx=fx(t) or 1.0)
                 if err:
                     st.error(err)
                 else:
+                    cr["posiciones"][t].update(nombre=nombre or cr["posiciones"][t].get("nombre"),
+                                               clase=clase_de(t, tipo, nombre))
                     guardar_datos()
-                    st.rerun()
-    with t2:
-        st.markdown(
-            "1. En Bankinter, entra en **Bróker → Posición global** y descárgala (sale un archivo "
-            "«Posición global.csv»).\n"
-            "2. Súbelo aquí tal cual. La app lee *Valor*, *Ticker*, *Títulos* y *Precio medio* y te deja corregir "
-            "cualquier fila antes de guardar.\n"
-            "3. Después, en cada posición, apunta el stop-loss si ya lo tienes puesto en Bankinter (el archivo no "
-            "lo incluye).")
-        archivo = st.file_uploader("Archivo de posiciones", type=["xlsx", "xls", "csv"])
-        if archivo:
-            try:
-                leidas = bankinter.leer_archivo(archivo, archivo.name)
-            except Exception as e:  # noqa: BLE001
-                st.error(f"No se ha podido leer el archivo: {e}")
-                leidas = pd.DataFrame()
-            if leidas.empty:
-                st.error("No se han encontrado posiciones. Comprueba que el archivo tiene columnas de valor, "
-                         "títulos y precio medio.")
-            else:
-                st.caption("Revisa la tabla. Si algún ticker está vacío o mal, corrígelo (ej. SAN.MC, ITX.MC).")
-                editada = st.data_editor(leidas, hide_index=True, width="stretch", num_rows="dynamic")
-                reemplazar = st.checkbox("Reemplazar mi cartera actual por esta", value=True)
-                if st.button("📥 Importar", type="primary"):
-                    if reemplazar:
-                        cr = d["cartera_real"] = cartera.nueva(None)
-                    malas = []
-                    for _, r in editada.iterrows():
-                        if not r["ticker"] or not r["precio_medio"]:
-                            malas.append(str(r["nombre"]))
-                            continue
-                        tk = str(r["ticker"]).upper()
-                        cartera.comprar(cr, tk, int(r["acciones"]), float(r["precio_medio"]), pf.tarifa,
-                                        nota="Importada de Bankinter", fx=fx(tk) or 1.0)
-                    guardar_datos()
-                    if malas:
-                        st.warning("No se importaron (falta ticker o precio): " + ", ".join(malas))
                     st.rerun()
     copia_seguridad()
 
@@ -596,10 +674,10 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     perfil_txt = c[0].selectbox("Tu perfil", opciones, index=opciones.index(guardado) if guardado else 3,
                                 help="Calcúlalo en 🎯 Mi plan (5 preguntas). Decide cuánto conviene tener en "
                                      "acciones sueltas y cuánto en fondos.")
-    otros = c[1].number_input("Otros ahorros e inversiones (€)", 0.0, 100_000_000.0,
+    otros = c[1].number_input("Dinero en cuentas y depósitos (€)", 0.0, 100_000_000.0,
                               float(d.get("otros_ahorros", 0.0)), 1000.0,
-                              help="Cuentas, depósitos, fondos... Lo que no son estas acciones. Cuenta para saber "
-                                   "cuánto pesa cada empresa en todo tu dinero.")
+                              help="Lo que tienes en liquidez fuera de estas inversiones. Los fondos, planes o "
+                                   "acciones de otros bancos, mejor impórtalos como posiciones para analizarlos.")
     if otros != d.get("otros_ahorros", 0.0):
         d["otros_ahorros"] = otros
         guardar_datos()
@@ -608,7 +686,8 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     filas_inf = {r["ticker"]: r for r in inf.get("ranking", [])}
     posiciones = [{"ticker": f["ticker"], "acciones": f["pos"]["acciones"], "precio_medio": f["pos"]["precio_medio"],
                    "fx_medio": f["pos"].get("fx_medio", 1.0), "precio": f["precio"], "fx": f["fx"],
-                   "stop": f["pos"].get("stop")} for f in filas if f["precio"]]
+                   "stop": f["pos"].get("stop"), "clase": f["clase"], "nombre": f["nombre"]}
+                  for f in filas if f["precio"]]
     dg = diagnostico.diagnosticar(posiciones, otros, perfil_nombre, pf.tarifa, filas_inf)
     if dg["semaforo"] == "sin_datos":
         return False
@@ -657,9 +736,9 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
         st.markdown(f"- **{eur(importe)} → {producto}**: {asesor.PRODUCTOS[producto]['que']}")
     st.caption("Si tienes ganancias grandes, puedes repartir las ventas en dos años fiscales para pagar menos IRPF. "
                "Si vendes una acción con pérdidas, no la recompres en 2 meses (o no podrás aplicar esa pérdida). "
-               "Bankinter puede incluir las comisiones en su «precio medio»: el informe fiscal que te envía es el "
+               "Tu bróker puede incluir las comisiones en su «precio medio»: el informe fiscal que te envía es el "
                "que vale para la declaración.")
-    with st.expander("📋 Órdenes de venta para copiar en Bankinter"):
+    with st.expander(f"📋 Órdenes de venta para copiar en {bankinter._donde()}"):
         for v in dg["propuesta"]:
             st.code(bankinter.ticket_venta(v["ticker"], v["acciones"], v["precio"]), language=None)
 
@@ -688,10 +767,52 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     return bool(filas_t)
 
 
+@st.cache_data(ttl=86_400, show_spinner=False)
+def buscar_simbolo(consulta: str) -> dict | None:
+    from bolsa import datos
+
+    return datos.buscar_simbolo(consulta)
+
+
+def _cantidad(x: float):
+    return int(x) if float(x).is_integer() else round(float(x), 8)
+
+
+def revisar_e_importar(leidas: pd.DataFrame, origen: str):
+    pf = perfil()
+    d = datos_usuario()
+    if leidas.empty:
+        st.error("No se han encontrado posiciones. Comprueba que la tabla tiene columnas de nombre o ISIN, "
+                 "cantidad (títulos/participaciones) y precio medio.")
+        return
+    st.caption("Revisa la tabla. Si algún código está vacío o mal, corrígelo con el de Yahoo Finance (ej. SAN.MC, "
+               "IWDA.AS, BTC-EUR). Los fondos de inversión suelen tener un código que empieza por 0P.")
+    editada = st.data_editor(leidas, hide_index=True, width="stretch", num_rows="dynamic", key=f"ed_{origen}",
+                             column_config={"clase": st.column_config.SelectboxColumn("Tipo", options=CLASES)})
+    reemplazar = st.checkbox("Reemplazar mi cartera actual por esta", value=True, key=f"rep_{origen}")
+    if st.button("📥 Importar", type="primary", key=f"imp_{origen}"):
+        cr = d["cartera_real"] = cartera.nueva(None) if reemplazar else d.setdefault("cartera_real",
+                                                                                      cartera.nueva(None))
+        malas = []
+        for _, r in editada.iterrows():
+            if not r["ticker"] or not r["precio_medio"] or pd.isna(r["precio_medio"]):
+                malas.append(str(r["nombre"]))
+                continue
+            tk = str(r["ticker"]).strip().upper()
+            cartera.comprar(cr, tk, _cantidad(r["acciones"]), float(r["precio_medio"]), pf.tarifa,
+                            nota=f"Importada ({origen})", fx=fx(tk) or 1.0)
+            cr["posiciones"][tk].update(nombre=str(r["nombre"]), clase=r["clase"] if r["clase"] in CLASES
+                                        else clase_de(tk, None, str(r["nombre"])))
+        guardar_datos()
+        if malas:
+            st.warning("No se importaron (falta código o precio): " + ", ".join(malas))
+        st.rerun()
+
+
 def posicion_detalle(f: dict, cr: dict):
     pf = perfil()
     t, pos = f["ticker"], f["pos"]
-    with st.expander(f"{ICONO_NIVEL[f['nivel']]} {nombre_de(t)} — {f['consejo'][:70]}"):
+    with st.expander(f"{ICONO_NIVEL[f['nivel']]} {f['nombre']} — {f['consejo'][:70]}"):
         st.write(f["consejo"])
         if f["ev"]:
             for a in f["ev"].avisos:
@@ -709,7 +830,7 @@ def posicion_detalle(f: dict, cr: dict):
             st.rerun()
         precio_v = c[1].number_input("Vendida a (precio)", 0.0, value=float(f["precio"] or 0.0), key=f"pv_{t}")
         if c[1].button("Registrar venta", key=f"vend_{t}"):
-            cartera.vender(cr, t, pos["acciones"], precio_v, pf.tarifa, motivo="Venta en Bankinter", fx=f["fx"])
+            cartera.vender(cr, t, pos["acciones"], precio_v, pf.tarifa, motivo="Venta registrada", fx=f["fx"])
             guardar_datos()
             st.rerun()
         if c[2].button("🗑️ Quitar sin vender", key=f"del_{t}"):
@@ -723,13 +844,16 @@ def bloque_operar(ticker: str, n: int, plan: senales.Plan, f_eur: float):
     """Pasos y órdenes exactas para Bankinter, y botones para registrar la operación (virtual o real)."""
     pf = perfil()
     n = max(n, 1)
-    st.markdown("**📱 Cómo hacerlo en Bankinter**")
+    donde = bankinter._donde()
+    st.markdown(f"**📱 Cómo hacerlo en {donde}**")
     st.markdown(
-        f"1. Abre la app de Bankinter → **Bróker** → busca **{nombre_de(ticker).split(' (')[0]}** "
-        f"({bankinter.mercado_de(ticker)}).\n"
+        f"1. Abre la app de {donde}" + (" → **Bróker**" if bankinter.es_bankinter() else "")
+        + f" → busca **{nombre_de(ticker).split(' (')[0]}** ({bankinter.mercado_de(ticker)}).\n"
         "2. **Compra** con orden **Limitada** (no «a mercado»): así nunca pagas más del precio que fijes.\n"
-        "3. Cuando se ejecute, crea la **protección**: órdenes «stop relacionadas» (stop-loss + objetivo a la vez) o, "
-        "si prefieres, solo una orden **Stop** de venta.")
+        "3. Cuando se ejecute, crea la **protección**: "
+        + ("órdenes «stop relacionadas» (stop-loss + objetivo a la vez)" if bankinter.es_bankinter()
+           else "una orden OCO (stop-loss + objetivo a la vez), si tu bróker la tiene,")
+        + " o, si prefieres, solo una orden **Stop** de venta.")
     st.code(bankinter.ticket_compra(ticker, n, plan.entrada, tarifa=pf.tarifa, importe_eur=n * plan.entrada * f_eur),
             language=None)
     st.code(bankinter.ticket_stop_relacionadas(ticker, n, plan.stop, plan.objetivo), language=None)
@@ -755,7 +879,7 @@ def bloque_operar(ticker: str, n: int, plan: senales.Plan, f_eur: float):
             guardar_datos()
             st.success(f"Orden limitada enviada a tu 🎮 Cartera virtual: {n} títulos a {num(plan.entrada, 3)} como "
                        "máximo, válida 7 días. Al ejecutarse se le pondrán el stop-loss y el objetivo.")
-    with c2.popover("🏦 Ya la compré en Bankinter", width="stretch"):
+    with c2.popover(f"🏦 Ya la compré en {donde}", width="stretch"):
         with st.form(f"real_{ticker}"):
             n_real = st.number_input("Títulos comprados", 1, 10_000_000, n)
             precio = st.number_input("Precio al que se ejecutó", 0.0, value=round(plan.entrada, 2))
@@ -765,7 +889,7 @@ def bloque_operar(ticker: str, n: int, plan: senales.Plan, f_eur: float):
                 cartera.comprar(cr, ticker, int(n_real), precio, pf.tarifa, stop=stop or None,
                                 nota="Comprada tras analizarla", fx=f_eur)
                 guardar_datos()
-                st.success("Registrada. La verás en 🏦 Mi Bankinter, que la vigilará cada día.")
+                st.success("Registrada. La verás en 🏦 Mi cartera, que la vigilará cada día.")
 
 
 # --------------------------------------------------------------------------- copia de seguridad

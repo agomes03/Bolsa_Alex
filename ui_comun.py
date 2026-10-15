@@ -41,6 +41,14 @@ def cargar_diario_real(ticker: str, periodo: str = "1y") -> pd.DataFrame:
     return datos.diario_sin_ajustar(ticker, periodo)
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def cargar_activos() -> list[dict]:
+    """Lectura de todo tipo de activos: bolsas, fondo mundial, renta fija, monetario, oro, petróleo, bitcoin..."""
+    from bolsa import activos
+
+    return activos.resumen(datos.varios(list(activos.ACTIVOS), "2y"))
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def cargar_noticias() -> tuple[list[noticias.Noticia], list[str]]:
     return noticias.descargar()
@@ -247,6 +255,16 @@ def fila_informe(ticker: str) -> dict | None:
     if not inf:
         return None
     return next((r for r in inf.get("ranking", []) if r["ticker"] == ticker), None)
+
+
+def enlace(pagina: str, texto: str, icono: str | None = None):
+    """Enlace a otra página de la app (no hace nada si la página no existe)."""
+    paginas = st.session_state.get("_paginas", {})
+    if pagina in paginas:
+        try:
+            st.page_link(paginas[pagina], label=texto, icon=icono)
+        except Exception:  # noqa: BLE001 - un enlace nunca debe romper la página
+            pass
 
 
 def ir_a(pagina: str, **estado):

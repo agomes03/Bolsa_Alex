@@ -11,7 +11,7 @@ import streamlit as st
 from bolsa import asesor, bankinter, costes, estrategias, patrones
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
-from paginas_extra import avisos_resumen
+from paginas_extra import asesor_hoy
 from ui_comun import (cargar_informe, cargar_varios, datos_usuario, dias_informe, eur, fecha, guardar_datos,
                       hora_espana, ir_a, moneda_de, num, pct, perfil)
 
@@ -99,7 +99,7 @@ def pagina_hoy():
     pf = perfil()
     st.title("🧭 Hoy")
     inf = cargar_informe()
-    avisos_resumen()
+    asesor_hoy(inf)
     if not inf:
         sin_informe()
         return
