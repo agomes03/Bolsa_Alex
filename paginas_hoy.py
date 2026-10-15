@@ -410,7 +410,7 @@ def bloque_fases(inf: dict | None):
                 st.dataframe(pd.DataFrame([{
                     "Empezó": c["inicio"], "Fondo": c["fondo"], "Caída": pct(c["caida"] * 100, 0),
                     "Recuperado": c["recuperado"] or "aún no",
-                    "Años en recuperar": round(c["dias_recuperar"] / 365, 1) if c["dias_recuperar"] else "—"}
+                    "Años en recuperar": f"{c['dias_recuperar'] / 365:.1f}" if c["dias_recuperar"] else "—"}
                     for c in caidas]), hide_index=True, width="stretch")
         st.caption("Lección: las caídas fuertes ocurren cada pocos años. Quien invierte a largo plazo y no vende "
                    "con pánico ha acabado recuperándose; quien necesitaba el dinero en mal momento, no.")

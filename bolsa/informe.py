@@ -173,9 +173,11 @@ def paso_ranking(acciones, indices, fundamentales, lista_noticias, modelo, param
     # momentum 12-1 (50%), puntuación técnica (30%) y menor riesgo de caída (20%).
     tabla = pd.DataFrame([r for r in filas if not r["etf"]]).set_index("ticker")
     if not tabla.empty:
-        compuesto = (0.5 * tabla["momentum"].rank(pct=True).fillna(0.5)
+        menor_riesgo = (1 - tabla["riesgo_caida"].astype(float).rank(pct=True)).fillna(0.5) if usar_riesgo \
+            else pd.Series(0.5, index=tabla.index)  # si el modelo de riesgo no es fiable, no cuenta
+        compuesto = (0.5 * tabla["momentum"].astype(float).rank(pct=True).fillna(0.5)
                      + 0.3 * tabla["puntuacion"].rank(pct=True)
-                     + 0.2 * (1 - tabla["riesgo_caida"].rank(pct=True)).fillna(0.5))
+                     + 0.2 * menor_riesgo)
         notas = (compuesto.rank(pct=True) * 100).round()
         puestos = compuesto.rank(ascending=False, method="min")
         for r in filas:

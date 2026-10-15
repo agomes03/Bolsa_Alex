@@ -91,6 +91,33 @@ La puntuación empieza en 50 y suma o resta puntos según reglas clásicas y tra
 
 Todo el código de las reglas está en `bolsa/senales.py` y `bolsa/noticias.py`.
 
+## Lo que hemos aprendido con datos reales (laboratorio, octubre 2026)
+Probado con ~130 empresas (2016-2026) e índices con toda su historia, siempre en años que los modelos no
+habían visto y con comisiones incluidas:
+
+| Pregunta | ¿Se puede predecir? |
+|---|---|
+| ¿Subirá una acción en 1 o 3 meses? | No (AUC 0,50-0,52: igual que lanzar una moneda) |
+| ¿Lo hará mejor que las demás? | Prácticamente no (AUC 0,51) |
+| **¿Sufrirá una caída de más del 10% el próximo mes?** | **Sí (AUC 0,61)**: con riesgo "muy bajo" ocurrió el 7% de las veces; con "muy alto", el 21% |
+
+| Estrategia (2020-2026, años no vistos) | Rentabilidad/año | Peor caída |
+|---|---|---|
+| Momentum 12-1, 10 acciones, rotación mensual | 27,9% | -37% |
+| Momentum 12-1, 20 acciones, con filtro de mercado | 14,4% | -28% |
+| Baja volatilidad, 20 acciones, con filtro de mercado | 7,9% | **-14%** |
+| Todas las acciones a partes iguales | 7,5% | -28% |
+| Reglas de compra/venta diarias con stop-loss (entrenadas) | 4,2% | -19% |
+
+| Regla de protección (media 200 ± 2%) | Sin regla | Con regla |
+|---|---|---|
+| IBEX 35 (1994-2026) | 5,3%/año, peor caída -63% | 6,7%/año, peor caída -37% |
+| S&P 500 (1928-2026) | 6,2%/año, peor caída -86% | 7,0%/año, peor caída -53% |
+
+Por eso la app se apoya en el **riesgo de caída** (para evitar sustos), en **carteras modelo de rotación mensual**
+y en la **regla de protección** para los fondos indexados, y no presume de adivinar si una acción subirá.
+Cuidado: el universo son las grandes empresas de hoy (sesgo de supervivencia), lo que favorece al momentum.
+
 ## Cómo predice (y por qué no promete milagros)
 `bolsa/prediccion.py` usa el método de **situaciones parecidas** (k vecinos más cercanos): describe el
 momento actual de la acción con 9 números (tendencia, RSI, impulso a 1 semana / 1 mes / 3 meses,
