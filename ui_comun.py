@@ -143,14 +143,15 @@ def num(x: float | None, dec: int = 2) -> str:
 
 
 def pct(x: float | None, dec: int = 1, signo: bool = True) -> str:
-    """Porcentaje (x ya en %) en formato español: +3,2 %."""
+    """Porcentaje (x ya en %) en formato español: +3,2 %. El signo menos es el guion normal: st.metric solo pinta
+    en rojo y con flecha hacia abajo las variaciones que empiezan por «-»."""
     if x is None or pd.isna(x):
         return "—"
     texto = num(abs(x), dec)
     if signo:
-        texto = ("+" if x > 0 else "−" if x < 0 else "") + texto
+        texto = ("+" if x > 0 else "-" if x < 0 else "") + texto
     elif x < 0:
-        texto = "−" + texto
+        texto = "-" + texto
     return f"{texto} %"
 
 

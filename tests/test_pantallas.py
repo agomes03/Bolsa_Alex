@@ -213,3 +213,10 @@ def test_seguimiento_crear_aviso_aportacion_y_apunte():
     # Renta: la venta de Santander aparece con su resultado y se puede descargar.
     assert any("Ganancias y pérdidas patrimoniales" in s.value for s in at.subheader)
     sin_fallos(at)
+
+
+def test_variaciones_negativas_salen_en_rojo():
+    """st.metric decide rojo/flecha abajo por el «-» inicial: un «−» tipográfico saldría en verde."""
+    from ui_comun import pct
+
+    assert pct(-0.28).startswith("-") and pct(1.08).startswith("+")
