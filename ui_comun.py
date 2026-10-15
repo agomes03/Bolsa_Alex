@@ -29,6 +29,18 @@ def cargar_varios(tickers: tuple[str, ...], periodo: str = "2y") -> dict[str, pd
     return datos.varios(list(tickers), periodo)
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def cargar_intradia(ticker: str) -> pd.DataFrame:
+    """Velas de 5 minutos del último mes, sin ajustar (los precios del bróker), en hora de Madrid."""
+    return datos.intradia(ticker, "1mo", "5m")
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def cargar_diario_real(ticker: str, periodo: str = "1y") -> pd.DataFrame:
+    """Histórico diario sin ajustar por dividendos (como lo muestra el bróker)."""
+    return datos.diario_sin_ajustar(ticker, periodo)
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def cargar_noticias() -> tuple[list[noticias.Noticia], list[str]]:
     return noticias.descargar()

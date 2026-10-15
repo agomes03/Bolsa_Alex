@@ -3,21 +3,20 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 import streamlit as st
 
 import plotly.graph_objects as go
 
-from bolsa import (asesor, bankinter, cartera, costes, diagnostico, estrategias, experimentos, patrones, senales,
-                   simulador)
-from bolsa.costes import acciones_asequibles, tamano_por_riesgo
+from bolsa import (asesor, bankinter, cartera, costes, diagnostico, estrategias, experimentos, horario, patrones,
+                   senales, simulador)
 from bolsa.simulador import Parametros
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
 from ui_comun import (almacen_actual, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
-                      datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de,
-                      num, pct, perfil, ultimo_precio)
+                      datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, num,
+                      pct, perfil)
 
 UNIVERSOS = {
     "IBEX 35": (tuple(IBEX35), "^IBEX"),
@@ -261,97 +260,16 @@ def mostrar_entrenamiento(wf: dict, capital: float):
 # --------------------------------------------------------------------------- 🎮 Cartera virtual
 def pagina_cartera_virtual():
     st.title("🎮 Cartera virtual")
-    st.caption("Practica sin arriesgar nada: compra y vende con dinero ficticio a precios reales. Los stop-loss "
-               "y objetivos se ejecutan solos, igual que en el broker. Cuando lleves unos meses, compara: "
-               "¿has ganado más que el robot? ¿y que comprar y mantener?")
+    st.caption("Practica sin arriesgar nada, como si fuera el bróker: precios reales, órdenes limitadas, a mercado "
+               "y stop que se ejecutan cuando el precio llega de verdad, órdenes pendientes y comisiones de "
+               "Bankinter. Cuando lleves unos meses, compara: ¿has ganado más que el robot? ¿y que el IBEX?")
     t1, t2 = st.tabs(["🙋 Mis operaciones virtuales", "🤖 Robot automático"])
     with t1:
+        from paginas_virtual import cartera_manual
         cartera_manual()
     with t2:
         robot()
     copia_seguridad()
-
-
-def cartera_manual():
-    pf = perfil()
-    d = datos_usuario()
-    cv = d.setdefault("cartera_virtual", cartera.nueva(10_000.0))
-    posiciones = tuple(sorted(cv["posiciones"]))
-    hist = cargar_varios(posiciones, "1y") if posiciones else {}
-    fx_pos = {t: fx(t) or 1.0 for t in cv["posiciones"]}
-    eventos = cartera.revisar_ordenes(cv, hist, pf.tarifa, fx_pos)
-    if eventos:
-        guardar_datos()
-        for e in eventos:
-            st.info("🔔 " + e)
-    precios = {t: ultimo_precio(hist.get(t)) for t in cv["posiciones"]}
-    tabla, res = cartera.valorar(cv, precios, fx_pos)
-    c = st.columns(2 if pf.movil else 4)
-    c[0].metric("Valor total", eur(res["total"]), pct(res["ganancia_pct"], 1))
-    c[1].metric("Ganancia / pérdida", eur(res["ganancia"]))
-    c[2 % len(c)].metric("Dinero disponible", eur(res["efectivo"]))
-    c[3 % len(c)].metric("Operaciones cerradas", f"{res['ganadoras']}/{res['operaciones_cerradas']} ganadoras")
-    st.caption(f"Empezaste con {eur(cv['capital_inicial'])} el {fecha(cv['creada'])}. Los importes están en euros; "
-               "los precios, en la divisa de cada acción (como en Bankinter).")
-
-    if len(tabla):
-        st.subheader("Posiciones abiertas")
-        vista = pd.DataFrame({
-            "Empresa": tabla["ticker"].map(nombre_de), "Acciones": tabla["acciones"],
-            "Precio compra": tabla["precio_medio"].round(2), "Precio actual": tabla["precio"].round(2),
-            "Resultado (€)": tabla["resultado"].round(2), "Resultado (%)": tabla["resultado_pct"].round(1),
-            "Stop-loss": tabla["stop"], "Objetivo": tabla["objetivo"]})
-        st.dataframe(vista, hide_index=True, width="stretch")
-        c1, c2 = st.columns([2, 1])
-        vender_t = c1.selectbox("Vender", list(cv["posiciones"]), format_func=nombre_de, key="v_vender")
-        if c2.button("Vender todo a precio actual", width="stretch") and precios.get(vender_t):
-            cartera.vender(cv, vender_t, cv["posiciones"][vender_t]["acciones"], precios[vender_t], pf.tarifa,
-                           motivo="Venta manual", fx=fx_pos.get(vender_t, 1.0))
-            guardar_datos()
-            st.rerun()
-
-    st.subheader("Comprar con dinero virtual")
-    ticker = st.selectbox("Empresa", list(TODAS_LAS_ACCIONES), format_func=nombre_de, key="v_ticker")
-    df = cargar_historico(ticker, "2y")
-    f_eur = fx(ticker)
-    if df.empty or f_eur is None:
-        st.error("No hay cotización o tipo de cambio disponible.")
-    else:
-        p = estrategia_actual()
-        ev = senales.evaluar(ticker, df, mercado_alcista=mercado_alcista_para(ticker),
-                             stop_atr=p.stop_atr, ratio_objetivo=p.ratio_objetivo)
-        st.caption(f"Precio: **{eur(ev.precio, moneda_de(ticker))}**. Para el análisis completo, usa 🔍 Analizar.")
-        patrimonio = res["total"]
-        sugeridas = 0
-        if ev.plan:
-            sugeridas = min(tamano_por_riesgo(patrimonio, pf.riesgo, ev.precio * f_eur, ev.plan.stop * f_eur),
-                            acciones_asequibles(res["efectivo"], ev.precio * f_eur, ticker, pf.tarifa))
-        with st.form("compra_virtual"):
-            c = st.columns(3)
-            n = c[0].number_input("Acciones", 1, 1_000_000, max(sugeridas, 1))
-            stop = c[1].number_input("Stop-loss", 0.0, value=round(ev.plan.stop, 2) if ev.plan else 0.0)
-            obj = c[2].number_input("Objetivo", 0.0, value=round(ev.plan.objetivo, 2) if ev.plan else 0.0)
-            if st.form_submit_button("🎮 Comprar", type="primary", width="stretch"):
-                err = cartera.comprar(cv, ticker, int(n), ev.precio, pf.tarifa, stop=stop or None,
-                                      objetivo=obj or None, nota=f"Puntuación {ev.puntuacion}", fx=f_eur)
-                if err:
-                    st.error(err)
-                else:
-                    guardar_datos()
-                    st.success(f"Comprado: {n} acciones de {nombre_de(ticker)}.")
-                    st.rerun()
-
-    if cv["historial"]:
-        with st.expander(f"📜 Historial ({len(cv['historial'])} movimientos)"):
-            h = pd.DataFrame(cv["historial"]).iloc[::-1]
-            h["ticker"] = h["ticker"].map(nombre_de)
-            st.dataframe(h.round(2), hide_index=True, width="stretch")
-    with st.expander("♻️ Empezar de cero"):
-        nuevo = st.number_input("Nuevo capital virtual (€)", 500.0, 1_000_000.0, 10_000.0, 500.0, key="v_reset_cap")
-        if st.button("Reiniciar mi cartera virtual"):
-            d["cartera_virtual"] = cartera.nueva(nuevo)
-            guardar_datos()
-            st.rerun()
 
 
 def robot():
@@ -824,13 +742,19 @@ def bloque_operar(ticker: str, n: int, plan: senales.Plan, f_eur: float):
     c1, c2 = st.columns(2)
     if c1.button("🎮 Probarla con dinero virtual", width="stretch"):
         cv = d.setdefault("cartera_virtual", cartera.nueva(10_000.0))
-        err = cartera.comprar(cv, ticker, n, plan.entrada, pf.tarifa, stop=plan.stop, objetivo=plan.objetivo,
-                              nota="Desde Analizar", fx=f_eur)
+        ahora_iso = f"{horario.ahora_madrid():%Y-%m-%dT%H:%M}"
+        validez = (date.today() + timedelta(days=7)).isoformat()
+        err = cartera.nueva_orden(cv, ticker, "compra", "limitada", n, pf.tarifa, precio_ref=plan.entrada,
+                                  ahora=ahora_iso, validez=validez, limite=round(plan.entrada, 3), fx=f_eur,
+                                  stop=plan.stop, objetivo=plan.objetivo)
         if err:
             st.error(err)
         else:
+            cartera.ejecutar_ordenes(cv, {}, pf.tarifa, ahora_iso,
+                                     {ticker: (plan.entrada, horario.estado_mercado(ticker)["abierto"])})
             guardar_datos()
-            st.success("Añadida a tu 🎮 Cartera virtual. El stop-loss y el objetivo se ejecutarán solos.")
+            st.success(f"Orden limitada enviada a tu 🎮 Cartera virtual: {n} títulos a {num(plan.entrada, 3)} como "
+                       "máximo, válida 7 días. Al ejecutarse se le pondrán el stop-loss y el objetivo.")
     with c2.popover("🏦 Ya la compré en Bankinter", width="stretch"):
         with st.form(f"real_{ticker}"):
             n_real = st.number_input("Títulos comprados", 1, 10_000_000, n)

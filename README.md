@@ -11,7 +11,7 @@ Una app sencilla (en español) que te ayuda a invertir en bolsa con el **broker 
 | 📰 **Noticias** | 19 fuentes en español e inglés, ordenadas por impacto y explicadas. |
 | 🌍 **Mercados** | Índices, termómetros (VIX, euro/dólar, petróleo), fase de cada mercado con estadísticas desde los años 90 y peores caídas de la historia. |
 | 🏦 **Mi Bankinter** | Copiloto de tu broker: importa el archivo «Posición global.csv» de Bankinter (o registra a mano) y recibe un **diagnóstico como el de un asesor**: concentración por empresa, sector y país, encaje con tu perfil, propuesta de reequilibrio con comisiones e IRPF, y comparación con crisis reales. La app vigila cada posición y te prepara las órdenes. |
-| 🎮 **Cartera virtual** | Practica con dinero ficticio y crea un robot que opera solo desde hoy. |
+| 🎮 **Cartera virtual** | Un bróker de práctica con dinero ficticio: ficha de cotización (último, variación, apertura, máximo, mínimo, volumen, gráfico del día; ~15 min de retraso), órdenes **limitadas, a mercado y stop con límite** que se ejecutan cuando el precio llega de verdad (velas de 5 minutos), órdenes pendientes con dinero reservado, validez, comisiones de tu tarifa, posición al estilo Bankinter, evolución frente al IBEX y ejercicios guiados. También un robot que opera solo. |
 | 🧪 **Simulador y modelos** | Resultados diarios con todas las empresas, acierto real de las ideas pasadas, laboratorio de experimentos, y simulación/entrenamiento propios. |
 | 🧮 **Calculadoras** · 🎓 **Aprende** | Costes, impuestos, interés compuesto. Aprende: lo esencial, **diccionario bursátil** con buscador (más de 100 términos con ejemplos), **guías paso a paso** de cómo se hace cada cosa en Bankinter y un test para comprobar lo aprendido. |
 
