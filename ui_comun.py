@@ -226,6 +226,11 @@ def perfil() -> Perfil:
     return st.session_state["_perfil"]
 
 
+def alto_grafico() -> int:
+    """Alto de los gráficos grandes: más bajo en el móvil."""
+    return 430 if perfil().movil else 560
+
+
 @st.cache_resource
 def _almacen() -> almacen.Almacen:
     return almacen.desde_secrets(st.secrets)
