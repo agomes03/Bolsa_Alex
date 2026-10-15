@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from bolsa import asesor, bankinter, costes, noticias, senales
+from bolsa import aprendizaje, asesor, bankinter, costes, noticias, senales
 from bolsa.indicadores import calcular_todo
 from bolsa.tickers import INDICES, MERCADOS, TERMOMETROS, TODAS_LAS_ACCIONES, mercado_de, nombre_de, sector_de
 from paginas_extra import bloque_operar, pagina_bankinter, pagina_cartera_virtual, pagina_simulador
@@ -457,7 +457,19 @@ def pagina_calculadoras():
 
 
 def pagina_aprende():
-    st.title("🎓 Aprende: lo básico para invertir con cabeza")
+    st.title("🎓 Aprende")
+    t1, t2, t3, t4 = st.tabs(["📘 Lo esencial", "📖 Diccionario", "🛠️ Cómo se hace", "✅ Ponte a prueba"])
+    with t1:
+        aprende_esencial()
+    with t2:
+        aprende_diccionario()
+    with t3:
+        aprende_guias()
+    with t4:
+        aprende_test()
+
+
+def aprende_esencial():
     st.info(AVISO)
     st.markdown("""
 ### 1. Lo que funciona y lo que no (comprobado con datos reales)
@@ -475,31 +487,9 @@ def pagina_aprende():
 2. **El núcleo: un fondo indexado mundial** con aportaciones mensuales.
 3. **Una parte pequeña en acciones españolas** de la cartera modelo de tu perfil.
 
-### 3. Cómo usar Bankinter con esta app
-| Para… | En Bankinter | Por qué |
-|---|---|---|
-| Comprar una acción | Bróker → buscar el nombre → **Comprar** → orden **Limitada** | Nunca pagas más del precio que pones. |
-| Limitar pérdidas | Orden **Stop** de venta: condición «menor o igual que» + **precio límite** | Bankinter exige precio límite; ponlo un 2 % por debajo para que se ejecute aunque caiga deprisa. |
-| Pérdidas y objetivo a la vez | **Stop relacionadas** | Al ejecutarse una, Bankinter cancela la otra. |
-| Que el stop suba solo | **Stop dinámica** | Sube con la cotización y no baja nunca. |
-| Subir un stop | Cancelar la orden stop y crear otra | En Bankinter las órdenes stop no se modifican. |
-| Aportar cada mes | **Fondos** → fondo indexado → aportaciones periódicas | Sin comisión por aportación (un ETF extranjero cuesta 20 € cada compra). |
-
-**Lo que cuesta en Bankinter** (tarifa pública, octubre 2026; compruébala en Bróker → Tarifas):
-- Acciones españolas: **3,95 €** hasta 2.000 € y **8 €** hasta 60.000 € por operación (**0 €** con Bróker Cero), más
-  pequeños cánones de bolsa y la tasa Tobin (0,2 % al comprar empresas grandes).
-- Acciones extranjeras: **20 €** por operación, **+1 %** si cotizan en otra divisa (dólares) y una **custodia mínima
-  de 24 € al año por valor**. Por eso, con poco dinero, mejor acciones españolas y fondos indexados.
-
-### 4. Cómo leer la app
-- **Veredicto**: la conclusión para cada acción (Candidata a comprar, Neutral, Esperar…), la misma en toda la app.
-- **Nota global (0-100)**: su puesto frente a las demás (100 = la mejor de hoy).
-- **Riesgo de caída**: probabilidad de que caiga más de un 10 % en algún momento del próximo mes, frente a lo normal.
-- **Stop-loss**: precio al que vender si sale mal, para que la pérdida sea pequeña.
-
-### 5. Reglas de oro
+### 3. Reglas de oro
 1. **No inviertas dinero que vayas a necesitar** en los próximos 3-5 años.
-2. **Diversifica**: un fondo indexado ya tiene miles de empresas; en acciones sueltas, sectores distintos.
+2. **Diversifica**: ninguna empresa por encima del 20 % de tu dinero, ningún sector por encima del 40 %.
 3. **No arriesgues más del 1-2 % de tu dinero en una operación** (la app calcula cuántas acciones comprar).
 4. **Pon siempre stop-loss** en acciones sueltas y no lo bajes nunca.
 5. **No persigas** una acción que ha subido un 20 % en una semana.
@@ -507,24 +497,118 @@ def pagina_aprende():
 7. **Las comisiones importan**: pocas operaciones y bien pensadas.
 8. **Las emociones son tu mayor enemigo**: ten un plan y síguelo.
 
-### 6. Diccionario rápido
-| Término | Qué significa |
-|---|---|
-| **Fondo indexado** | Fondo que copia un índice (p. ej. MSCI World): miles de empresas con comisiones muy bajas. |
-| **ETF** | Fondo que se compra y vende como una acción. En España tributa al venderlo (los fondos permiten traspasos sin impuestos). |
-| **Momentum** | Las acciones que más han subido en el último año tienden a seguir haciéndolo algo mejor durante unos meses. |
-| **Media de 200 sesiones** | Precio medio del último año: si el precio está por encima, la tendencia es alcista. |
-| **RSI** | De 0 a 100: más de 70, ha subido muy deprisa; menos de 30, ha caído muy deprisa. |
-| **Dividendo** | Parte del beneficio que la empresa reparte a sus accionistas. |
-| **PER** | Cuántos años de beneficios pagas al comprar la acción. |
-| **VIX** | El «índice del miedo» de Wall Street. |
-
-### 7. Calendario que mueve los mercados
+### 4. Calendario que mueve los mercados
 - Reuniones del **BCE** (cada ~6 semanas, jueves) y de la **Fed** (8 al año, miércoles por la tarde en España).
 - **IPC** de EEUU (hacia mediados de mes) y **empleo** de EEUU (primer viernes de mes, 14:30 h).
 - **Resultados de las empresas**: enero-febrero, abril-mayo, julio-agosto y octubre-noviembre.
-- **Horario**: Bolsa española de 9:00 a 17:30; Wall Street de 15:30 a 22:00 (hora peninsular).
+- **Horario**: Bolsa española de 9:00 a 17:30; Wall Street de 15:30 a 22:00 (hora peninsular; una hora antes
+  unas semanas de marzo y de octubre-noviembre por el cambio de hora).
 """)
+
+
+def _termino_md(t) -> str:
+    texto = f"**{t.termino}** · _{t.categoria}_\n\n{t.definicion}"
+    if t.ejemplo:
+        texto += f"\n\n> 💡 {t.ejemplo}"
+    if t.ver:
+        texto += f"\n\n<small>Ver también: {', '.join(t.ver)}</small>"
+    return texto
+
+
+def aprende_diccionario():
+    st.caption(f"{len(aprendizaje.GLOSARIO)} términos explicados en lenguaje sencillo, con ejemplos en euros.")
+    c = st.columns([2, 1]) if not movil else [st.container(), st.container()]
+    q = c[0].text_input("🔎 Buscar", placeholder="stop, dividendo, PER, tasa Tobin...")
+    cat = c[1].selectbox("Tema", ["Todos"] + aprendizaje.CATEGORIAS)
+    categoria = None if cat == "Todos" else cat
+    if not q and not categoria:
+        for nombre in aprendizaje.CATEGORIAS:
+            terminos = aprendizaje.buscar(categoria=nombre)
+            with st.expander(f"{nombre} ({len(terminos)})"):
+                for t in terminos:
+                    st.markdown(_termino_md(t), unsafe_allow_html=True)
+        return
+    resultados = aprendizaje.buscar(q, categoria)
+    if not resultados:
+        st.info("No hay ningún término con esas palabras. Prueba con otra o elige un tema.")
+    for t in resultados:
+        with st.container(border=True):
+            st.markdown(_termino_md(t), unsafe_allow_html=True)
+
+
+def aprende_guias():
+    st.caption("Paso a paso, con lo que tienes que pulsar en Bankinter y en esta app. Los nombres de los menús de "
+               "Bankinter pueden variar un poco entre la web y la app del móvil.")
+    for g in aprendizaje.GUIAS:
+        with st.expander(f"🛠️ {g.titulo}"):
+            st.markdown(f"**Para qué:** {g.para_que}")
+            st.markdown("\n".join(f"{i}. {p}" for i, p in enumerate(g.pasos, 1)))
+            if g.errores:
+                st.markdown("**Errores típicos:**\n" + "\n".join(f"- ❌ {e}" for e in g.errores))
+            if g.en_la_app:
+                st.caption("📱 " + g.en_la_app)
+
+    with st.expander("🧮 Practica: cuántas acciones comprar y dónde poner el stop"):
+        st.write("La cantidad no se elige a ojo: sale de cuánto aceptas perder si la operación sale mal.")
+        k = st.columns(2 if movil else 4)
+        dinero = k[0].number_input("Tu dinero para acciones (€)", 500.0, 10_000_000.0, 10_000.0, 500.0)
+        riesgo_p = k[1].number_input("Riesgo por operación (%)", 0.25, 5.0, 1.0, 0.25)
+        entrada = k[2 % len(k)].number_input("Precio de compra (€)", 0.1, 100_000.0, 20.0, 0.5)
+        stop_p = k[3 % len(k)].number_input("Stop-loss (€)", 0.0, 100_000.0, 18.0, 0.5)
+        if stop_p >= entrada:
+            st.warning("El stop-loss tiene que estar por debajo del precio de compra.")
+        else:
+            n = costes.tamano_por_riesgo(dinero, riesgo_p, entrada, stop_p)
+            arriesgado = dinero * riesgo_p / 100
+            st.markdown(
+                f"1. Lo máximo que aceptas perder: {num(riesgo_p, 2)} % de {eur(dinero)} = **{eur(arriesgado)}**.\n"
+                f"2. Si salta el stop, pierdes {eur(entrada)} − {eur(stop_p)} = **{eur(entrada - stop_p)} por acción**.\n"
+                f"3. Acciones: {eur(arriesgado)} / {eur(entrada - stop_p)} = **{n} "
+                f"{'acción' if n == 1 else 'acciones'}** ({eur(n * entrada)}, el "
+                f"{num(n * entrada / dinero * 100, 0)} % de tu dinero).")
+            if n * entrada > dinero * 0.20:
+                st.info(f"Eso supera el 20 % de tu dinero en una sola empresa: por diversificación, la app lo limita a "
+                        f"unas {costes.acciones_asequibles(dinero * 0.20, entrada, 'SAN.MC', tarifa)} acciones.")
+
+    st.markdown("#### Resumen: qué orden usar en Bankinter")
+    st.markdown("""
+| Para… | En Bankinter | Por qué |
+|---|---|---|
+| Comprar una acción | Bróker → buscar el nombre → **Comprar** → orden **Limitada** | Nunca pagas más del precio que pones. |
+| Limitar pérdidas | Orden **Stop** de venta: «menor o igual que» + **precio límite** | Bankinter exige precio límite; ponlo un 2 % por debajo para que se ejecute aunque caiga deprisa. |
+| Pérdidas y objetivo a la vez | **Stop relacionadas** | Al ejecutarse una, Bankinter cancela la otra. |
+| Que el stop suba solo | **Stop dinámica** | Sube con la cotización y no baja nunca. |
+| Subir un stop | Anular la orden stop y crear otra | En Bankinter las órdenes stop no se modifican. |
+| Aportar cada mes | **Fondos** → fondo indexado → aportación periódica | Sin comisión por aportación (un ETF extranjero cuesta 20 € cada compra). |
+| Revisar tu cartera | Bróker → **Posición global** → descargar | Súbelo en 🏦 Mi Bankinter para el diagnóstico. |
+
+**Lo que cuesta en Bankinter** (tarifa pública, octubre 2026; compruébala en Bróker → Tarifas):
+- Acciones españolas: **3,95 €** hasta 2.000 € y **8 €** hasta 60.000 € por operación (**0 €** con Bróker Cero), más
+  un canon de bolsa de ~1 € y la tasa Tobin (0,2 % al comprar empresas de más de 1.000 millones).
+- Acciones extranjeras: **20 €** por operación, **+1 %** si cotizan en otra divisa y una **custodia mínima de 24 € al
+  año por valor**. Con poco dinero, mejor acciones españolas y fondos indexados.
+""")
+
+
+def aprende_test():
+    st.caption(f"{len(aprendizaje.PREGUNTAS)} preguntas sobre situaciones reales. Sin nota que guardar: solo para "
+               "comprobar que lo tienes claro.")
+    with st.form("test_aprende"):
+        respuestas = [st.radio(f"**{i}.** {p.pregunta}", p.opciones, index=None, key=f"test_{i}")
+                      for i, p in enumerate(aprendizaje.PREGUNTAS, 1)]
+        corregir = st.form_submit_button("Corregir", type="primary")
+    if not corregir:
+        return
+    aciertos = 0
+    for i, (p, r) in enumerate(zip(aprendizaje.PREGUNTAS, respuestas), 1):
+        bien = r == p.opciones[p.correcta]
+        aciertos += bien
+        icono = "✅" if bien else ("⬜" if r is None else "❌")
+        st.markdown(f"{icono} **{i}.** {p.opciones[p.correcta]} — {p.explicacion}")
+    n = len(aprendizaje.PREGUNTAS)
+    (st.success if aciertos >= n * 0.8 else st.info)(
+        f"Has acertado {aciertos} de {n}." + ("" if aciertos >= n * 0.8 else
+                                            " Repasa las guías de 🛠️ Cómo se hace y vuelve a intentarlo."))
 
 
 PAGINAS = {

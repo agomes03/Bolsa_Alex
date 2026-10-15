@@ -1,0 +1,1 @@
+at = run("pagina_cartera_virtual"); chk(at, "Robot cartera"); print("  ROBOT:", [m.label + "=" + str(m.value) for m in at.metric][-3:])

@@ -1,0 +1,1 @@
+    c = 100 * np.cumprod(1 + rng.normal(0.0004, 0.013, n)); o = np.r_[c[0], c[:-1]]

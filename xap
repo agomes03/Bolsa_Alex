@@ -1,0 +1,1 @@
+datos.fundamentales = lambda t: {"targetMeanPrice": 150.0, "numberOfAnalystOpinions": 12, "recommendationKey": "buy"}

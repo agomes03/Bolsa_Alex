@@ -1,0 +1,1 @@
+        chk(run(p, movil), ("móvil " if movil else "pc ") + p)

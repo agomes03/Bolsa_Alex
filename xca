@@ -1,0 +1,1 @@
+b = [x for x in at.button if "Crear robot" in x.label]; b[0].click().run(); chk(at, "Robot cartera creado")

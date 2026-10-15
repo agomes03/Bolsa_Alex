@@ -1,0 +1,1 @@
+datos.varios = lambda ts, periodo="2y": {t: fake_hist(t, periodo) for t in ts}

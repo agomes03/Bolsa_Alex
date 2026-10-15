@@ -1,0 +1,1 @@
+    [noticias.Noticia("El Ibex sube con la banca", "x", "F", datetime.now(timezone.utc))], max_horas), [])

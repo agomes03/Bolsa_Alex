@@ -1,0 +1,1 @@
+    return pd.DataFrame({"Open": o, "High": np.maximum(o,c)*1.004, "Low": np.minimum(o,c)*0.996, "Close": c, "Volume": 1e6},

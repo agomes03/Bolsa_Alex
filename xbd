@@ -1,0 +1,1 @@
+st.switch_page = lambda p: None

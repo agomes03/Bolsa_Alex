@@ -1,0 +1,1 @@
+    at = AppTest.from_file("/home/user/Bolsa_Alex/app.py", default_timeout=300).run()

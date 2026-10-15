@@ -1,0 +1,1 @@
+    print(etiqueta, "EXC:", [e.value for e in at.exception] or "ok", "| errors:", [e.value[:100] for e in at.error])

@@ -10,10 +10,10 @@ Una app sencilla (en español) que te ayuda a invertir en bolsa con el **broker 
 | 📡 **Radar** | Acciones españolas (o todas) ordenadas por nota global con su veredicto. Toca una fila para analizarla. |
 | 📰 **Noticias** | 19 fuentes en español e inglés, ordenadas por impacto y explicadas. |
 | 🌍 **Mercados** | Índices, termómetros (VIX, euro/dólar, petróleo), fase de cada mercado con estadísticas desde los años 90 y peores caídas de la historia. |
-| 🏦 **Mi Bankinter** | Copiloto de tu broker: importa o registra tus posiciones, la app las vigila, te avisa y te prepara las órdenes; además, qué le puede pasar a tu cartera. |
+| 🏦 **Mi Bankinter** | Copiloto de tu broker: importa el archivo «Posición global.csv» de Bankinter (o registra a mano) y recibe un **diagnóstico como el de un asesor**: concentración por empresa, sector y país, encaje con tu perfil, propuesta de reequilibrio con comisiones e IRPF, y comparación con crisis reales. La app vigila cada posición y te prepara las órdenes. |
 | 🎮 **Cartera virtual** | Practica con dinero ficticio y crea un robot que opera solo desde hoy. |
 | 🧪 **Simulador y modelos** | Resultados diarios con todas las empresas, acierto real de las ideas pasadas, laboratorio de experimentos, y simulación/entrenamiento propios. |
-| 🧮 **Calculadoras** · 🎓 **Aprende** | Costes, impuestos, interés compuesto y lo básico explicado fácil. |
+| 🧮 **Calculadoras** · 🎓 **Aprende** | Costes, impuestos, interés compuesto. Aprende: lo esencial, **diccionario bursátil** con buscador (más de 100 términos con ejemplos), **guías paso a paso** de cómo se hace cada cosa en Bankinter y un test para comprobar lo aprendido. |
 
 > ⚠️ **Es una herramienta educativa, no asesoramiento financiero.** Ningún programa puede garantizar
 > beneficios ni adivinar el futuro. Lo que sí hace es ayudarte a no comprar en mal momento, a tener

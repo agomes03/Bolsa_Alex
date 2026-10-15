@@ -8,11 +8,14 @@ from datetime import date, datetime
 import pandas as pd
 import streamlit as st
 
-from bolsa import bankinter, cartera, costes, estrategias, experimentos, senales, simulador
+import plotly.graph_objects as go
+
+from bolsa import (asesor, bankinter, cartera, costes, diagnostico, estrategias, experimentos, patrones, senales,
+                   simulador)
 from bolsa.costes import acciones_asequibles, tamano_por_riesgo
 from bolsa.simulador import Parametros
-from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de, sector_de
-from ui_comun import (almacen_actual, cargar_fundamentales_varios, cargar_historico, cargar_varios,
+from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
+from ui_comun import (almacen_actual, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
                       datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de,
                       num, pct, perfil, ultimo_precio)
 
@@ -574,16 +577,17 @@ def pagina_bankinter():
         if pf.movil:
             tabla = tabla[["", "Empresa", "Ganancia (%)", "Valor (€)"]]
         st.dataframe(tabla, hide_index=True, width="stretch")
-        concentracion(filas, total)
+        comparado = bloque_diagnostico(filas)
 
         st.subheader("Qué hacer con cada posición")
         for f in filas:
             posicion_detalle(f, cr)
 
-        st.subheader("🌦️ Qué le puede pasar a tu cartera")
-        from paginas_hoy import bloque_que_puede_pasar
-        pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
-        bloque_que_puede_pasar(pesos, total, 0.0, 0)
+        if not comparado:
+            st.subheader("🌦️ Qué le puede pasar a tu cartera")
+            from paginas_hoy import bloque_que_puede_pasar
+            pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
+            bloque_que_puede_pasar(pesos, total, 0.0, 0)
     else:
         st.caption("Aún no has registrado posiciones. Añádelas a mano o impórtalas desde un Excel.")
 
@@ -609,11 +613,12 @@ def pagina_bankinter():
                     st.rerun()
     with t2:
         st.markdown(
-            "1. En **bankinter.com** (ordenador), entra en **Bróker → Posición**.\n"
-            "2. Si tu pantalla permite descargarla en Excel, hazlo; si no, selecciona la tabla, cópiala y pégala en "
-            "una hoja de cálculo (Excel o Google Sheets) y guárdala.\n"
-            "3. Súbela aquí. La app busca columnas como *Valor*, *Títulos* y *Precio medio* y te deja corregir "
-            "cualquier fila antes de guardar.")
+            "1. En Bankinter, entra en **Bróker → Posición global** y descárgala (sale un archivo "
+            "«Posición global.csv»).\n"
+            "2. Súbelo aquí tal cual. La app lee *Valor*, *Ticker*, *Títulos* y *Precio medio* y te deja corregir "
+            "cualquier fila antes de guardar.\n"
+            "3. Después, en cada posición, apunta el stop-loss si ya lo tienes puesto en Bankinter (el archivo no "
+            "lo incluye).")
         archivo = st.file_uploader("Archivo de posiciones", type=["xlsx", "xls", "csv"])
         if archivo:
             try:
@@ -646,24 +651,123 @@ def pagina_bankinter():
     copia_seguridad()
 
 
-def concentracion(filas: list[dict], total: float):
-    if total <= 0:
-        return
-    por_valor, por_sector = {}, {}
-    for f in filas:
-        if not f["precio"]:
-            continue
-        v = f["pos"]["acciones"] * f["precio"] * f["fx"]
-        por_valor[f["ticker"]] = v
-        s = sector_de(f["ticker"])
-        por_sector[s] = por_sector.get(s, 0) + v
-    for t, v in por_valor.items():
-        if v / total > 0.25 and len(por_valor) > 1:
-            st.warning(f"⚖️ {nombre_de(t)} pesa un {v / total * 100:.0f}% de tu cartera. Lo prudente es que "
-                       "ninguna empresa supere el 20-25%.")
-    for s, v in por_sector.items():
-        if v / total > 0.4 and len(por_sector) > 1:
-            st.warning(f"⚖️ El sector {s} pesa un {v / total * 100:.0f}%: estás poco diversificado.")
+ICONO_GRAVEDAD = {"alta": "🔴", "media": "🟠", "baja": "🔵", "ok": "🟢"}
+TITULO_SEMAFORO = {"rojo": "🔴 Necesita cambios", "ambar": "🟠 Mejorable", "verde": "🟢 Bien construida"}
+
+
+def _perfil_guardado() -> str | None:
+    p = datos_usuario().get("perfil_inversor")
+    if not p:
+        return None
+    try:
+        return asesor.perfil_inversor(p["horizonte"], p["reaccion"], p["experiencia"], p["colchon"],
+                                      p.get("deudas", False)).nombre
+    except (KeyError, TypeError):
+        return None
+
+
+def bloque_diagnostico(filas: list[dict]) -> bool:
+    """Revisión de la cartera como la haría un asesor, con una propuesta concreta y sus costes.
+    Devuelve True si ya ha mostrado la comparación con crisis reales."""
+    pf = perfil()
+    d = datos_usuario()
+    st.subheader("🩺 Diagnóstico de tu cartera")
+    guardado = _perfil_guardado()
+    c = st.columns(2)
+    opciones = ["Conservador", "Moderado", "Dinámico", "Aún no lo sé"]
+    perfil_txt = c[0].selectbox("Tu perfil", opciones, index=opciones.index(guardado) if guardado else 3,
+                                help="Calcúlalo en 🎯 Mi plan (5 preguntas). Decide cuánto conviene tener en "
+                                     "acciones sueltas y cuánto en fondos.")
+    otros = c[1].number_input("Otros ahorros e inversiones (€)", 0.0, 100_000_000.0,
+                              float(d.get("otros_ahorros", 0.0)), 1000.0,
+                              help="Cuentas, depósitos, fondos... Lo que no son estas acciones. Cuenta para saber "
+                                   "cuánto pesa cada empresa en todo tu dinero.")
+    if otros != d.get("otros_ahorros", 0.0):
+        d["otros_ahorros"] = otros
+        guardar_datos()
+    perfil_nombre = None if perfil_txt == "Aún no lo sé" else perfil_txt
+    inf = cargar_informe() or {}
+    filas_inf = {r["ticker"]: r for r in inf.get("ranking", [])}
+    posiciones = [{"ticker": f["ticker"], "acciones": f["pos"]["acciones"], "precio_medio": f["pos"]["precio_medio"],
+                   "fx_medio": f["pos"].get("fx_medio", 1.0), "precio": f["precio"], "fx": f["fx"],
+                   "stop": f["pos"].get("stop")} for f in filas if f["precio"]]
+    dg = diagnostico.diagnosticar(posiciones, otros, perfil_nombre, pf.tarifa, filas_inf)
+    if dg["semaforo"] == "sin_datos":
+        return False
+
+    mayor = dg["empresas"][0]
+    m = st.columns(2 if pf.movil else 4)
+    m[0].metric("Estado", TITULO_SEMAFORO[dg["semaforo"]])
+    m[1].metric("Mayor peso", f"{mayor['peso'] * 100:.0f} %".replace(".", ","), mayor["nombre"], delta_color="off")
+    m[2 % len(m)].metric("Equivale a", f"{num(dg['n_efectivo'], 1)} empresas",
+                         help="1 / suma de los pesos al cuadrado: cuántas empresas a partes iguales tendrían el "
+                              "mismo riesgo de concentración. Lo prudente es 5 o más (un fondo indexado: más de 1.000).")
+    pais, w_pais = max(dg["paises"].items(), key=lambda x: x[1])
+    m[3 % len(m)].metric("País principal", f"{pais} {w_pais * 100:.0f} %")
+
+    figura = go.Figure(go.Bar(x=[e["peso"] * 100 for e in dg["empresas"]], y=[e["nombre"] for e in dg["empresas"]],
+                              orientation="h", marker_color=["#d62728" if e["peso"] > diagnostico.MAX_EMPRESA
+                                                             else "#2ca02c" for e in dg["empresas"]],
+                              text=[f"{e['peso'] * 100:.0f} %" for e in dg["empresas"]], textposition="auto"))
+    figura.add_vline(x=diagnostico.MAX_EMPRESA * 100, line_dash="dash",
+                     annotation_text=f"máximo prudente {diagnostico.MAX_EMPRESA * 100:.0f} %")
+    figura.update_layout(height=80 + 45 * len(dg["empresas"]), margin=dict(l=0, r=0, t=30, b=0),
+                         xaxis_title="% de tu dinero", yaxis=dict(autorange="reversed"))
+    st.plotly_chart(figura, width="stretch", config={"displayModeBar": False})
+
+    for x in dg["hallazgos"]:
+        with st.expander(f"{ICONO_GRAVEDAD[x['gravedad']]} {x['titulo']}", expanded=x["gravedad"] == "alta"):
+            st.write(x["texto"])
+
+    if not dg["propuesta"]:
+        return False
+    st.markdown("#### 🧭 Propuesta: repartir el riesgo")
+    st.write(f"Para que ninguna empresa pase del {diagnostico.MAX_EMPRESA * 100:.0f} % de tu dinero, venderías:")
+    st.dataframe(pd.DataFrame([{
+        "Empresa": v["nombre"], "Vender": f"{v['acciones']} {'acción' if v['acciones'] == 1 else 'acciones'}",
+        "Importe": eur(v["importe"]), "Ganancia (+) o pérdida (−) a declarar": eur(v["ganancia"]),
+        "Peso después": f"{v['queda_peso'] * 100:.0f} %"} for v in dg["propuesta"]]),
+        hide_index=True, width="stretch")
+    k = st.columns(1 if pf.movil else 3)
+    k[0].metric("Comisiones de venta", eur(dg["costes_venta"]))
+    k[1 % len(k)].metric("IRPF aproximado", eur(dg["impuesto"]),
+                         help="Sobre la ganancia neta de estas ventas (las pérdidas compensan las ganancias). "
+                              "Depende también de tus otras ganancias y pérdidas del año.")
+    k[2 % len(k)].metric("Dinero para diversificar", eur(dg["liberado"]))
+    st.markdown("**A dónde llevar ese dinero**" + ("" if perfil_nombre else " (indica tu perfil para afinarlo)") + ":")
+    for producto, importe in dg["destino"].items():
+        st.markdown(f"- **{eur(importe)} → {producto}**: {asesor.PRODUCTOS[producto]['que']}")
+    st.caption("Si tienes ganancias grandes, puedes repartir las ventas en dos años fiscales para pagar menos IRPF. "
+               "Si vendes una acción con pérdidas, no la recompres en 2 meses (o no podrás aplicar esa pérdida). "
+               "Bankinter puede incluir las comisiones en su «precio medio»: el informe fiscal que te envía es el "
+               "que vale para la declaración.")
+    with st.expander("📋 Órdenes de venta para copiar en Bankinter"):
+        for v in dg["propuesta"]:
+            st.code(bankinter.ticket_venta(v["ticker"], v["acciones"], v["precio"]), language=None)
+
+    st.markdown("#### 🔬 Qué habría pasado en crisis reales")
+    with st.spinner("Comparando tu cartera y la propuesta con 10 años de historia real..."):
+        todos = tuple(sorted(set(dg["pesos_antes"]) | set(dg["pesos_despues"])))
+        hist = cargar_varios(todos, "10y")
+        cambios = cargar_varios(tuple(costes.TICKER_CAMBIO.values()), "10y")
+        hist_eur = costes.historicos_en_euros(hist, {d: cambios.get(t) for d, t in costes.TICKER_CAMBIO.items()})
+        est_a = {e["crisis"]: e["cambio"] for e in patrones.prueba_estres(hist_eur, dg["pesos_antes"])}
+        est_d = {e["crisis"]: e["cambio"] for e in patrones.prueba_estres(hist_eur, dg["pesos_despues"])}
+        esc_a = patrones.escenarios(patrones.rentabilidades_cartera(hist_eur, dg["pesos_antes"]))
+        esc_d = patrones.escenarios(patrones.rentabilidades_cartera(hist_eur, dg["pesos_despues"]))
+    total = sum(dg["pesos_antes"].values())
+    filas_t = [{"Situación": cr, "Tu cartera hoy": f"{pct(est_a[cr] * 100, 0)} ({eur(total * est_a[cr])})",
+                "Con la propuesta": f"{pct(est_d[cr] * 100, 0)} ({eur(total * est_d[cr])})"}
+               for cr in est_a if cr in est_d]
+    if esc_a and esc_d:
+        filas_t.append({"Situación": "Un año malo (1 de cada 20)",
+                        "Tu cartera hoy": f"{pct(esc_a['p5'] * 100, 0)} ({eur(total * esc_a['p5'])})",
+                        "Con la propuesta": f"{pct(esc_d['p5'] * 100, 0)} ({eur(total * esc_d['p5'])})"})
+    if filas_t:
+        st.dataframe(pd.DataFrame(filas_t), hide_index=True, width="stretch")
+        st.caption("Con los precios reales de cada crisis (solo los valores que ya cotizaban). La propuesta no "
+                   "promete ganar más: reduce cuánto depende tu dinero de pocas empresas.")
+    return bool(filas_t)
 
 
 def posicion_detalle(f: dict, cr: dict):
