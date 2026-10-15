@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ui_comun import aviso_datos_antiguos, barra_movil, control_acceso, estilos
+from ui_comun import aviso_datos_antiguos, control_acceso, estilos
 
 st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide",
                    initial_sidebar_state="collapsed")
@@ -57,8 +57,6 @@ GRUPOS = {
     "Aprender y probar": [PAGINAS["acierto"], PAGINAS["simulador"], PAGINAS["calculadoras"], PAGINAS["aprende"]],
 }
 nav = st.navigation(GRUPOS, position="top")
-if st.session_state["_perfil"].movil:
-    barra_movil(GRUPOS)
 _hueco_aviso = st.empty()
 nav.run()
 aviso_datos_antiguos(_hueco_aviso)

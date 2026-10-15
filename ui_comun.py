@@ -515,7 +515,7 @@ def ir_a(pagina: str, **estado):
         st.switch_page(paginas[pagina])
 
 
-# --------------------------------------------------------------------------- estilo y menú del móvil
+# --------------------------------------------------------------------------- estilo
 ESTILOS = """
 <style>
 /* Cifras un poco más pequeñas: caben más sin hacer scroll. */
@@ -533,50 +533,11 @@ ESTILOS = """
   [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]):not(:has([data-testid="stPlotlyChart"], [data-testid="stDataFrame"], [data-testid="stButton"], [data-testid="stExpander"], [data-testid="stForm"])) > [data-testid="stColumn"] {
     flex: 1 1 calc(50% - 0.75rem) !important; min-width: calc(50% - 0.75rem) !important;
     width: calc(50% - 0.75rem) !important; }
-  /* Menú fijo arriba, justo debajo de la cabecera de Streamlit: abajo a la derecha Streamlit Cloud pone el botón
-     «Manage app» (solo lo ve el dueño) y taparía el menú. */
-  .st-key-nav_movil { position: fixed; top: 60px; left: 0; right: 0; z-index: 999990;
-    background: var(--background-color, #fff); border-bottom: 1px solid rgba(128, 128, 128, 0.25);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06); padding: 0.15rem 0.3rem; }
-  [data-testid="stMainBlockContainer"]:has(.st-key-nav_movil) { padding-top: 7.25rem; }
-  .st-key-nav_movil [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important;
-    gap: 0.1rem !important; }
-  .st-key-nav_movil [data-testid="stColumn"] { min-width: 0 !important; width: 20% !important; flex: 1 1 0 !important; }
-  .st-key-nav_movil a, .st-key-nav_movil button { flex-direction: column !important; padding: 0.2rem 0 !important;
-    min-height: 0 !important; gap: 0 !important; justify-content: center; width: 100%; border: none !important; }
-  .st-key-nav_movil a p, .st-key-nav_movil button p { font-size: 0.68rem !important; white-space: nowrap; }
-  .st-key-nav_movil [data-testid="stPopoverButton"] span[data-has-shortcut] {
-    display: flex; flex-direction: column; align-items: center; gap: 0; }
-  .st-key-nav_movil [data-testid="stPopoverButton"] div[aria-hidden="true"] { display: none; }
 }
-@media (min-width: 641px) { .st-key-nav_movil { display: none; } }
 </style>
 """
-
-ACCESOS_MOVIL = [("hoy", "Hoy", "🧭"), ("bankinter", "Cartera", "🏦"), ("seguimiento", "Seguimiento", "📒"),
-                 ("chat", "Pregunta", "💬")]
 
 
 def estilos() -> None:
     st.html(ESTILOS)
 
-
-def barra_movil(grupos: dict[str, list]) -> None:
-    """Menú fijo arriba en el móvil con las 4 páginas que más se usan y «Más» con todas las demás."""
-    def enlazar(destino, pagina, **kw):
-        try:
-            destino.page_link(pagina, **kw)
-        except Exception:  # noqa: BLE001 - un enlace nunca debe romper la página
-            pass
-
-    paginas = st.session_state.get("_paginas", {})
-    with st.container(key="nav_movil"):
-        cols = st.columns(5)
-        for col, (clave, texto, icono) in zip(cols, ACCESOS_MOVIL):
-            if clave in paginas:
-                enlazar(col, paginas[clave], label=texto, icon=icono)
-        with cols[4].popover("Más", icon=":material/menu:", width="stretch"):
-            for grupo, lista in grupos.items():
-                st.caption(grupo)
-                for p in lista:
-                    enlazar(st, p)
