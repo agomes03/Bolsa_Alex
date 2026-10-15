@@ -1,1 +1,0 @@
-at = run("pagina_hoy"); print("  HOY:", [m.value[:120] for m in at.markdown][:8])

@@ -1,1 +1,0 @@
-    return SimpleNamespace(run=next(p for p in todas if p.__name__ == PAG[0]))

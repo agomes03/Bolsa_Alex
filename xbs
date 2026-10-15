@@ -1,1 +1,0 @@
-sub = [b for b in at.button if "Ver mi plan" in b.label]; sub[0].click().run(); chk(at, "Plan enviado")

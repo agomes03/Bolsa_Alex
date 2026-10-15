@@ -1,1 +1,0 @@
-    todas = [p for grupo in pages.values() for p in grupo] if isinstance(pages, dict) else pages

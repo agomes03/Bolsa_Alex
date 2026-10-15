@@ -1,1 +1,0 @@
-                        index=pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=n))

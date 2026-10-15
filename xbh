@@ -1,1 +1,0 @@
-    if movil: at.sidebar.toggle[0].set_value(True).run()

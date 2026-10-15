@@ -1,1 +1,0 @@
-at = run("pagina_carteras"); chk(at, "Carteras"); print("  CARTERAS:", [m.label + "=" + str(m.value) for m in at.metric][:3], "tabs", len(at.tabs))

@@ -1,1 +1,0 @@
-if os.environ.get("INFORME"): ui_comun.RUTA_INFORME = Path(os.environ["INFORME"])

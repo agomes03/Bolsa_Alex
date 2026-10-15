@@ -1,1 +1,0 @@
-at = run("pagina_simulador"); print("  SIM:", [m.label + "=" + str(m.value) for m in at.metric][:4])

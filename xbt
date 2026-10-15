@@ -1,1 +1,0 @@
-print("  PLAN:", [h.value for h in at.header], [m.label + "=" + str(m.value) for m in at.metric][:3])

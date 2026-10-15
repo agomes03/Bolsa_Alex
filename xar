@@ -1,1 +1,0 @@
-noticias.descargar = lambda fuentes=None, max_por_fuente=30, extra=None, max_horas=72: (noticias.combinar(
