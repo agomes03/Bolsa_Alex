@@ -12,9 +12,9 @@ import streamlit as st
 from bolsa import asesor, bankinter, cartera, costes, datos, ejercicios, horario, senales
 from bolsa.activos import clase_de
 from bolsa.tickers import nombre_de, sector_de
-from ui_comun import (palabras_de_la_pagina, mostrar_plotly, selector_valor, cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, datos_usuario,
-                      estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de, num, pct,
-                      perfil)
+from ui_comun import (cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, cotizacion_al_instante,
+                      datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de,
+                      mostrar_plotly, num, palabras_de_la_pagina, pct, perfil, selector_valor)
 
 TIPOS = {"Limitada": "limitada", "A mercado": "mercado", "Stop (con límite)": "stop"}
 EXPLICA_TIPO = {
@@ -34,7 +34,11 @@ def _cuando(iso: str) -> str:
 def _datos_valor(ticker: str):
     diario = cargar_diario_real(ticker)
     intra = cargar_intradia(ticker)
-    return diario, intra, datos.cotizacion(diario, intra)
+    q = datos.cotizacion(diario, intra)
+    al_instante = cotizacion_al_instante(ticker)
+    if q and al_instante:
+        q.update({k: v for k, v in al_instante.items() if v is not None})
+    return diario, intra, q
 
 
 def cartera_manual():
@@ -217,7 +221,8 @@ def ficha_cotizacion(ticker: str, diario: pd.DataFrame, q: dict):
     c[0].metric(f"{nombre_de(ticker).split(' (')[0]} · último", eur(q["precio"], m), delta)
     c[1].markdown(f"{'🟢' if estado['abierto'] else '🔴'} {estado['texto']}  \n"
                   f"<small>Precio de las {pd.Timestamp(q['hora']):%H:%M} del {pd.Timestamp(q['hora']):%d/%m} "
-                  f"(≈15 min de retraso; en tu bróker lo verás en tiempo real) · {sector_de(ticker)}</small>",
+                  + ("(⚡ tiempo real, Finnhub)" if q.get("tiempo_real") else
+                     "(≈15 min de retraso; en tu bróker lo verás en tiempo real)") + f" · {sector_de(ticker)}</small>",
                   unsafe_allow_html=True)
     k = st.columns(3 if pf.movil else 6)
     k[0].metric("Apertura", num(q["apertura"], 3))

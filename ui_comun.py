@@ -4,6 +4,7 @@ perfil del usuario y almacenamiento de carteras/estrategia."""
 from __future__ import annotations
 
 import json
+import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -14,7 +15,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
-from bolsa import almacen, costes, datos, noticias, prediccion, senales
+from bolsa import almacen, costes, datos, finnhub, noticias, prediccion, senales
 from bolsa.simulador import Parametros
 from bolsa.tickers import TODAS_LAS_ACCIONES, indice_de_referencia, nombre_de
 
@@ -84,9 +85,52 @@ def cargar_dividendos_varios(tickers) -> dict[str, pd.Series]:
     return _dividendos_varios(tuple(sorted(set(tickers))))
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+def clave_finnhub() -> str | None:
+    """Clave de Finnhub de Secrets ([finnhub] api_key) o de la variable FINNHUB_API_KEY; None si no hay."""
+    try:
+        clave = (st.secrets.get("finnhub", {}) or {}).get("api_key")
+    except Exception:  # noqa: BLE001 - sin archivo de secretos
+        clave = None
+    return (clave or os.environ.get("FINNHUB_API_KEY") or "").strip() or None
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _estado_finnhub(clave: str) -> tuple[bool, str]:
+    return finnhub.comprobar(clave)
+
+
+def estado_finnhub() -> tuple[bool, str] | None:
+    """(funciona, mensaje) si hay clave de Finnhub; None si no está configurada."""
+    clave = clave_finnhub()
+    return _estado_finnhub(clave) if clave else None
+
+
+def _a_noticias(items: list[dict]) -> list[noticias.Noticia]:
+    return [noticias.Noticia(n["titulo"], n["enlace"], n["fuente"], n["fecha"], n["resumen"]) for n in items]
+
+
+@st.cache_data(ttl=120, show_spinner=False)
 def cargar_noticias() -> tuple[list[noticias.Noticia], list[str]]:
-    return noticias.descargar()
+    extra = []
+    clave = clave_finnhub()
+    if clave:
+        try:
+            extra = _a_noticias(finnhub.noticias_mercado(clave))
+        except Exception:  # noqa: BLE001 - si Finnhub falla, quedan las demás fuentes
+            extra = []
+    return noticias.descargar(extra=extra)
+
+
+@st.cache_data(ttl=20, show_spinner=False)
+def cotizacion_al_instante(ticker: str) -> dict | None:
+    """Precio en tiempo real de Finnhub (acciones de EEUU con clave); None en los demás casos."""
+    clave = clave_finnhub()
+    if not clave or not finnhub.es_eeuu(ticker):
+        return None
+    try:
+        return finnhub.cotizacion(ticker, clave)
+    except Exception:  # noqa: BLE001 - se queda el precio de Yahoo
+        return None
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -105,6 +149,12 @@ def noticias_empresa(ticker: str) -> list[noticias.Noticia]:
     nombre = nombre_de(ticker)
     extra = [noticias.Noticia(n["titulo"], n["enlace"], n["fuente"], n["fecha"], n["resumen"][:400])
              for n in datos.noticias_yahoo(ticker)]
+    clave = clave_finnhub()
+    if clave and finnhub.es_eeuu(ticker):
+        try:
+            extra += _a_noticias(finnhub.noticias_empresa(ticker, clave))
+        except Exception:  # noqa: BLE001
+            pass
     lista, _ = noticias.descargar(noticias.fuentes_empresa(ticker, nombre), max_por_fuente=25,
                                   extra=extra, max_horas=24 * 10)
     # Las fuentes de Google/Yahoo traen a veces noticias de otras empresas: quedarnos con las que la nombran.

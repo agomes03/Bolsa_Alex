@@ -73,14 +73,16 @@ def sin_internet(monkeypatch, tmp_path):
     monkeypatch.setattr(datos, "dividendos_varios", lambda ts, periodo="5y": {})
     monkeypatch.setattr(datos, "buscar_simbolo", lambda q: None)
     titular = noticias.Noticia("El BCE baja los tipos de interés", "x", "Prueba", datetime.now(timezone.utc))
-    monkeypatch.setattr(noticias, "descargar", lambda *a, **k: (noticias.combinar([titular], 72), []))
+    monkeypatch.setattr(noticias, "descargar",
+                        lambda *a, extra=None, **k: (noticias.combinar([titular] + list(extra or []), 72), []))
     monkeypatch.setattr(st, "Page", lambda fn, **kw: fn)
     monkeypatch.setattr(st, "switch_page", lambda p: None)
     st.cache_data.clear()
     yield
 
 
-def abrir(pagina: str, movil: bool = False, datos_usuario: dict | None = None, secretos: dict | None = None):
+def abrir(pagina: str, movil: bool = False, datos_usuario: dict | None = None, secretos: dict | None = None,
+          estado: dict | None = None):
     def navegacion(paginas, **_k):
         todas = [p for grupo in paginas.values() for p in grupo]
         return SimpleNamespace(run=next(p for p in todas if p.__name__ == pagina))
@@ -91,6 +93,8 @@ def abrir(pagina: str, movil: bool = False, datos_usuario: dict | None = None, s
         at.session_state["_datos"] = datos_usuario
     for k, v in (secretos or {}).items():
         at.secrets[k] = v
+    for k, v in (estado or {}).items():
+        at.session_state[k] = v
     at.run()
     if movil and at.sidebar.toggle:
         at.sidebar.toggle[0].set_value(True).run()
@@ -220,3 +224,24 @@ def test_variaciones_negativas_salen_en_rojo():
     from ui_comun import pct
 
     assert pct(-0.28).startswith("-") and pct(1.08).startswith("+")
+
+
+def test_finnhub_conectado(monkeypatch):
+    from bolsa import finnhub
+
+    monkeypatch.setattr(finnhub, "comprobar", lambda clave: (True, "Finnhub conectado: prueba."))
+    monkeypatch.setattr(finnhub, "cotizacion", lambda t, clave: {
+        "precio": 231.5, "variacion": 2.5, "variacion_pct": 1.09, "maximo": 232.0, "minimo": 228.0,
+        "apertura": 229.0, "anterior": 229.0, "hora": datetime(2026, 10, 15, 20, 0), "tiempo_real": True})
+    monkeypatch.setattr(finnhub, "noticias_mercado", lambda clave: [{
+        "titulo": "Fed holds rates steady", "enlace": "https://x", "fuente": "Finnhub · Reuters",
+        "fecha": datetime.now(timezone.utc), "resumen": ""}])
+    monkeypatch.setattr(finnhub, "noticias_empresa", lambda t, clave: [])
+    secretos = {"finnhub": {"api_key": "clave-de-prueba"}}
+    at = abrir("pagina_noticias", secretos=secretos)
+    sin_fallos(at)
+    assert any("Finnhub conectado" in c.value for c in at.sidebar.caption)
+    assert any("Fed holds rates" in e.label for e in at.expander)
+    at = abrir("pagina_analizar", secretos=secretos, estado={"analizar_ticker": "AAPL"})
+    sin_fallos(at)
+    assert any("tiempo real, Finnhub" in c.value for c in at.caption)

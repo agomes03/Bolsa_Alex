@@ -5,7 +5,8 @@ from __future__ import annotations
 import streamlit as st
 
 from bolsa import asesor, bankinter, costes, noticias
-from ui_comun import Perfil, datos_usuario, es_movil, estado_guardado, guardar_datos, hay_contrasena
+from ui_comun import (Perfil, datos_usuario, es_movil, estado_finnhub, estado_guardado, guardar_datos,
+                      hay_contrasena)
 
 
 def _capital_por_defecto() -> float:
@@ -56,6 +57,9 @@ def _pie():
                "fuentes RSS en español e inglés. Se actualizan solas cada 5-10 minutos.")
     texto, ayuda = estado_guardado()
     st.caption(texto, help=ayuda)
+    fh = estado_finnhub()
+    if fh:
+        st.caption(("⚡ " if fh[0] else "⚠️ ") + fh[1])
     if not hay_contrasena():
         st.caption("🔓 App sin contraseña", help="Si la app es pública, cualquiera con el enlace ve tu cartera. Ponla "
                    "privada en Streamlit → Settings → Sharing y añade en Secrets:\n\n[app]\npassword = \"...\"")

@@ -234,7 +234,14 @@ Bankinter no ofrece una API pública para que apps de terceros lean la cuenta de
   arriba con la fecha de esos datos, en vez de quedarse en blanco.
 - Festivos: la app conoce los festivos de la Bolsa española, Xetra, Euronext, Londres, Suiza y Nueva York
   (`bolsa/festivos.py`), y no da un mercado por abierto en Viernes Santo o Navidad.
-- Noticias: RSS públicos. Si una fuente cambia su dirección, edítala en `bolsa/noticias.py` (`FUENTES_RSS`).
+- **Finnhub (opcional, gratis para uso personal):** con tu clave en Streamlit → Settings → Secrets
+  (`[finnhub]` `api_key = "..."`) la app añade noticias de mercado al momento, noticias de cada empresa de EEUU y
+  **precios de EEUU en tiempo real** (ficha de la cartera virtual y Analizar, marcados con ⚡). La barra lateral
+  dice si la clave funciona. Las acciones españolas siguen con el retraso de ~15 minutos de Yahoo.
+- **CNMV:** para enterarte de los comunicados oficiales de tus empresas antes que la prensa, suscríbete gratis por
+  correo en la web de la CNMV (Suscripciones → por entidad → «Información privilegiada» y «Otra información
+  relevante»).
+- Noticias: RSS públicos, actualizados cada 2 minutos. Si una fuente cambia su dirección, edítala en `bolsa/noticias.py` (`FUENTES_RSS`).
 - Comisiones de Bankinter: los valores por defecto son orientativos. Ajústalos en la barra lateral
   con tu tarifa real (app Bankinter → Broker → Tarifas).
 

@@ -17,7 +17,8 @@ from bolsa.tickers import NO_INVERTIBLES, nombre_de, sector_de, TODOS_LOS_VALORE
 from paginas_extra import bloque_operar, pesos_cartera_real
 from paginas_hoy import bloque_que_puede_pasar_accion, pagina_radar_global
 from paginas_noticias import tarjeta_noticia
-from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, cargar_informe, eur, fila_informe, fx,
+from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, cargar_informe, cotizacion_al_instante, eur,
+                      fila_informe, fx,
                       mercado_alcista_para, moneda_de, mostrar_plotly, noticias_empresa, num, palabras_de_la_pagina,
                       pct, perfil, selector_valor)
 
@@ -172,6 +173,12 @@ def pagina_analizar():
     st.header(f"{titulo} · {precio_txt}")
     st.caption(f"{sector_de(ticker)} · {bankinter.mercado_de(ticker)} · hoy {pct(ev.datos['var_1d'])} · "
                f"último año {pct(ev.datos['var_1a'], 0)}")
+    al_instante = cotizacion_al_instante(ticker)
+    if al_instante:
+        st.caption(f"⚡ Ahora mismo (tiempo real, Finnhub): **{eur(al_instante['precio'], m)}**"
+                   + (f" · {pct(al_instante['variacion_pct'], 2)} hoy" if al_instante.get("variacion_pct") is not None
+                      else "")
+                   + (f" · {al_instante['hora']:%H:%M}" if al_instante.get("hora") else ""))
 
     datos_v = fila or {"puntuacion": ev.puntuacion, "mercado_alcista": mercado_ok,
                        "resultados_pronto": any("resultados" in a for a in ev.avisos)}
