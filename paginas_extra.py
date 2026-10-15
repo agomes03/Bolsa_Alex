@@ -15,7 +15,7 @@ from bolsa import (asesor, asesor_diario, avisos, bankinter, comparativa, divide
 from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
-from ui_comun import (palabras_de_la_pagina, cargar_dividendos, cargar_noticias, mostrar_plotly, reducir, selector_valor, almacen_actual, cargar_activos, enlace, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
+from ui_comun import (palabras_de_la_pagina, cargar_dividendos_varios, historia_larga_eur, cargar_noticias, mostrar_plotly, reducir, selector_valor, almacen_actual, cargar_activos, enlace, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
                       datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, num,
                       pct, perfil)
 
@@ -728,11 +728,12 @@ def _perfil_guardado() -> str | None:
 
 def resumenes_dividendos(filas: list[dict]) -> list[dict]:
     funds = cargar_fundamentales_varios(tuple(sorted(f["ticker"] for f in filas)))
+    divs = cargar_dividendos_varios([f["ticker"] for f in filas if f["clase"] in ("Acciones", "Fondos y ETF")])
     salida = []
     for f in filas:
         if not f["precio"] or f["clase"] not in ("Acciones", "Fondos y ETF"):
             continue
-        r = dividendos.resumen(f["ticker"], cargar_dividendos(f["ticker"]), (funds.get(f["ticker"]) or {}).get(
+        r = dividendos.resumen(f["ticker"], divs.get(f["ticker"]), (funds.get(f["ticker"]) or {}).get(
             "exDividendDate"), f["pos"]["acciones"], f["precio"], f["fx"],
             fecha_compra=f["pos"].get("fecha") if f["pos"].get("fecha", "") < date.today().isoformat() else None)
         salida.append({**r, "nombre": f["nombre"]})
@@ -780,13 +781,7 @@ def bloque_comparativa(filas: list[dict]):
     if not pesos:
         return
     with st.spinner("Calculando con la historia real..."):
-        tickers = tuple(sorted(set(pesos) | set(comparativa.REFERENCIAS)))
-        hist = cargar_varios(tickers, "10y")
-        cambios = cargar_varios(tuple(costes.TICKER_CAMBIO.values()), "10y")
-        hist_eur = costes.historicos_en_euros(hist, {d: cambios.get(t) for d, t in costes.TICKER_CAMBIO.items()})
-        if "^IBEX" in hist:
-            hist_eur["^IBEX"] = hist["^IBEX"]
-        res = comparativa.comparar(hist_eur, pesos, int(anos))
+        res = comparativa.comparar(historia_larga_eur(tuple(pesos)), pesos, int(anos))
     if not res:
         st.caption("No hay historia suficiente para comparar.")
         return
@@ -939,10 +934,7 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
 
     st.markdown("#### 🔬 Qué habría pasado en crisis reales")
     with st.spinner("Comparando tu cartera y la propuesta con 10 años de historia real..."):
-        todos = tuple(sorted(set(dg["pesos_antes"]) | set(dg["pesos_despues"])))
-        hist = cargar_varios(todos, "10y")
-        cambios = cargar_varios(tuple(costes.TICKER_CAMBIO.values()), "10y")
-        hist_eur = costes.historicos_en_euros(hist, {d: cambios.get(t) for d, t in costes.TICKER_CAMBIO.items()})
+        hist_eur = historia_larga_eur(tuple(set(dg["pesos_antes"]) | set(dg["pesos_despues"])))
         est_a = {e["crisis"]: e["cambio"] for e in patrones.prueba_estres(hist_eur, dg["pesos_antes"])}
         est_d = {e["crisis"]: e["cambio"] for e in patrones.prueba_estres(hist_eur, dg["pesos_despues"])}
         esc_a = patrones.escenarios(patrones.rentabilidades_cartera(hist_eur, dg["pesos_antes"]))

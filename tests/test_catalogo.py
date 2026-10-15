@@ -51,3 +51,21 @@ def test_reducir_puntos_mantiene_el_ultimo():
     r = reducir(s, 400)
     assert len(r) <= 401 and r.index[-1] == s.index[-1] and r.iloc[-1] == 2_499
     assert reducir(s.iloc[:100], 400) is not None and len(reducir(s.iloc[:100], 400)) == 100
+
+
+def test_festivos_de_las_bolsas():
+    from datetime import date, datetime, timezone
+
+    from bolsa import festivos
+    assert festivos.pascua(2026) == date(2026, 4, 5) and festivos.pascua(2027) == date(2027, 3, 28)
+    assert festivos.festivo("SAN.MC", date(2026, 4, 3)) == "Viernes Santo"
+    assert festivos.festivo("SAN.MC", date(2026, 12, 24)) == "Nochebuena"
+    assert festivos.festivo("MC.PA", date(2026, 12, 24)) is None          # Euronext abre (sesión corta)
+    assert festivos.festivo("AAPL", date(2026, 7, 3)) == "Independencia"   # el 4 de julio de 2026 es sábado
+    assert festivos.festivo("AAPL", date(2026, 11, 26)) == "Acción de Gracias"
+    assert festivos.festivo("HSBA.L", date(2026, 12, 28)) == "San Esteban"
+    assert festivos.festivo("7203.T", date(2026, 1, 1)) is None            # Asia no incluida
+    viernes_santo = datetime(2026, 4, 3, 10, 0, tzinfo=timezone.utc)
+    e = horario.estado_mercado("SAN.MC", viernes_santo)
+    assert not e["abierto"] and "Viernes Santo" in e["texto"] and "martes" in e["texto"]
+    assert horario.estado_mercado("BTC-EUR", viernes_santo)["abierto"]

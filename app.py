@@ -21,12 +21,13 @@ from paginas_chat import pagina_chat
 from paginas_extra import bloque_operar, pagina_bankinter, pagina_cartera_virtual, pagina_simulador
 from paginas_hoy import (bloque_fases, bloque_que_puede_pasar_accion, pagina_carteras, pagina_hoy, pagina_plan,
                          pagina_radar_global)
-from ui_comun import (Perfil, estado_guardado, palabras_de_la_pagina, ir_a, mostrar_plotly, reducir, selector_valor, cargar_activos, conclusion_noticia, mostrar_conclusion, cargar_fundamentales, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
+from ui_comun import (Perfil, aviso_datos_antiguos, control_acceso, hay_contrasena, estado_guardado, palabras_de_la_pagina, ir_a, mostrar_plotly, reducir, selector_valor, cargar_activos, conclusion_noticia, mostrar_conclusion, cargar_fundamentales, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
                       datos_usuario, es_movil, guardar_datos, eur, fila_informe, fx, mercado_alcista_para, moneda_de,
                       noticias_empresa, num, pct)
 
 st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide",
                    initial_sidebar_state="collapsed")
+control_acceso()
 
 AVISO = ("⚠️ **Herramienta educativa, no es asesoramiento financiero.** Ningún sistema puede "
          "garantizar beneficios ni predecir la bolsa con certeza: invierte solo dinero que no vayas a "
@@ -96,6 +97,12 @@ with st.sidebar:
                "fuentes RSS en español e inglés. Se actualizan solas cada 5-10 minutos.")
     _texto_guardado, _ayuda_guardado = estado_guardado()
     st.caption(_texto_guardado, help=_ayuda_guardado)
+    if not hay_contrasena():
+        st.caption("🔓 App sin contraseña", help="Si la app es pública, cualquiera con el enlace ve tu cartera. Ponla "
+                   "privada en Streamlit → Settings → Sharing y añade en Secrets:\n\n[app]\npassword = \"...\"")
+    elif st.button("🔒 Salir", width="stretch"):
+        st.session_state.pop("_acceso_ok", None)
+        st.rerun()
     if st.button("🔄 Actualizar ahora", width="stretch"):
         st.cache_data.clear()
         st.rerun()
@@ -774,4 +781,6 @@ nav = st.navigation({
     "Mis carteras": [PAGINAS["bankinter"], PAGINAS["virtual"]],
     "Aprender y probar": [PAGINAS["acierto"], PAGINAS["simulador"], PAGINAS["calculadoras"], PAGINAS["aprende"]],
 }, position="top")
+_hueco_aviso = st.empty()
 nav.run()
+aviso_datos_antiguos(_hueco_aviso)

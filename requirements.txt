@@ -1,10 +1,12 @@
-streamlit>=1.50
-yfinance>=0.2.50
-feedparser>=6.0
-pandas>=2.1
-numpy>=1.26
-plotly>=5.20
-requests>=2.31
-openpyxl>=3.1
-scikit-learn>=1.4
-anthropic>=1.14
+# Versiones exactas probadas juntas (para que una actualización de una librería no rompa la app).
+# Para actualizar: cambia la versión, ejecuta `python -m pytest` y, si todo pasa, súbelo.
+streamlit==1.66.0
+yfinance==1.7.0
+feedparser==6.0.14
+pandas==3.0.5
+numpy==2.5.3
+plotly==7.1.0
+requests==2.34.2
+openpyxl==3.1.5
+scikit-learn==1.9.1
+anthropic==1.14.0

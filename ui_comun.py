@@ -26,8 +26,33 @@ def cargar_historico(ticker: str, periodo: str = "2y") -> pd.DataFrame:
 
 
 @st.cache_data(ttl=600, show_spinner=False)
-def cargar_varios(tickers: tuple[str, ...], periodo: str = "2y") -> dict[str, pd.DataFrame]:
+def _varios_corto(tickers: tuple[str, ...], periodo: str) -> dict[str, pd.DataFrame]:
     return datos.varios(list(tickers), periodo)
+
+
+@st.cache_data(ttl=21_600, show_spinner=False)
+def _varios_largo(tickers: tuple[str, ...], periodo: str) -> dict[str, pd.DataFrame]:
+    """Historias largas (10 años): solo cambian una vez al día, así que se guardan 6 horas."""
+    return datos.varios(list(tickers), periodo)
+
+
+def cargar_varios(tickers: tuple[str, ...], periodo: str = "2y") -> dict[str, pd.DataFrame]:
+    clave = tuple(sorted(set(tickers)))      # el mismo grupo en otro orden reutiliza la caché
+    return _varios_largo(clave, periodo) if periodo in ("5y", "10y", "max") else _varios_corto(clave, periodo)
+
+
+REFERENCIAS_LARGAS = ("IWDA.AS", "IBGS.AS", "XEON.DE", "^IBEX")
+
+
+def historia_larga_eur(tickers: tuple[str, ...] | list[str]) -> dict[str, pd.DataFrame]:
+    """10 años de tus valores y de las referencias (fondo mundial, renta fija, monetario, IBEX) en euros, con
+    una sola descarga compartida por todos los bloques que la necesitan."""
+    hist = cargar_varios(tuple(set(tickers) | set(REFERENCIAS_LARGAS)), "10y")
+    cambios = cargar_varios(tuple(set(costes.TICKER_CAMBIO.values())), "10y")
+    hist_eur = costes.historicos_en_euros(hist, {d: cambios.get(t) for d, t in costes.TICKER_CAMBIO.items()})
+    if "^IBEX" in hist:
+        hist_eur["^IBEX"] = hist["^IBEX"]
+    return hist_eur
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -51,8 +76,12 @@ def cargar_activos() -> list[dict]:
 
 
 @st.cache_data(ttl=43_200, show_spinner=False)
-def cargar_dividendos(ticker: str) -> pd.Series:
-    return datos.dividendos(ticker)
+def _dividendos_varios(tickers: tuple[str, ...]) -> dict[str, pd.Series]:
+    return datos.dividendos_varios(list(tickers))
+
+
+def cargar_dividendos_varios(tickers) -> dict[str, pd.Series]:
+    return _dividendos_varios(tuple(sorted(set(tickers))))
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -226,6 +255,58 @@ def guardar_datos() -> None:
     except Exception as e:  # noqa: BLE001
         st.session_state["_guardado"] = (False, datetime.now(MADRID_TZ).strftime("%H:%M"), str(e))
         st.error(f"No se han podido guardar los datos: {e}. Descarga una copia de seguridad por si acaso.")
+
+
+def aviso_datos_antiguos(hueco) -> None:
+    """Si Yahoo ha fallado y se están mostrando datos de respaldo, lo dice arriba de la página."""
+    from datetime import datetime
+
+    antiguo = datos.respaldo_mas_antiguo()
+    if antiguo:
+        cuando = datetime.fromtimestamp(antiguo, MADRID_TZ).strftime("%d/%m a las %H:%M")
+        hueco.warning(f"⚠️ Yahoo Finance no responde ahora mismo: ves los últimos datos buenos guardados (del {cuando}). "
+                      "Pulsa «🔄 Actualizar ahora» en la barra lateral dentro de un rato.")
+
+
+def _clave_app() -> str | None:
+    try:
+        return (st.secrets.get("app", {}) or {}).get("password") or None
+    except Exception:  # noqa: BLE001 - sin secrets.toml, Streamlit lanza excepción
+        return None
+
+
+def control_acceso() -> None:
+    """Pide la contraseña de la app (Secrets: [app] password = "...") antes de mostrar nada. Sin contraseña
+    configurada, la app se abre (y la barra lateral avisa de que conviene ponerla)."""
+    import hmac
+    import time
+
+    clave = _clave_app()
+    if not clave or st.session_state.get("_acceso_ok"):
+        return
+    st.title("🔒 Asistente de Bolsa")
+    st.caption("Esta app contiene tu cartera. Introduce la contraseña para entrar.")
+    espera = st.session_state.get("_acceso_espera", 0) - time.time()
+    with st.form("acceso"):
+        tecleada = st.text_input("Contraseña", type="password")
+        entrar = st.form_submit_button("Entrar", type="primary", disabled=espera > 0)
+    if espera > 0:
+        st.warning(f"Demasiados intentos. Espera {int(espera) + 1} segundos.")
+    elif entrar:
+        if hmac.compare_digest(tecleada.encode(), str(clave).encode()):
+            st.session_state["_acceso_ok"] = True
+            st.session_state.pop("_acceso_fallos", None)
+            st.rerun()
+        fallos = st.session_state.get("_acceso_fallos", 0) + 1
+        st.session_state["_acceso_fallos"] = fallos
+        if fallos >= 5:
+            st.session_state["_acceso_espera"] = time.time() + 30 * (fallos - 4)
+        st.error("Contraseña incorrecta.")
+    st.stop()
+
+
+def hay_contrasena() -> bool:
+    return _clave_app() is not None
 
 
 def estado_guardado() -> tuple[str, str]:

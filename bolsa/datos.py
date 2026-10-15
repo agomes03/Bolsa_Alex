@@ -2,7 +2,46 @@
 
 from __future__ import annotations
 
+import os
+import re
+from pathlib import Path
+
 import pandas as pd
+
+# Respaldo: cada descarga correcta se guarda en disco; si Yahoo falla (sin conexión, límite de peticiones,
+# cambios en su web), se usan los últimos datos buenos y la app avisa de que son antiguos.
+CARPETA_RESPALDO = Path(os.environ.get("BOLSA_RESPALDO", Path(__file__).resolve().parent.parent / ".respaldo_datos"))
+RESPALDOS_USADOS: dict[str, float] = {}     # ticker -> fecha (epoch) de los datos de respaldo usados
+
+
+def _ruta_respaldo(ticker: str, tipo: str) -> Path:
+    return CARPETA_RESPALDO / (re.sub(r"[^A-Za-z0-9._-]", "_", f"{tipo}_{ticker}") + ".pkl")
+
+
+def _guardar_respaldo(ticker: str, tipo: str, df: pd.DataFrame) -> None:
+    try:
+        CARPETA_RESPALDO.mkdir(parents=True, exist_ok=True)
+        ruta = _ruta_respaldo(ticker, tipo)
+        temporal = ruta.with_suffix(f".{os.getpid()}.tmp")
+        df.to_pickle(temporal)
+        os.replace(temporal, ruta)           # escritura atómica
+    except Exception:  # noqa: BLE001 - el respaldo nunca debe romper una descarga correcta
+        pass
+
+
+def _leer_respaldo(ticker: str, tipo: str) -> pd.DataFrame:
+    ruta = _ruta_respaldo(ticker, tipo)
+    try:
+        df = pd.read_pickle(ruta)
+    except Exception:  # noqa: BLE001
+        return pd.DataFrame()
+    RESPALDOS_USADOS[ticker] = ruta.stat().st_mtime
+    return df
+
+
+def respaldo_mas_antiguo() -> float | None:
+    """Fecha (epoch) del respaldo más antiguo usado en esta sesión, o None si todo es fresco."""
+    return min(RESPALDOS_USADOS.values()) if RESPALDOS_USADOS else None
 
 
 def _sin_zona(df: pd.DataFrame) -> pd.DataFrame:
@@ -17,12 +56,14 @@ def historico(ticker: str, periodo: str = "2y") -> pd.DataFrame:
 
     try:
         df = yf.Ticker(ticker).history(period=periodo, interval="1d", auto_adjust=True)
-    except Exception:  # noqa: BLE001 - errores de red: la app mostrará un aviso
-        return pd.DataFrame()
+    except Exception:  # noqa: BLE001 - errores de red: se usan los últimos datos buenos
+        df = None
     if df is None or df.empty:
-        return pd.DataFrame()
-    df = df[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"])
-    return _sin_zona(df)
+        return _leer_respaldo(ticker, f"diario{periodo}")
+    df = _sin_zona(df[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"]))
+    RESPALDOS_USADOS.pop(ticker, None)
+    _guardar_respaldo(ticker, f"diario{periodo}", df)
+    return df
 
 
 def varios(tickers: list[str], periodo: str = "2y") -> dict[str, pd.DataFrame]:
@@ -33,16 +74,24 @@ def varios(tickers: list[str], periodo: str = "2y") -> dict[str, pd.DataFrame]:
         bruto = yf.download(tickers, period=periodo, interval="1d", auto_adjust=True,
                             group_by="ticker", progress=False, threads=True)
     except Exception:  # noqa: BLE001
-        return {}
+        bruto = pd.DataFrame()
     salida = {}
     for t in tickers:
-        try:
-            df = bruto[t] if isinstance(bruto.columns, pd.MultiIndex) else bruto
-        except KeyError:
-            continue
-        df = df[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"])
+        df = pd.DataFrame()
+        if bruto is not None and not bruto.empty:
+            try:
+                df = bruto[t] if isinstance(bruto.columns, pd.MultiIndex) else bruto
+                df = df[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"])
+            except KeyError:
+                df = pd.DataFrame()
         if not df.empty:
             salida[t] = _sin_zona(df.copy())
+            RESPALDOS_USADOS.pop(t, None)
+            _guardar_respaldo(t, f"diario{periodo}", salida[t])
+        else:
+            respaldo = _leer_respaldo(t, f"diario{periodo}")
+            if not respaldo.empty:
+                salida[t] = respaldo
     return salida
 
 
@@ -74,10 +123,13 @@ def diario_sin_ajustar(ticker: str, periodo: str = "1y") -> pd.DataFrame:
     try:
         df = yf.Ticker(ticker).history(period=periodo, interval="1d", auto_adjust=False)
     except Exception:  # noqa: BLE001
-        return pd.DataFrame()
+        df = None
     if df is None or df.empty:
-        return pd.DataFrame()
-    return _sin_zona(df[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"]))
+        return _leer_respaldo(ticker, f"real{periodo}")
+    df = _sin_zona(df[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"]))
+    RESPALDOS_USADOS.pop(ticker, None)
+    _guardar_respaldo(ticker, f"real{periodo}", df)
+    return df
 
 
 def barras_ejecucion(diario: pd.DataFrame, intradia_df: pd.DataFrame) -> pd.DataFrame:
@@ -165,6 +217,27 @@ CAMPOS_FUNDAMENTALES = [
     "targetHighPrice", "numberOfAnalystOpinions", "recommendationKey", "recommendationMean",
     "earningsTimestamp", "earningsTimestampStart", "exDividendDate",
 ]
+
+
+def dividendos_varios(tickers: list[str], periodo: str = "5y") -> dict[str, pd.Series]:
+    """Dividendos de varios valores en UNA descarga (mucho más rápido que uno a uno)."""
+    import yfinance as yf
+
+    if not tickers:
+        return {}
+    try:
+        bruto = yf.download(tickers, period=periodo, interval="1d", actions=True, group_by="ticker",
+                            progress=False, threads=True, auto_adjust=True)
+    except Exception:  # noqa: BLE001
+        return {}
+    salida = {}
+    for t in tickers:
+        try:
+            d = (bruto[t] if isinstance(bruto.columns, pd.MultiIndex) else bruto)["Dividends"]
+        except KeyError:
+            continue
+        salida[t] = d[d > 0].dropna()
+    return salida
 
 
 def dividendos(ticker: str) -> pd.Series:

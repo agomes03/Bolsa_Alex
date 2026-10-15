@@ -1,12 +1,14 @@
 """Horario de cada bolsa para saber si el mercado está abierto (como en el bróker).
 
-No incluye los festivos de cada bolsa: esos días la app dirá «abierto» pero no habrá cotizaciones nuevas.
+Incluye los festivos de las bolsas europeas, de Londres y de Nueva York (ver `festivos.py`).
 """
 
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
+
+from .festivos import festivo
 
 MADRID = ZoneInfo("Europe/Madrid")
 
@@ -54,24 +56,27 @@ def estado_mercado(ticker: str, ahora: datetime | None = None) -> dict:
         return {"abierto": abierto, "texto": f"{que} cotizan casi 24 horas de lunes a viernes"
                 + ("" if abierto else ": ahora está cerrado (abre el domingo a las 23:00)"), "apertura": madrid}
     if ticker.startswith("0P"):
-        return {"abierto": ahora.astimezone(MADRID).weekday() < 5,
+        hoy_m = ahora.astimezone(MADRID)
+        return {"abierto": hoy_m.weekday() < 5 and not festivo(ticker, hoy_m.date()),
                 "texto": "Los fondos se compran y venden al valor liquidativo, que se calcula una vez al día",
                 "apertura": ahora.astimezone(MADRID)}
     zona, abre, cierra = sesion(ticker)
     local = ahora.astimezone(zona)
     hoy_abre = local.replace(hour=abre.hour, minute=abre.minute, second=0, microsecond=0)
     hoy_cierra = local.replace(hour=cierra.hour, minute=cierra.minute, second=0, microsecond=0)
-    if local.weekday() < 5 and hoy_abre <= local < hoy_cierra:
+    fiesta = festivo(ticker, local.date()) if local.weekday() < 5 else None
+    if local.weekday() < 5 and not fiesta and hoy_abre <= local < hoy_cierra:
         cierre_madrid = hoy_cierra.astimezone(MADRID)
         return {"abierto": True, "texto": f"Mercado abierto (cierra a las {cierre_madrid:%H:%M}, hora peninsular)",
                 "apertura": hoy_abre.astimezone(MADRID)}
     siguiente = hoy_abre if local < hoy_abre else hoy_abre + timedelta(days=1)
-    while siguiente.weekday() >= 5:
+    while siguiente.weekday() >= 5 or festivo(ticker, siguiente.date()):
         siguiente += timedelta(days=1)
     s = siguiente.astimezone(MADRID)
     cuando = "hoy" if s.date() == ahora.astimezone(MADRID).date() else \
         "mañana" if s.date() == ahora.astimezone(MADRID).date() + timedelta(days=1) else f"el {DIAS[s.weekday()]}"
-    return {"abierto": False, "texto": f"Mercado cerrado: abre {cuando} a las {s:%H:%M} (hora peninsular)",
+    motivo = f" (hoy es festivo: {fiesta})" if fiesta else ""
+    return {"abierto": False, "texto": f"Mercado cerrado{motivo}: abre {cuando} a las {s:%H:%M} (hora peninsular)",
             "apertura": s}
 
 
