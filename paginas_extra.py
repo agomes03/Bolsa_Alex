@@ -10,12 +10,12 @@ import streamlit as st
 
 import plotly.graph_objects as go
 
-from bolsa import (asesor, asesor_diario, bankinter, cartera, costes, diagnostico, estrategias, experimentos, horario, importador,
+from bolsa import (asesor, asesor_diario, avisos, bankinter, comparativa, dividendos, reequilibrio, semanal, cartera, costes, diagnostico, estrategias, experimentos, horario, importador,
                    patrones, senales, simulador)
 from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
-from ui_comun import (mostrar_plotly, reducir, selector_valor, almacen_actual, cargar_activos, enlace, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
+from ui_comun import (palabras_de_la_pagina, cargar_dividendos, cargar_noticias, mostrar_plotly, reducir, selector_valor, almacen_actual, cargar_activos, enlace, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
                       datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, num,
                       pct, perfil)
 
@@ -512,11 +512,67 @@ def asesor_hoy(inf: dict | None):
             principal = max(dg["clases"].items(), key=lambda x: x[1])
             c[2 % len(c)].metric("Reparto", f"{principal[1] * 100:.0f} % {principal[0].lower()}",
                                  TITULO_SEMAFORO.get(dg["semaforo"], ""), delta_color="off")
-        for a in asesor_diario.plan_del_dia(dg, filas, inf, activos_hoy):
+        try:
+            proximos_div = dividendos.calendario(resumenes_dividendos(filas), dias=10)
+        except Exception:  # noqa: BLE001 - sin datos de dividendos, el resto sigue
+            proximos_div = []
+        for a in asesor_diario.plan_del_dia(dg, filas, inf, activos_hoy, dividendos=proximos_div):
             st.markdown(f"{a['icono']} **{a['titulo']}** — {a['texto']}")
+        bloque_semana(posiciones)
         enlace("bankinter", "Ver el diagnóstico completo de tu cartera", "🩺")
         st.caption("Consejos educativos a partir de tus datos y de reglas de gestión prudente; no sustituyen a un "
                    "asesor financiero registrado en la CNMV.")
+
+
+def bloque_telegram():
+    """Avisos gratis al móvil: guía paso a paso y mensaje de prueba."""
+    with st.expander("🔔 Avisos al móvil por Telegram (gratis)"):
+        st.markdown(
+            "Cada día laborable por la noche recibirás el resumen del mercado, las ideas del día y **avisos de tu "
+            "cartera** (stops, resultados…). Los viernes, además, el **resumen de tu semana**.\n\n"
+            "1. En Telegram, busca **@BotFather** → escribe `/newbot` → ponle un nombre → copia el **token** que te da.\n"
+            "2. Escribe cualquier cosa a tu bot nuevo. Luego abre en el navegador "
+            "`https://api.telegram.org/bot<TOKEN>/getUpdates` (con tu token) y copia el número de **\"chat\":{\"id\"**.\n"
+            "3. En **GitHub → tu repositorio → Settings → Secrets and variables → Actions → New repository secret**, "
+            "crea estos cuatro: `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `GIST_TOKEN` y `GIST_ID` (los dos últimos, los "
+            "mismos del Gist que pusiste en Streamlit: así el aviso conoce tu cartera).\n"
+            "4. Prueba aquí abajo que el bot te llega.")
+        c = st.columns(2)
+        token = c[0].text_input("Token del bot", type="password", key="tg_token")
+        chat = c[1].text_input("Chat id", key="tg_chat")
+        if st.button("📨 Enviar mensaje de prueba", disabled=not (token and chat)):
+            try:
+                ok = avisos.enviar_telegram(token.strip(), chat.strip(),
+                                            "✅ Prueba de la app de bolsa: los avisos funcionan.")
+            except Exception as e:  # noqa: BLE001
+                ok = False
+                st.error(f"No se pudo enviar: {e}")
+            if ok:
+                st.success("¡Enviado! Míralo en Telegram. El token no se guarda en la app.")
+            else:
+                st.warning("Telegram no lo aceptó. Revisa el token y el chat id (y que hayas escrito antes a tu bot).")
+
+
+def bloque_semana(posiciones: list[dict]):
+    """Tu semana en palabras: cambio de tu dinero, qué lo ha movido y noticias de lo que tienes."""
+    try:
+        tickers = tuple(sorted({p["ticker"] for p in posiciones} | {"^IBEX", "IWDA.AS"}))
+        hist = cargar_varios(tickers, "1mo")
+        try:
+            lista, _ = cargar_noticias()
+            titulares = [{"titulo": n.titulo, "empresas": n.empresas} for n in lista if n.empresas]
+        except Exception:  # noqa: BLE001
+            titulares = []
+        r = semanal.resumen(posiciones, hist, {"IBEX 35": hist.get("^IBEX"),
+                                               "Fondo indexado mundial": hist.get("IWDA.AS")}, titulares)
+    except Exception:  # noqa: BLE001 - el resumen nunca debe romper la página
+        return
+    lineas = semanal.texto(r)
+    if lineas:
+        with st.expander(f"📅 Tu semana: {lineas[0].split('(')[0].replace('Esta semana tu dinero ha cambiado ', '')}"
+                         .strip()):
+            for x in lineas:
+                st.markdown(f"- {x}")
 
 
 def avisos_resumen():
@@ -580,6 +636,9 @@ def pagina_bankinter():
         st.dataframe(tabla, hide_index=True, width="stretch")
         comparado = bloque_diagnostico(filas)
 
+        bloque_dividendos(filas)
+        bloque_comparativa(filas)
+
         st.subheader("Qué hacer con cada posición")
         for f in filas:
             posicion_detalle(f, cr)
@@ -591,6 +650,11 @@ def pagina_bankinter():
             bloque_que_puede_pasar(pesos, total, 0.0, 0)
     else:
         st.caption("Aún no has registrado posiciones. Impórtalas de tu banco o añádelas a mano.")
+
+    palabras_de_la_pagina(["Concentración", "Diversificación", "Sector", "Volatilidad", "Caída máxima", "Stop-loss",
+                           "Dividendo", "Fecha ex-dividendo", "Retención", "Ganancia patrimonial", "Base del ahorro",
+                           "Compensación de pérdidas", "Regla de los 2 meses", "Fondo indexado", "Rebalanceo"])
+    bloque_telegram()
 
     st.subheader("➕ Añadir posiciones")
     t2, t3, t1 = st.tabs(["📥 Archivo de tu banco", "📋 Pegar tabla", "✍️ A mano"])
@@ -660,6 +724,134 @@ def _perfil_guardado() -> str | None:
                                       p.get("deudas", False)).nombre
     except (KeyError, TypeError):
         return None
+
+
+def resumenes_dividendos(filas: list[dict]) -> list[dict]:
+    funds = cargar_fundamentales_varios(tuple(sorted(f["ticker"] for f in filas)))
+    salida = []
+    for f in filas:
+        if not f["precio"] or f["clase"] not in ("Acciones", "Fondos y ETF"):
+            continue
+        r = dividendos.resumen(f["ticker"], cargar_dividendos(f["ticker"]), (funds.get(f["ticker"]) or {}).get(
+            "exDividendDate"), f["pos"]["acciones"], f["precio"], f["fx"],
+            fecha_compra=f["pos"].get("fecha") if f["pos"].get("fecha", "") < date.today().isoformat() else None)
+        salida.append({**r, "nombre": f["nombre"]})
+    return salida
+
+
+def bloque_dividendos(filas: list[dict]):
+    """Cuánto cobras en dividendos, cuándo, y la rentabilidad contando dividendos."""
+    with st.spinner("Consultando dividendos..."):
+        lista = resumenes_dividendos(filas)
+    if not lista or not any(r["bruto_ano"] for r in lista):
+        return
+    st.subheader("💶 Dividendos")
+    valor = sum(f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"])
+    bruto = sum(r["bruto_ano"] for r in lista)
+    c = st.columns(3 if not perfil().movil else 1)
+    c[0].metric("Al año (bruto)", eur(bruto), help="Lo pagado por tus acciones en los últimos 12 meses.")
+    c[1 % len(c)].metric("Te quedan (neto)", eur(sum(r["neto_ano"] for r in lista)),
+                         "tras la retención del 19 %", delta_color="off")
+    c[2 % len(c)].metric("Rentabilidad por dividendo", pct(bruto / valor * 100, 2, False) if valor else "—")
+    st.dataframe(pd.DataFrame([{
+        "Empresa": r["nombre"], "Por acción (12 meses)": num(r["por_accion_ano"], 3),
+        "Rentabilidad": pct(r["rentabilidad"] * 100, 2, False), "Al año (bruto)": eur(r["bruto_ano"]),
+        "Próxima fecha ex-dividendo": (r["proximo"].strftime("%d/%m/%Y") + ("" if r["proximo_confirmado"]
+                                                                          else " (estimada)")) if r["proximo"] else "—",
+        "Próximo cobro (bruto, aprox.)": eur(r["proximo_importe"]) if r["proximo_importe"] else "—"}
+        for r in sorted(lista, key=lambda x: -x["bruto_ano"]) if r["bruto_ano"]]), hide_index=True, width="stretch")
+    cobrado = sum(r["cobrado_desde_compra"] for r in lista)
+    if cobrado:
+        st.caption(f"Desde las fechas de compra que tienes apuntadas has cobrado ≈ {eur(cobrado)} brutos en dividendos: "
+                   "súmalos a la ganancia para ver tu rentabilidad real.")
+    st.caption("Para cobrar un dividendo tienes que tener las acciones al cierre del día anterior a la fecha "
+               "ex-dividendo. Ese día la acción baja más o menos lo que paga. El próximo cobro se estima con el último "
+               "pago (el definitivo lo anuncia la empresa). Los de empresas extranjeras pagan además impuesto en su país "
+               "(se recupera en parte en la renta). Los fondos y ETF de acumulación no reparten: reinvierten.")
+
+
+@st.fragment
+def bloque_comparativa(filas: list[dict]):
+    """Tu cartera (con el reparto de hoy) frente a un fondo indexado mundial y el IBEX."""
+    st.subheader("📊 Tu cartera frente a un fondo indexado")
+    anos = st.segmented_control("Periodo", [1, 3, 5], default=3, format_func=lambda a: f"{a} año{'s' if a > 1 else ''}",
+                                key="cmp_anos") or 3
+    pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
+    if not pesos:
+        return
+    with st.spinner("Calculando con la historia real..."):
+        tickers = tuple(sorted(set(pesos) | set(comparativa.REFERENCIAS)))
+        hist = cargar_varios(tickers, "10y")
+        cambios = cargar_varios(tuple(costes.TICKER_CAMBIO.values()), "10y")
+        hist_eur = costes.historicos_en_euros(hist, {d: cambios.get(t) for d, t in costes.TICKER_CAMBIO.items()})
+        if "^IBEX" in hist:
+            hist_eur["^IBEX"] = hist["^IBEX"]
+        res = comparativa.comparar(hist_eur, pesos, int(anos))
+    if not res:
+        st.caption("No hay historia suficiente para comparar.")
+        return
+    st.dataframe(pd.DataFrame([{
+        "": nombre, "Rentabilidad total": pct(m["total"] * 100, 1),
+        "Al año": pct(m["anual"] * 100, 1) if m.get("anual") is not None else "—",
+        "Volatilidad": pct(m["volatilidad"] * 100, 0, False), "Peor caída": pct(m["peor_caida"] * 100, 0),
+        "Peor mes": pct(m["peor_mes"] * 100, 0) if m.get("peor_mes") is not None else "—"} for nombre, m in res.items()]),
+        hide_index=True, width="stretch")
+    curvas = pd.DataFrame({nombre.split(" (")[0]: m["curva"] * 10_000 for nombre, m in res.items()}).ffill()
+    st.line_chart(reducir(curvas), height=260)
+    texto = comparativa.conclusion(res)
+    if texto:
+        st.info(texto)
+    st.caption("Ojo: es mirar atrás con las empresas que tienes hoy, que precisamente son las que te gustaron por cómo "
+               "les ha ido; elegirlas al principio del periodo, sin saberlo, no era lo mismo. Sirve sobre todo para "
+               "comparar el **riesgo** (volatilidad y caídas).")
+    st.caption("Qué habrían hecho 10.000 € con tu reparto de hoy frente a las alternativas. Precios ajustados por "
+               "dividendos (el IBEX es solo el índice de precios, sin dividendos). Volatilidad: cuánto se mueve al año; "
+               "a más volatilidad, más sustos.")
+
+
+def bloque_plan_fiscal(dg: dict, posiciones: list[dict]):
+    """Plan por pasos con calendario fiscal (qué vender este año y qué en enero) y entrada al fondo en tramos."""
+    d = datos_usuario()
+    st.markdown("#### 📅 Plan por pasos (calendario fiscal)")
+    otras = st.number_input("Ganancias (+) o pérdidas (−) que ya has realizado este año al vender (€)", -1e7, 1e7,
+                            float(d.get("ganancias_ano", 0.0)), 500.0,
+                            help="Cuentan para el IRPF del año junto con estas ventas. Míralo en tus operaciones de "
+                                 "este año o en el informe fiscal provisional de tu bróker.")
+    if otras != d.get("ganancias_ano", 0.0):
+        d["ganancias_ano"] = otras
+        guardar_datos()
+    plan = reequilibrio.planificar(dg["propuesta"], dg["liberado"], dg["destino"], otras_ganancias_ano=otras)
+    (st.success if plan["ahorro"] > 0 else st.info)(plan["motivo"])
+    k = st.columns(2)
+    k[0].metric("IRPF vendiendo todo ahora", eur(plan["irpf_todo_ahora"]))
+    k[1].metric("IRPF con este plan", eur(plan["irpf_plan"]),
+                f"−{eur(plan['ahorro'])}" if plan["ahorro"] > 0 else None, delta_color="inverse")
+    for i, paso in enumerate(plan["pasos"], 1):
+        with st.container(border=True):
+            st.markdown(f"**Paso {i} · {paso['cuando']}** — IRPF de ese año por estas ventas: ≈ {eur(paso['irpf'])}")
+            st.dataframe(pd.DataFrame([{"Vender": v["nombre"], "Títulos": v["acciones"], "Importe": eur(v["importe"]),
+                                        "Ganancia (+) / pérdida (−)": eur(v["ganancia"])} for v in paso["ventas"]]),
+                         hide_index=True, width="stretch")
+            st.caption(paso["nota"])
+    if plan["aportaciones"]:
+        with st.container(border=True):
+            st.markdown(f"**Después: el dinero al fondo en {plan['tramos']} tramos mensuales** (así no lo inviertes "
+                        "todo justo antes de una caída)")
+            st.dataframe(pd.DataFrame([{"Fecha": a["fecha"].strftime("%d/%m/%Y"),
+                                        **{prod: eur(imp) for prod, imp in a["productos"].items()}}
+                                       for a in plan["aportaciones"]]), hide_index=True, width="stretch")
+    vendidas = {v["ticker"] for v in dg["propuesta"]}
+    en_perdidas = [{"nombre": p.get("nombre") or nombre_de(p["ticker"]),
+                    "ganancia": p["acciones"] * (p["precio"] * p.get("fx", 1.0)
+                                                 - p["precio_medio"] * p.get("fx_medio", 1.0))}
+                   for p in posiciones if p["ticker"] not in vendidas]
+    en_perdidas = [p for p in en_perdidas if p["ganancia"] < 0]
+    if en_perdidas and dg["ganancia_realizada"] + otras > 0:
+        extra = reequilibrio.ahorro_por_perdidas(en_perdidas, dg["ganancia_realizada"] + otras)
+        if extra > 10:
+            st.caption(f"💡 Si además quisieras reducir {', '.join(p['nombre'] for p in en_perdidas)}, venderla(s) "
+                       f"con pérdidas te ahorraría ≈ {eur(extra)} de IRPF este año. Hazlo solo si de verdad quieres "
+                       "reducirla(s): si recompras antes de 2 meses, Hacienda no te deja usar esa pérdida.")
 
 
 @st.fragment
@@ -742,6 +934,8 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     with st.expander(f"📋 Órdenes de venta para copiar en {bankinter._donde()}"):
         for v in dg["propuesta"]:
             st.code(bankinter.ticket_venta(v["ticker"], v["acciones"], v["precio"]), language=None)
+
+    bloque_plan_fiscal(dg, posiciones)
 
     st.markdown("#### 🔬 Qué habría pasado en crisis reales")
     with st.spinner("Comparando tu cartera y la propuesta con 10 años de historia real..."):

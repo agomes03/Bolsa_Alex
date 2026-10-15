@@ -16,6 +16,7 @@ import argparse
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -42,15 +43,18 @@ def main() -> int:
 
     token, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if token and chat:
-        propios = []
+        propios, semana = [], ""
         if os.environ.get("GIST_TOKEN") and os.environ.get("GIST_ID"):
             try:
                 datos = almacen.Almacen(gist_token=os.environ["GIST_TOKEN"], gist_id=os.environ["GIST_ID"]).cargar()
                 umbral = inf["estrategia"]["parametros"].get("umbral_venta", 40)
                 propios = avisos.avisos_cartera(datos.get("cartera_real"), inf["ranking"], umbral)
+                if datetime.now(timezone.utc).weekday() == 4:      # viernes: resumen de la semana
+                    semana = avisos.mensaje_semanal(datos.get("cartera_real"), inf.get("noticias", {}).get("top"))
             except Exception as e:  # noqa: BLE001
                 log(f"No se pudo leer la cartera del Gist: {e}")
-        ok = avisos.enviar_telegram(token, chat, avisos.mensaje_diario(inf, propios))
+        mensaje = avisos.mensaje_diario(inf, propios) + (f"\n\n{semana}" if semana else "")
+        ok = avisos.enviar_telegram(token, chat, mensaje)
         log("Aviso de Telegram enviado" if ok else "Fallo al enviar el aviso de Telegram")
     log("Terminado.")
     return 0

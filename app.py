@@ -16,11 +16,12 @@ from bolsa import aprendizaje, asesor, bankinter, costes, noticias, senales
 from bolsa.activos import clase_de
 from bolsa.indicadores import calcular_todo
 from bolsa.tickers import CATALOGO, NO_INVERTIBLES, TODOS_LOS_VALORES, nombre_de, sector_de
+from paginas_acierto import pagina_acierto
 from paginas_chat import pagina_chat
 from paginas_extra import bloque_operar, pagina_bankinter, pagina_cartera_virtual, pagina_simulador
 from paginas_hoy import (bloque_fases, bloque_que_puede_pasar_accion, pagina_carteras, pagina_hoy, pagina_plan,
                          pagina_radar_global)
-from ui_comun import (Perfil, ir_a, mostrar_plotly, reducir, selector_valor, cargar_activos, conclusion_noticia, mostrar_conclusion, cargar_fundamentales, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
+from ui_comun import (Perfil, estado_guardado, palabras_de_la_pagina, ir_a, mostrar_plotly, reducir, selector_valor, cargar_activos, conclusion_noticia, mostrar_conclusion, cargar_fundamentales, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
                       datos_usuario, es_movil, guardar_datos, eur, fila_informe, fx, mercado_alcista_para, moneda_de,
                       noticias_empresa, num, pct)
 
@@ -93,6 +94,8 @@ with st.sidebar:
     st.divider()
     st.caption(f"Cotizaciones de Yahoo Finance (retraso ~15 min). Noticias de {len(noticias.FUENTES_RSS)} "
                "fuentes RSS en español e inglés. Se actualizan solas cada 5-10 minutos.")
+    _texto_guardado, _ayuda_guardado = estado_guardado()
+    st.caption(_texto_guardado, help=_ayuda_guardado)
     if st.button("🔄 Actualizar ahora", width="stretch"):
         st.cache_data.clear()
         st.rerun()
@@ -246,6 +249,8 @@ def pagina_resumen():
         st.caption(texto_ayuda)
     tabla_mercado(grupo, filas)
 
+    palabras_de_la_pagina(["Índice bursátil", "Tendencia", "Media de 200 sesiones", "Volatilidad", "VIX", "Bono",
+                           "Tipos de interés", "Fondo indexado", "ETF", "Valor liquidativo", "Criptomonedas", "Oro"])
     if grupo == "Índices":
         with st.expander("📖 Lectura en palabras de cada tipo de activo"):
             for a in cargar_activos():
@@ -484,6 +489,9 @@ def pagina_analizar():
             tarjeta_noticia(n_)
     else:
         st.caption("No se han encontrado noticias recientes.")
+    palabras_de_la_pagina(["Veredicto", "Nota global", "Riesgo de caída", "Tendencia", "Media de 200 sesiones", "RSI",
+                           "Volatilidad", "Stop-loss", "Objetivo de precio", "Orden limitada", "PER", "Dividendo",
+                           "Rentabilidad por dividendo", "Precio objetivo de los analistas"])
 
 
 def pagina_radar():
@@ -756,6 +764,7 @@ PAGINAS = {
     "calculadoras": st.Page(pagina_calculadoras, title="Calculadoras", icon="🧮"),
     "aprende": st.Page(pagina_aprende, title="Aprende", icon="🎓"),
     "chat": st.Page(pagina_chat, title="Pregunta", icon="💬"),
+    "acierto": st.Page(pagina_acierto, title="¿Acierta la app?", icon="✅"),
 }
 st.session_state["_paginas"] = PAGINAS
 nav = st.navigation({
@@ -763,6 +772,6 @@ nav = st.navigation({
     "Invertir": [PAGINAS["analizar"], PAGINAS["radar"], PAGINAS["carteras"], PAGINAS["noticias"],
                  PAGINAS["mercados"]],
     "Mis carteras": [PAGINAS["bankinter"], PAGINAS["virtual"]],
-    "Aprender y probar": [PAGINAS["simulador"], PAGINAS["calculadoras"], PAGINAS["aprende"]],
+    "Aprender y probar": [PAGINAS["acierto"], PAGINAS["simulador"], PAGINAS["calculadoras"], PAGINAS["aprende"]],
 }, position="top")
 nav.run()

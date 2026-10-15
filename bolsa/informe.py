@@ -7,6 +7,7 @@ Archivos en la carpeta `informe/`:
 - informe.json ............ el informe del día
 - fundamentales.json ...... datos de empresa y analistas (se refrescan una vez por semana)
 - historico_ideas.csv ..... cada idea del día que se ha dado, para medir su acierto real después
+- historico_veredictos.csv  el veredicto de cada acción cada día, para medir si «Candidata» acierta más que «Evitar»
 - historico_noticias.csv .. el tono de las noticias de cada día, para buscar patrones con el tiempo
 """
 
@@ -361,6 +362,65 @@ def evaluar_ideas(hist_ideas: pd.DataFrame, acciones, indices, sesiones: int = 2
             "ultimas": t.tail(30).iloc[::-1].to_dict("records")}
 
 
+COLUMNAS_VEREDICTOS = ["fecha", "ticker", "veredicto", "color", "nota", "precio", "indice", "precio_indice"]
+
+
+def archivar_veredictos(ruta: Path, hoy: str, ranking: list[dict], indices) -> pd.DataFrame:
+    """Guarda el veredicto de cada acción cada día, para medir después si «Candidata» acierta más que «Evitar»."""
+    previo = _leer_csv(ruta, COLUMNAS_VEREDICTOS)
+    filas = []
+    for r in ranking:
+        if r.get("etf") or r.get("precio") is None:
+            continue
+        etiqueta, color, _ = asesor.veredicto(r)
+        idx = indices.get(r.get("indice"))
+        filas.append({"fecha": hoy, "ticker": r["ticker"], "veredicto": etiqueta, "color": color, "nota": r.get("nota"),
+                      "precio": r["precio"], "indice": r.get("indice"),
+                      "precio_indice": float(idx["Close"].iloc[-1]) if idx is not None and len(idx) else None})
+    if not previo.empty:
+        previo = previo[previo["fecha"] != hoy]
+    total = pd.concat([d for d in (previo, pd.DataFrame(filas, columns=COLUMNAS_VEREDICTOS)) if not d.empty]
+                      or [pd.DataFrame(columns=COLUMNAS_VEREDICTOS)], ignore_index=True)
+    total.to_csv(ruta, index=False)
+    return total
+
+
+def evaluar_veredictos(hist: pd.DataFrame, acciones, indices, sesiones: int = 21) -> dict:
+    """Rentabilidad REAL un mes después según el veredicto que tenía cada acción ese día (frente a su índice)."""
+    if hist is None or hist.empty:
+        return {"evaluados": 0, "pendientes": 0, "dias": 0}
+    filas, pendientes = [], 0
+    for _, r in hist.iterrows():
+        df, idx = acciones.get(r["ticker"]), indices.get(r["indice"])
+        if df is None or not r.get("precio"):
+            continue
+        posteriores = df["Close"][df.index > pd.Timestamp(r["fecha"])]
+        if len(posteriores) < sesiones:
+            pendientes += 1
+            continue
+        fin = posteriores.index[sesiones - 1]
+        ret = float(posteriores.iloc[sesiones - 1] / r["precio"] - 1)
+        exceso = None
+        if idx is not None and r.get("precio_indice"):
+            c = idx["Close"][idx.index <= fin]
+            if len(c):
+                exceso = ret - float(c.iloc[-1] / r["precio_indice"] - 1)
+        filas.append({"veredicto": r["veredicto"], "ret": ret, "exceso": exceso})
+    dias = int(hist["fecha"].nunique())
+    if not filas:
+        return {"evaluados": 0, "pendientes": pendientes, "dias": dias, "desde": str(hist["fecha"].min())}
+    t = pd.DataFrame(filas)
+    grupos = []
+    for v, g in t.groupby("veredicto"):
+        e = g["exceso"].dropna()
+        grupos.append({"veredicto": v, "casos": len(g), "rent_media": float(g["ret"].mean()),
+                       "suben": float((g["ret"] > 0).mean()),
+                       "exceso_medio": float(e.mean()) if len(e) else None,
+                       "baten_indice": float((e > 0).mean()) if len(e) else None})
+    return {"evaluados": len(t), "pendientes": pendientes, "dias": dias, "desde": str(hist["fecha"].min()),
+            "grupos": sorted(grupos, key=lambda g: -g["rent_media"])}
+
+
 def archivar_noticias(ruta: Path, hoy: str, lista) -> pd.DataFrame:
     previo = _leer_csv(ruta, ["fecha", "ambito", "n", "sentimiento"])
     importantes = [n for n in lista if n.impacto >= 4]
@@ -479,6 +539,7 @@ def actualizar(carpeta: str | Path = "informe", entrenar: bool | None = None, it
     hist_ideas = archivar_ideas(carpeta / "historico_ideas.csv", hoy, ideas_es, indices, "espana")
     hist_ideas = archivar_ideas(carpeta / "historico_ideas.csv", hoy, ideas, indices, "global")
     hist_not = archivar_noticias(carpeta / "historico_noticias.csv", hoy, lista) if con_noticias else None
+    hist_ver = archivar_veredictos(carpeta / "historico_veredictos.csv", hoy, ranking, indices)
     def resumen_modelo(clave: str) -> dict:
         mo = modelo[clave]
         return {"metricas": mo["wf"]["metricas"], "fiabilidad": mo["fiabilidad"],
@@ -497,6 +558,7 @@ def actualizar(carpeta: str | Path = "informe", entrenar: bool | None = None, it
         "carteras": carteras, "proteccion": proteccion,
         "estrategia": estrategia,
         "historial_ideas": evaluar_ideas(hist_ideas, acciones, indices),
+        "historial_veredictos": evaluar_veredictos(hist_ver, acciones, indices),
         "patron_noticias": patron_noticias(hist_not, indices.get("^IBEX")),
         "cobertura": {"acciones": len(acciones), "indices": len(indices),
                       "fundamentales": len(fundamentales), "noticias": len(lista)},

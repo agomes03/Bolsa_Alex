@@ -39,6 +39,28 @@ def avisos_cartera(cartera_real: dict, ranking: list[dict], umbral_venta: int = 
     return avisos
 
 
+def mensaje_semanal(cartera_real: dict | None, noticias_top: list[dict] | None = None) -> str:
+    """Resumen de la semana de tu cartera (para el aviso del viernes). Vacío si no hay cartera."""
+    from . import costes, datos, semanal
+
+    posiciones = (cartera_real or {}).get("posiciones", {})
+    if not posiciones:
+        return ""
+    tickers = sorted(set(posiciones) | {"^IBEX", "IWDA.AS"})
+    hist = datos.varios(tickers, "1mo")
+    cambios = datos.varios(sorted(set(costes.TICKER_CAMBIO.values())), "1mo")
+    tipos = {d: float(cambios[t]["Close"].iloc[-1]) for d, t in costes.TICKER_CAMBIO.items()
+             if d != "GBp" and t in cambios}
+    from .tickers import nombre_de
+
+    lista = [{"ticker": t, "nombre": p.get("nombre") or nombre_de(t), "acciones": p["acciones"],
+              "fx": costes.euros_por_unidad(costes.divisa(t), tipos) or 1.0} for t, p in posiciones.items()]
+    r = semanal.resumen(lista, hist, {"IBEX 35": hist.get("^IBEX"), "Fondo indexado mundial": hist.get("IWDA.AS")},
+                        noticias_top)
+    lineas = semanal.texto(r)
+    return ("📅 Tu semana\n" + "\n".join(f"• {x}" for x in lineas)) if lineas else ""
+
+
 def mensaje_diario(informe: dict, avisos_propios: list[str] | None = None) -> str:
     por_ticker = {r["ticker"]: r for r in informe.get("ranking", [])}
     lineas = [f"📈 Bolsa · {informe['fecha']}", ""]

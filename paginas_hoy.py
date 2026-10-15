@@ -12,7 +12,7 @@ from bolsa import asesor, bankinter, costes, estrategias, patrones
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import asesor_hoy
-from ui_comun import (reducir, conclusion_noticia, cargar_informe, cargar_varios, datos_usuario, dias_informe, eur, fecha, guardar_datos,
+from ui_comun import (palabras_de_la_pagina, reducir, conclusion_noticia, cargar_informe, cargar_varios, datos_usuario, dias_informe, eur, fecha, guardar_datos,
                       hora_espana, ir_a, moneda_de, num, pct, perfil)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
@@ -153,6 +153,8 @@ def pagina_hoy():
                 st.markdown("- " + texto_fase(nombre, f))
         st.caption("Estadísticas de lo que pasó en situaciones parecidas del pasado, no una garantía.")
 
+    palabras_de_la_pagina(["Semáforo", "Regla de protección", "Veredicto", "Nota global", "Riesgo de caída",
+                           "Cartera modelo", "Momentum", "Diversificación"])
     st.subheader("📰 Lo más importante")
     st.caption("Con la conclusión sencilla de cada una: dónde repercute y qué oportunidad o riesgo genera. Todas en "
                "📰 Noticias.")

@@ -17,7 +17,8 @@ def _accion(prioridad: int, icono: str, titulo: str, texto: str, pagina: str | N
 
 
 def plan_del_dia(diagnostico: dict | None, posiciones: list[dict], informe: dict | None,
-                 activos: list[dict] | None = None, hoy: date | None = None, maximo: int = 6) -> list[dict]:
+                 activos: list[dict] | None = None, hoy: date | None = None, maximo: int = 6,
+                 dividendos: list[dict] | None = None) -> list[dict]:
     """`posiciones`: filas con ticker, nombre, clase, nivel y consejo (de la revisión diaria de la cartera).
     `activos`: resumen de activos.resumen()."""
     hoy = hoy or date.today()
@@ -77,6 +78,15 @@ def plan_del_dia(diagnostico: dict | None, posiciones: list[dict], informe: dict
             acciones.append(_accion(3, "📅", f"{p.get('nombre') or p['ticker']} presenta resultados pronto",
                                     "Ese día el precio puede moverse con fuerza. Comprueba tu stop-loss.", "bankinter"))
 
+    for r in dividendos or []:
+        if r.get("proximo") and 0 <= (r["proximo"] - hoy).days <= 10:
+            importe = f" (≈ {r['proximo_importe']:,.0f} € brutos)".replace(",", ".") if r.get("proximo_importe") else ""
+            dia_antes = r["proximo"].toordinal() - 1
+            acciones.append(_accion(
+                3, "💶", f"{r.get('nombre', r['ticker'])}: dividendo el {r['proximo']:%d/%m}{importe}",
+                "Para cobrarlo, ten las acciones al cierre del " + date.fromordinal(dia_antes).strftime("%d/%m")
+                + ". Ese día la acción bajará más o menos lo que paga: no es un motivo para comprar ni vender.",
+                "bankinter"))
     acciones.sort(key=lambda a: a["prioridad"])
     if not acciones:
         acciones.append(_accion(3, "✅", "Nada urgente hoy",

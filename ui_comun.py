@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
@@ -47,6 +48,11 @@ def cargar_activos() -> list[dict]:
     from bolsa import activos
 
     return activos.resumen(datos.varios(list(activos.ACTIVOS), "2y"))
+
+
+@st.cache_data(ttl=43_200, show_spinner=False)
+def cargar_dividendos(ticker: str) -> pd.Series:
+    return datos.dividendos(ticker)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -212,10 +218,48 @@ def datos_usuario() -> dict:
 
 
 def guardar_datos() -> None:
+    from datetime import datetime
+
     try:
         _almacen().guardar(datos_usuario())
+        st.session_state["_guardado"] = (True, datetime.now(MADRID_TZ).strftime("%H:%M"), "")
     except Exception as e:  # noqa: BLE001
+        st.session_state["_guardado"] = (False, datetime.now(MADRID_TZ).strftime("%H:%M"), str(e))
         st.error(f"No se han podido guardar los datos: {e}. Descarga una copia de seguridad por si acaso.")
+
+
+def estado_guardado() -> tuple[str, str]:
+    """(icono y texto corto, explicación) del lugar donde se guardan tus datos."""
+    alm = _almacen()
+    ok, hora, error = st.session_state.get("_guardado", (None, "", ""))
+    if ok is False:
+        return f"❌ No se pudo guardar ({hora})", f"Error: {error}. Revisa el token y el id del Gist en Secrets."
+    if alm.en_la_nube:
+        return ("💾 Datos guardados en la nube" + (f" · {hora}" if hora else ""),
+                "Se guardan en tu Gist privado de GitHub: no se pierden aunque la app se reinicie.")
+    return ("⚠️ Datos solo en esta sesión",
+            "No hay Gist configurado: si la app se reinicia, se pierden tu cartera y tu perfil. Configúralo en "
+            "Streamlit → Settings → Secrets ([gist] token e id) o descarga una copia de seguridad.")
+
+
+def ayuda(termino: str) -> str:
+    """Definición del diccionario para usar como ayuda (?) en cualquier página."""
+    from bolsa import aprendizaje
+
+    return aprendizaje.definicion(termino)
+
+
+def palabras_de_la_pagina(terminos: list[str]):
+    """Desplegable con la explicación de las palabras técnicas que aparecen en la página."""
+    from bolsa import aprendizaje
+
+    encontrados = [t for t in aprendizaje.GLOSARIO if t.termino in terminos]
+    if not encontrados:
+        return
+    with st.expander("📖 Palabras de esta página"):
+        for t in sorted(encontrados, key=lambda x: terminos.index(x.termino)):
+            st.markdown(f"**{t.termino}**: {t.definicion}" + (f"  \n<small>💡 {t.ejemplo}</small>" if t.ejemplo else ""),
+                        unsafe_allow_html=True)
 
 
 def estrategia_actual() -> Parametros:
@@ -230,6 +274,7 @@ def ultimo_precio(df: pd.DataFrame) -> float | None:
 
 
 # --------------------------------------------------------------------------- informe diario
+MADRID_TZ = ZoneInfo("Europe/Madrid")
 RUTA_INFORME = Path(__file__).resolve().parent / "informe" / "informe.json"
 
 

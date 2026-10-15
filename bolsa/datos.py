@@ -163,8 +163,19 @@ CAMPOS_FUNDAMENTALES = [
     "trailingAnnualDividendYield", "payoutRatio", "returnOnEquity", "profitMargins",
     "revenueGrowth", "earningsGrowth", "debtToEquity", "beta", "targetMeanPrice", "targetLowPrice",
     "targetHighPrice", "numberOfAnalystOpinions", "recommendationKey", "recommendationMean",
-    "earningsTimestamp", "earningsTimestampStart",
+    "earningsTimestamp", "earningsTimestampStart", "exDividendDate",
 ]
+
+
+def dividendos(ticker: str) -> pd.Series:
+    """Historial de dividendos por acción (fecha ex-dividendo → importe, en la divisa del valor)."""
+    import yfinance as yf
+
+    try:
+        d = yf.Ticker(ticker).dividends
+    except Exception:  # noqa: BLE001
+        return pd.Series(dtype=float)
+    return d if d is not None else pd.Series(dtype=float)
 
 
 def fundamentales(ticker: str) -> dict:

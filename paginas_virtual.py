@@ -12,7 +12,7 @@ import streamlit as st
 from bolsa import asesor, bankinter, cartera, costes, datos, ejercicios, horario, senales
 from bolsa.activos import clase_de
 from bolsa.tickers import nombre_de, sector_de
-from ui_comun import (mostrar_plotly, selector_valor, cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, datos_usuario,
+from ui_comun import (palabras_de_la_pagina, mostrar_plotly, selector_valor, cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, datos_usuario,
                       estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de, num, pct,
                       perfil)
 
@@ -83,6 +83,9 @@ def cartera_manual():
     bloque_ordenes_pendientes(cv)
     bloque_operar_virtual(cv, libre, res["total"])
     bloque_ejercicios(cv)
+    palabras_de_la_pagina(["Orden limitada", "Orden a mercado", "Orden stop", "Stop limitada", "Validez de la orden",
+                           "Stop-loss", "Objetivo de precio", "Comisión", "Tasa Tobin", "Cambio de divisa", "Horquilla",
+                           "Riesgo por operación"])
 
     if cv["historial"]:
         with st.expander(f"📜 Historial ({len(cv['historial'])} movimientos)"):
