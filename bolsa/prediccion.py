@@ -122,6 +122,36 @@ def _preparar(X: pd.DataFrame, r: pd.Series):
     return X[valido], r[valido]
 
 
+def _entrenamiento(Xv: np.ndarray, rv: np.ndarray, conocidos: np.ndarray, hasta: int, sesiones: int):
+    """Datos de entrenamiento disponibles en la fila `hasta`: solo filas cuyo resultado ya se conocía."""
+    mask = conocidos.copy()
+    mask[max(hasta - sesiones, 0):] = False
+    Xt, rt = Xv[mask], rv[mask]
+    mu, sd = Xt.mean(axis=0), Xt.std(axis=0) + 1e-9
+    return (Xt - mu) / sd, rt, mu, sd
+
+
+def serie_probabilidad(df: pd.DataFrame, sesiones: int = 21, paso: int = 5, min_entreno: int = 250) -> pd.Series:
+    """Probabilidad de subida que el modelo habría dado cada día del pasado, usando SOLO la información
+    disponible ese día (se recalcula cada `paso` sesiones). Es lo que usa el simulador."""
+    X, r = _preparar(caracteristicas(df), rentabilidad_futura(df, sesiones))
+    salida = pd.Series(np.nan, index=df.index)
+    if X.empty:
+        return salida
+    Xv, rv = X.to_numpy(), r.to_numpy()
+    conocidos = ~np.isnan(rv)
+    puntos = list(range(min_entreno + sesiones, len(Xv), paso))
+    if puntos and puntos[-1] != len(Xv) - 1:
+        puntos.append(len(Xv) - 1)
+    for t in puntos:
+        Z, rt, mu, sd = _entrenamiento(Xv, rv, conocidos, t, sesiones)
+        if len(rt) < min_entreno:
+            continue
+        p, _ = _vecinos(Z, rt, (Xv[t] - mu) / sd, _k(len(rt)), float((rt > 0).mean()))
+        salida[X.index[t]] = p
+    return salida.ffill(limit=paso - 1)
+
+
 def predecir(df: pd.DataFrame, sesiones: int, horizonte: str = "", n_pruebas: int = 150,
              min_entreno: int = 250) -> Prediccion | None:
     """Predice la rentabilidad a `sesiones` vista y examina el modelo con el pasado."""
@@ -134,13 +164,7 @@ def predecir(df: pd.DataFrame, sesiones: int, horizonte: str = "", n_pruebas: in
         return None
 
     def ajustar(hasta: int):
-        """Entrena con las filas < hasta cuyo resultado ya se conocía en la fila `hasta`."""
-        limite = hasta - sesiones
-        mask = conocidos.copy()
-        mask[max(limite, 0):] = False
-        Xt, rt = Xv[mask], rv[mask]
-        mu, sd = Xt.mean(axis=0), Xt.std(axis=0) + 1e-9
-        return (Xt - mu) / sd, rt, mu, sd
+        return _entrenamiento(Xv, rv, conocidos, hasta, sesiones)
 
     # --- Examen walk-forward: fechas pasadas, sin mirar el futuro.
     pos = np.arange(len(Xv))

@@ -80,7 +80,8 @@ def _ok(x) -> bool:
 
 def evaluar(ticker: str, historico: pd.DataFrame, sentimiento_noticias: float | None = None,
             n_noticias: int = 0, mercado_alcista: bool | None = None,
-            fundamentales: dict | None = None, prediccion=None) -> Evaluacion:
+            fundamentales: dict | None = None, prediccion=None,
+            stop_atr: float = 2.0, ratio_objetivo: float = 2.0) -> Evaluacion:
     """Evalúa una acción.
 
     historico: DataFrame diario con Open/High/Low/Close/Volume (ideal: 1-2 años).
@@ -240,11 +241,11 @@ def evaluar(ticker: str, historico: pd.DataFrame, sentimiento_noticias: float | 
     plan = None
     atr_v = u["ATR"]
     if _ok(atr_v) and atr_v > 0:
-        stop = precio - 2 * atr_v
+        stop = precio - stop_atr * atr_v
         if _ok(sma200) and alcista_largo and sma200 < precio and sma200 > stop - atr_v:
             stop = min(stop, sma200 * 0.99)  # dejar margen bajo la media de 200 si está cerca
         stop = max(stop, precio * 0.80)      # nunca arriesgar más de un 20%
-        objetivo = precio + 2 * (precio - stop)
+        objetivo = precio + (ratio_objetivo or 2.0) * (precio - stop)
         plan = Plan(entrada=precio, stop=stop, objetivo=objetivo,
                     riesgo_pct=(1 - stop / precio) * 100,
                     beneficio_pct=(objetivo / precio - 1) * 100)

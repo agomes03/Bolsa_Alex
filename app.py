@@ -5,7 +5,6 @@ Ejecutar:  streamlit run app.py
 
 from __future__ import annotations
 
-import re
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
@@ -13,9 +12,15 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from bolsa import costes, datos, noticias, prediccion, senales
+from bolsa import costes, noticias, prediccion, senales
 from bolsa.indicadores import calcular_todo
 from bolsa.tickers import EEUU, ETFS, IBEX35, INDICES, TERMOMETROS, TODAS_LAS_ACCIONES, nombre_de, sector_de
+from paginas_extra import (acciones_rapidas, avisos_resumen, pagina_bankinter, pagina_cartera_virtual,
+                           pagina_simulador)
+from ui_comun import (Perfil, cargar_fundamentales, cargar_fundamentales_varios, cargar_historico,
+                      cargar_noticias, cargar_predicciones, cargar_varios, datos_usuario, es_movil,
+                      estrategia_actual, eur, mercado_alcista_para, moneda_de, noticias_empresa, pct,
+                      predicciones_radar)
 
 st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide",
                    initial_sidebar_state="collapsed")
@@ -23,91 +28,6 @@ st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wi
 AVISO = ("⚠️ **Herramienta educativa, no es asesoramiento financiero.** Ningún sistema puede "
          "garantizar beneficios ni predecir la bolsa con certeza: invierte solo dinero que no vayas a "
          "necesitar en años y que puedas permitirte ver bajar un 30% sin vender por miedo.")
-
-
-# --------------------------------------------------------------------------- caché de datos
-@st.cache_data(ttl=600, show_spinner=False)
-def cargar_historico(ticker: str, periodo: str = "2y") -> pd.DataFrame:
-    return datos.historico(ticker, periodo)
-
-
-@st.cache_data(ttl=600, show_spinner=False)
-def cargar_varios(tickers: tuple[str, ...], periodo: str = "2y") -> dict[str, pd.DataFrame]:
-    return datos.varios(list(tickers), periodo)
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def cargar_noticias() -> tuple[list[noticias.Noticia], list[str]]:
-    return noticias.descargar()
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def cargar_fundamentales(ticker: str) -> dict:
-    return datos.fundamentales(ticker)
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def cargar_fundamentales_varios(tickers: tuple[str, ...]) -> dict[str, dict]:
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        return dict(zip(tickers, pool.map(datos.fundamentales, tickers)))
-
-
-@st.cache_data(ttl=900, show_spinner=False)
-def noticias_empresa(ticker: str) -> list[noticias.Noticia]:
-    nombre = nombre_de(ticker)
-    extra = [noticias.Noticia(n["titulo"], n["enlace"], n["fuente"], n["fecha"], n["resumen"][:400])
-             for n in datos.noticias_yahoo(ticker)]
-    lista, _ = noticias.descargar(noticias.fuentes_empresa(ticker, nombre), max_por_fuente=25,
-                                  extra=extra, max_horas=24 * 10)
-    # Las fuentes de Google/Yahoo traen a veces noticias de otras empresas: quedarnos con las que la nombran.
-    if ticker in TODAS_LAS_ACCIONES and TODAS_LAS_ACCIONES[ticker][2]:
-        lista = [n for n in lista if ticker in n.empresas] or lista
-    return lista
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def cargar_predicciones(ticker: str) -> dict[str, prediccion.Prediccion]:
-    df = cargar_historico(ticker, "10y")
-    return prediccion.predecir_todos(df) if len(df) > 500 else {}
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def predicciones_radar(tickers: tuple[str, ...]) -> dict[str, prediccion.Prediccion]:
-    hist = cargar_varios(tickers, "10y")
-    salida = {}
-    for t, df in hist.items():
-        p = prediccion.predecir(df, 21, "1 mes", n_pruebas=80) if len(df) > 500 else None
-        if p:
-            salida[t] = p
-    return salida
-
-
-def mercado_alcista_para(ticker: str) -> bool | None:
-    indice = "^IBEX" if ticker.endswith(".MC") else "^GSPC"
-    h = cargar_historico(indice)
-    return senales.estado_indice(h)["alcista"] if not h.empty else None
-
-
-def pct(x: float | None, dec: int = 2) -> str:
-    if x is None or pd.isna(x):
-        return "—"
-    return f"{x:+.{dec}f}%"
-
-
-def eur(x: float, moneda: str = "€") -> str:
-    return f"{x:,.2f} {moneda}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-
-def moneda_de(ticker: str) -> str:
-    return "€" if ticker.endswith((".MC", ".AS")) else "$"
-
-
-def es_movil() -> bool:
-    try:
-        ua = st.context.headers.get("User-Agent", "") or ""
-    except Exception:  # noqa: BLE001
-        ua = ""
-    return bool(re.search(r"Mobi|Android|iPhone|iPad", ua))
 
 
 # --------------------------------------------------------------------------- barra lateral (perfil)
@@ -134,6 +54,7 @@ with st.sidebar:
         st.rerun()
 
 ALTO_GRAFICO = 430 if movil else 560
+st.session_state["_perfil"] = Perfil(movil=movil, capital=capital, riesgo=riesgo, tarifa=tarifa)
 
 
 # --------------------------------------------------------------------------- componentes
@@ -296,6 +217,7 @@ def bloque_bankinter(ticker: str, ev: senales.Evaluacion, n_acciones: int):
 def pagina_resumen():
     st.title("🏠 Resumen del día")
     st.info(AVISO)
+    avisos_resumen()
 
     with st.spinner("Descargando cotizaciones..."):
         hist = cargar_varios(tuple(list(INDICES) + list(TERMOMETROS)))
@@ -437,10 +359,12 @@ def pagina_analizar():
             f_pred = pool.submit(cargar_predicciones, ticker)
             fund, news, preds = f_fund.result(), f_news.result(), f_pred.result()
         recientes = [n for n in news if n.horas is None or n.horas < 24 * 7]
+        estrategia = estrategia_actual()
         ev = senales.evaluar(ticker, df,
                              sentimiento_noticias=noticias.sentimiento_medio(recientes) if recientes else None,
                              n_noticias=len(recientes), mercado_alcista=mercado_alcista_para(ticker),
-                             fundamentales=fund, prediccion=preds.get("1 mes"))
+                             fundamentales=fund, prediccion=preds.get("1 mes"),
+                             stop_atr=estrategia.stop_atr, ratio_objetivo=estrategia.ratio_objetivo)
 
     m = moneda_de(ticker)
     titulo = nombre_de(ticker) if ticker in TODAS_LAS_ACCIONES else fund.get("longName", ticker)
@@ -454,6 +378,9 @@ def pagina_analizar():
         st.progress(ev.puntuacion / 100)
         st.markdown(f"### :{ev.color}[{ev.veredicto}]")
         st.write(ev.resumen)
+        if "estrategia" in datos_usuario():
+            st.caption(f"🏋️ Tu estrategia entrenada compra a partir de **{estrategia.umbral_compra}** puntos "
+                       f"y vende por debajo de **{estrategia.umbral_venta}**.")
     with c2:
         st.plotly_chart(grafico(df, "Último año: velas, medias móviles y RSI", ev.plan), width="stretch")
         st.caption("Cada vela es un día: verde si cerró por encima de lo que abrió, roja si por debajo. "
@@ -492,9 +419,14 @@ def pagina_analizar():
             f"Si sale mal y salta el stop, perderías unos **{eur(n_riesgo * (p.entrada - p.stop), m)}**. "
             f"Si llega al objetivo, ganarías unos **{eur(n_riesgo * (p.objetivo - p.entrada), m)}** (antes de impuestos). "
             f"Comisiones e impuestos de compra estimados: **{eur(cc['total'])}** ({cc['pct']:.2f}%).")
-        st.caption("El stop-loss se coloca a 2 veces el movimiento diario típico (ATR) por debajo del precio, "
-                   "y el objetivo al doble de distancia: así ganas el doble de lo que arriesgas. "
-                   "Con esta proporción, aunque aciertes solo 4 de cada 10 veces, a la larga no pierdes.")
+        ratio = estrategia.ratio_objetivo or 2.0
+        st.caption(f"El stop-loss se coloca a {estrategia.stop_atr:g} veces el movimiento diario típico (ATR) por "
+                   f"debajo del precio, y el objetivo a {ratio:g} veces esa distancia: ganas {ratio:g} € por cada "
+                   f"1 € que arriesgas. Así, aunque aciertes solo {100 / (1 + ratio):.0f} de cada 100 veces, "
+                   "a la larga no pierdes (sin contar comisiones).")
+        if estrategia.ratio_objetivo == 0:
+            st.caption("🏋️ Tu estrategia entrenada prefiere **no fijar objetivo**: deja correr las ganancias y "
+                       "ve subiendo el stop-loss a medida que la acción sube.")
         if importe and cc["pct"] > 1:
             st.warning("Las comisiones se comen más del 1% de la compra. Con importes pequeños el mínimo de "
                        "comisión pesa mucho: mejor juntar más dinero y hacer menos operaciones.")
@@ -503,6 +435,7 @@ def pagina_analizar():
                     "Guarda este plan y vuelve a revisarlo en unos días.")
         with st.expander("📱 Cómo hacerlo en la app de Bankinter"):
             bloque_bankinter(ticker, ev, n_riesgo)
+        acciones_rapidas(ticker, ev, n_riesgo)
 
     st.subheader("🏢 La empresa en números")
     bloque_fundamentales(ticker, fund)
@@ -663,13 +596,19 @@ def pagina_aprende():
 - **Fiabilidad**: 🟢 Alta / 🟡 Media si en el examen con el pasado acertó claramente más que el azar;
   🔴 Baja si no. **Con fiabilidad baja, ignora la predicción.**
 
-### 3. Cómo usar este asistente (rutina de 10 minutos)
-1. **🏠 Resumen**: mira el semáforo y la previsión de los índices. Si está en rojo, no hay prisa por comprar.
+### 3. Cómo usar este asistente
+**Antes de arriesgar dinero real (una vez):**
+1. **🧪 Simulador → Entrenar**: la app prueba muchas combinaciones de reglas con 10 años de datos y te dice,
+   en años que no ha visto, si habría ganado dinero frente a simplemente comprar y mantener.
+2. **🎮 Cartera virtual**: crea el **robot** y practica tú también con dinero ficticio durante unas semanas.
+
+**Rutina (10 minutos):**
+1. **🏠 Resumen**: semáforo, previsión de los índices y avisos de tu cartera de Bankinter.
 2. **📰 Noticias**: lee las 3-5 más influyentes y su "por qué importa".
 3. **📡 Radar**: busca empresas con puntuación alta (≥ 70) y fiabilidad 🟢/🟡.
 4. **🔍 Analizar**: entra en la candidata, lee motivos, predicción, analistas y el plan.
-5. **Bankinter**: compra con **orden limitada** y pon el **stop-loss** inmediatamente.
-6. Apunta por qué compraste. Revisa una vez por semana, no cada hora.
+5. **Bankinter**: copia la **orden lista** que te prepara la app (orden limitada + stop-loss).
+6. **🏦 Mi Bankinter**: registra la compra. La app la vigilará y te dirá cuándo subir el stop o vender.
 
 ### 4. Diccionario rápido
 | Término | Qué significa |
@@ -718,6 +657,9 @@ nav = st.navigation([
     st.Page(pagina_noticias, title="Noticias", icon="📰"),
     st.Page(pagina_analizar, title="Analizar", icon="🔍"),
     st.Page(pagina_radar, title="Radar IBEX", icon="📡"),
+    st.Page(pagina_bankinter, title="Mi Bankinter", icon="🏦"),
+    st.Page(pagina_cartera_virtual, title="Cartera virtual", icon="🎮"),
+    st.Page(pagina_simulador, title="Simulador", icon="🧪"),
     st.Page(pagina_calculadoras, title="Calculadoras", icon="🧮"),
     st.Page(pagina_aprende, title="Aprende", icon="🎓"),
 ], position="top")

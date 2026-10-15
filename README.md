@@ -9,6 +9,9 @@ Una app sencilla (en español) que te ayuda a invertir en bolsa con el **broker 
 | 🔍 **Analizar una acción** | Da una puntuación de 0 a 100 y un veredicto (*Zona de compra*, *Compra escalonada*, *Esperar*, *Evitar*), explicando cada motivo. Te propone un **plan**: precio de compra, **stop-loss**, objetivo y **cuántas acciones comprar** según el dinero que quieras arriesgar. Incluye datos de la empresa (PER, dividendo, márgenes), **precio objetivo de los analistas**, noticias específicas y los pasos para hacerlo en la app de Bankinter. |
 | 🔮 **Predicción** | Probabilidad de subida y rango de precio probable a 1 semana, 1 mes y 3 meses, con su **porcentaje de acierto real** medido con datos pasados. |
 | 📡 **Radar del IBEX 35** | Analiza las 35 empresas a la vez y las ordena por puntuación. |
+| 🧪 **Simulador** | Prueba la estrategia con **dinero virtual** sobre 10 años de datos reales (operando día a día sin ver el futuro, con comisiones y stop-loss) y la **entrena**: prueba decenas de combinaciones de reglas y se queda con la de menor error de inversión, validándola en años que no ha visto (*walk-forward*). |
+| 🎮 **Cartera virtual** | Practica con dinero ficticio a precios reales (los stop-loss y objetivos se ejecutan solos) y crea un **robot** que opera solo desde hoy: una prueba en tiempo real, sin trampas. |
+| 🏦 **Mi Bankinter** | Copiloto de tu broker: registras o **importas** (Excel/CSV) tus posiciones de Bankinter y la app las vigila, te avisa (stop tocado, tendencia rota, subir stop, resultados próximos) y te deja escrita la **orden exacta** para copiar en Bankinter. |
 | 🧮 **Calculadoras** | Comisiones + Impuesto de Transacciones Financieras, IRPF al vender, e interés compuesto invirtiendo cada mes. |
 | 🎓 **Aprende** | Lo básico explicado fácil: diccionario, reglas de oro y calendario de eventos. **Empieza por aquí.** |
 
@@ -27,6 +30,24 @@ Una app sencilla (en español) que te ayuda a invertir en bolsa con el **broker 
 
 La app detecta el móvil y se adapta sola: menú arriba, gráficos más compactos y tablas con menos columnas
 (también puedes activarlo a mano en ⚙️ *Tu perfil → Vista para móvil*).
+
+### Que no se pierdan tus carteras en el móvil (guardado en la nube)
+La versión publicada borra sus archivos al reiniciarse. Para guardar tus carteras y la estrategia
+entrenada de forma permanente, usa un **Gist privado de GitHub** (gratis):
+
+1. Entra en <https://gist.github.com>, crea un gist **secreto** con un archivo llamado
+   `bolsa_alex_datos.json` cuyo contenido sea `{}`. Copia el código largo de la dirección
+   (`https://gist.github.com/tu_usuario/ESTE_CODIGO`).
+2. En GitHub → *Settings → Developer settings → Personal access tokens → Fine-grained tokens*, crea un
+   token con el permiso **Gists: Read and write**. Cópialo.
+3. En Streamlit Cloud → tu app → **Settings → Secrets**, pega:
+   ```toml
+   [gist]
+   token = "github_pat_..."
+   id = "ESTE_CODIGO"
+   ```
+En el ordenador se guardan en `datos_usuario/datos.json`. En ambos casos puedes descargar y restaurar
+una copia de seguridad desde la propia app.
 
 ## Cómo instalarla en el ordenador
 
@@ -85,6 +106,28 @@ fecha (validación *walk-forward*) y compara su acierto con el de decir siempre 
 
 Nadie puede predecir la bolsa con precisión; en bolsa, acertar de forma sostenida un 55-60% con el riesgo
 controlado ya es muy bueno. Lo importante es que siempre sepas cuánto fiarte.
+
+## Simulador y entrenamiento (`bolsa/simulador.py`)
+- **Sin mirar el futuro**: cada día se decide con el cierre anterior y se ejecuta en la apertura; la
+  predicción de cada día se calcula solo con datos anteriores. Hay una prueba automática que lo verifica
+  (si se cambian los precios a partir de una fecha, todo lo anterior queda idéntico).
+- **Realista**: comisiones de tu perfil, impuesto de transacciones, stop-loss que se ejecutan incluso si la
+  acción abre por debajo (hueco), tamaño de posición según tu riesgo y número máximo de empresas.
+- **Entrenamiento walk-forward**: con 3 años entrena (prueba N combinaciones de umbrales de compra/venta,
+  stop, objetivo, peso del modelo y nº de posiciones) y con el año siguiente comprueba. Avanza un año y
+  repite. El resultado que se muestra es el de los años **no vistos**, comparado con las reglas por
+  defecto y con comprar y mantener.
+- **Qué es "error de inversión"**: tú eliges qué minimizar: *Equilibrado* (rentabilidad anual menos la
+  mitad de la peor caída), *Menos pérdidas* (la menor caída ganando dinero) o *Máxima rentabilidad*.
+- **Limitaciones**: no hay histórico gratuito de noticias ni de analistas (no se simulan); se usa la
+  composición actual del IBEX (sesgo de supervivencia); no incluye IRPF. Si el simulador dice que la
+  estrategia no bate a comprar y mantener, créetelo: es lo más habitual en bolsa.
+
+## Cómo trabaja con Bankinter
+Bankinter no ofrece una API pública para que apps de terceros lean la cuenta de un particular o envíen
+órdenes, así que la app **no se conecta** a tu cuenta ni toca tu dinero. Funciona como copiloto:
+prepara cada orden con los campos del formulario de Bankinter (valor, mercado, tipo limitada, precio,
+títulos, validez y stop-loss), importa tus posiciones desde un Excel/CSV y vigila lo que tienes.
 
 ## Datos
 - Cotizaciones: Yahoo Finance (gratis, ~15 minutos de retraso). En Yahoo las acciones españolas
