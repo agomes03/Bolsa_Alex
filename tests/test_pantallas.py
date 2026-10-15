@@ -278,3 +278,63 @@ def test_cambiar_el_nivel_de_alarma_de_una_posicion():
     pos = at.session_state["_datos"]["cartera_real"]["posiciones"]["SAN.MC"]
     assert pos["sin_stop"] and pos["alarma"] == 1.0
     assert [a["precio"] for a in at.session_state["_datos"]["alertas"] if a["ticker"] == "SAN.MC"] == [1.0]
+
+
+def _dos_cuentas() -> dict:
+    principal = cartera.nueva(None)
+    cartera.comprar(principal, "SAN.MC", 2500, 12.46, costes.Tarifa(), "2025-06-02")
+    segunda = cartera.nueva(None)
+    cartera.comprar(segunda, "SAN.MC", 1000, 14.20, costes.Tarifa(), "2026-02-10")
+    cartera.comprar(segunda, "ITX.MC", 100, 50.0, costes.Tarifa(), "2026-02-10")
+    return {"cuentas": {"Bankinter 1": principal, "Bankinter 2": segunda}}
+
+
+def test_varias_cuentas_todas_y_cada_una():
+    at = abrir("pagina_bankinter", datos_usuario=_dos_cuentas())
+    sin_fallos(at)
+    tabla = at.dataframe[0].value
+    san = tabla[tabla["Activo"].str.contains("Santander")].iloc[0]
+    assert san["Títulos"] == 3500 and san["Cuentas"] == 2
+    assert any("Bankinter 1: 2.500 a 12,46" in m.value and "Bankinter 2: 1.000 a 14,20" in m.value
+               for m in at.markdown)
+    assert not [b for b in at.button if b.label == "Registrar venta"]      # en «Todas» no se edita
+    # Solo la segunda cuenta: su Santander con su propio precio medio, y se puede vender.
+    at.segmented_control(key="cuenta_vista").set_value("Bankinter 2").run()
+    sin_fallos(at)
+    tabla = at.dataframe[0].value
+    san = tabla[tabla["Activo"].str.contains("Santander")].iloc[0]
+    assert san["Títulos"] == 1000 and san["Precio medio"] == 14.2
+    assert [b for b in at.button if b.label == "Registrar venta"]
+
+
+def test_crear_una_cuenta_nueva():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    at.text_input(key="cta_nueva").set_value("Bankinter 2").run()
+    at.button(key="cta_anadir").click().run()
+    sin_fallos(at)
+    d = at.session_state["_datos"]
+    assert list(d["cuentas"]) == ["Cuenta principal", "Bankinter 2"]
+    assert d["cartera_real"]["posiciones"]["SAN.MC"]["acciones"] == 2500     # nada se pierde al migrar
+
+
+def test_valor_de_una_sola_cuenta_lleva_su_nombre():
+    at = abrir("pagina_bankinter", datos_usuario=_dos_cuentas())
+    at.segmented_control(key="cuenta_vista").set_value("Bankinter 2").run()
+    assert any(m.label == "Valor en «Bankinter 2»" for m in at.metric)
+
+
+def test_renombrar_y_borrar_cuenta_desde_la_pantalla():
+    at = abrir("pagina_bankinter", datos_usuario=_dos_cuentas())
+    at.segmented_control(key="cuenta_vista").set_value("Bankinter 2").run()
+    at.selectbox(key="cta_cual").set_value("Bankinter 2").run()
+    at.text_input(key="cta_nombre").set_value("Cuenta ahorro").run()
+    at.button(key="cta_renombrar").click().run()
+    sin_fallos(at)
+    assert list(at.session_state["_datos"]["cuentas"]) == ["Bankinter 1", "Cuenta ahorro"]
+    at.selectbox(key="cta_cual").set_value("Cuenta ahorro").run()
+    at.checkbox(key="cta_seguro").check().run()
+    at.button(key="cta_borrar").click().run()
+    sin_fallos(at)
+    d = at.session_state["_datos"]
+    assert list(d["cuentas"]) == ["Bankinter 1"] and d["cartera_real"]["posiciones"]["SAN.MC"]["acciones"] == 2500

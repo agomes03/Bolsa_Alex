@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
-from bolsa import almacen, costes, datos, finnhub, noticias, prediccion, senales
+from bolsa import almacen, costes, cuentas, datos, finnhub, noticias, prediccion, senales
 from bolsa.simulador import Parametros
 from bolsa.tickers import TODAS_LAS_ACCIONES, indice_de_referencia, nombre_de
 
@@ -299,14 +299,20 @@ def datos_usuario() -> dict:
         except Exception as e:  # noqa: BLE001
             st.warning(f"No se pudieron cargar tus datos guardados ({e}). Empiezas con datos vacíos.")
             st.session_state["_datos"] = {}
-    return st.session_state["_datos"]
+    d = st.session_state["_datos"]
+    if d.get("cartera_real") or d.get("cuentas"):
+        cuentas.asegurar(d)          # datos de antes de las cuentas: todo pasa a la «Cuenta principal»
+    return d
 
 
 def guardar_datos() -> None:
     from datetime import datetime
 
+    d = datos_usuario()
+    if d.get("cuentas"):
+        cuentas.consolidar(d)        # la cartera «Todas» siempre al día con lo que hay en cada cuenta
     try:
-        _almacen().guardar(datos_usuario())
+        _almacen().guardar(d)
         st.session_state["_guardado"] = (True, datetime.now(MADRID_TZ).strftime("%H:%M"), "")
     except Exception as e:  # noqa: BLE001
         st.session_state["_guardado"] = (False, datetime.now(MADRID_TZ).strftime("%H:%M"), str(e))
