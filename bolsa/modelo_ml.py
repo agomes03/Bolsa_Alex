@@ -41,6 +41,8 @@ NOMBRES = {
     "rank_r5": "Puesto por rentabilidad 1 semana", "rank_vol": "Puesto por volatilidad",
 }
 COLUMNAS = list(NOMBRES)
+COLUMNAS_FUTURAS = {"fwd", "fwd63", "fut_dd21", "fut_dd63", "fut_rel21", "fut_rel63"}
+assert not COLUMNAS_FUTURAS & set(COLUMNAS), "Una característica no puede ser un dato del futuro"
 
 
 # --------------------------------------------------------------------------- características
@@ -94,6 +96,10 @@ def construir_panel(historicos: dict[str, pd.DataFrame], indices: dict[str, pd.D
         f = caracteristicas_accion(df, indices.get(indice_de_referencia(t)), vix)
         c = df["Close"]
         f["fwd"] = c.shift(-horizonte) / c - 1
+        f["fwd63"] = c.shift(-63) / c - 1
+        # Peor momento de los próximos 21/63 días (para el modelo de riesgo de caída).
+        f["fut_dd21"] = c.shift(-1)[::-1].rolling(21, min_periods=21).min()[::-1] / c - 1
+        f["fut_dd63"] = c.shift(-1)[::-1].rolling(63, min_periods=63).min()[::-1] / c - 1
         f["ticker"] = t
         partes.append(f[f["r252"].notna()])
     if not partes:
@@ -106,8 +112,29 @@ def construir_panel(historicos: dict[str, pd.DataFrame], indices: dict[str, pd.D
     panel["rank_r63"] = g["r63"].rank(pct=True)
     panel["rank_r5"] = g["r5"].rank(pct=True)
     panel["rank_vol"] = g["vol21"].rank(pct=True)
+    # Rentabilidad futura frente a la mediana de todas las empresas ese día (¿lo hizo mejor que las demás?)
+    # (prefijo "fut_" = dato del FUTURO: solo se usa como respuesta, nunca como característica)
+    panel["fut_rel21"] = panel["fwd"] - g["fwd"].transform("median")
+    panel["fut_rel63"] = panel["fwd63"] - g["fwd63"].transform("median")
     panel[COLUMNAS] = panel[COLUMNAS].astype("float32")
     return panel
+
+
+# Qué se intenta predecir. y: etiqueta (True/False), ret: rentabilidad asociada, h: sesiones.
+OBJETIVOS = {
+    "sube_1m": {"col": "fwd", "y": lambda p: p["fwd"] > 0, "ret": "fwd", "h": 21,
+                "texto": "¿Subirá en el próximo mes?"},
+    "sube_3m": {"col": "fwd63", "y": lambda p: p["fwd63"] > 0, "ret": "fwd63", "h": 63,
+                "texto": "¿Subirá en los próximos 3 meses?"},
+    "supera_1m": {"col": "fut_rel21", "y": lambda p: p["fut_rel21"] > 0, "ret": "fwd", "h": 21,
+                  "texto": "¿Lo hará mejor que la mayoría de empresas el próximo mes?"},
+    "supera_3m": {"col": "fut_rel63", "y": lambda p: p["fut_rel63"] > 0, "ret": "fwd63", "h": 63,
+                  "texto": "¿Lo hará mejor que la mayoría en los próximos 3 meses?"},
+    "caida_1m": {"col": "fut_dd21", "y": lambda p: p["fut_dd21"] < -0.10, "ret": "fwd", "h": 21,
+                 "texto": "¿Sufrirá una caída de más del 10% en algún momento del próximo mes?"},
+    "caida_3m": {"col": "fut_dd63", "y": lambda p: p["fut_dd63"] < -0.15, "ret": "fwd63", "h": 63,
+                 "texto": "¿Sufrirá una caída de más del 15% en algún momento de los próximos 3 meses?"},
+}
 
 
 # --------------------------------------------------------------------------- modelo
@@ -119,25 +146,26 @@ def nuevo_modelo():
                                           early_stopping=False, random_state=0)
 
 
-def _muestra_entreno(panel: pd.DataFrame, hasta: pd.Timestamp, paso: int) -> pd.DataFrame:
+def _muestra_entreno(panel: pd.DataFrame, hasta: pd.Timestamp, paso: int, col: str = "fwd") -> pd.DataFrame:
     """Filas con resultado ya conocido antes de `hasta`, una de cada `paso` sesiones
     (las sesiones contiguas son casi iguales y no aportan información nueva)."""
     fechas = panel.index.get_level_values("fecha")
-    t = panel[(fechas < hasta) & panel["fwd"].notna()]
+    t = panel[(fechas < hasta) & panel[col].notna()]
     unicas = pd.Index(t.index.get_level_values("fecha").unique()).sort_values()
     elegidas = unicas[::paso]
     return t[t.index.get_level_values("fecha").isin(elegidas)]
 
 
-def calibracion(p: np.ndarray, fwd: np.ndarray, bins: int = 10) -> pd.DataFrame:
-    """Qué pasó de verdad en cada tramo de probabilidad que dio el modelo."""
-    df = pd.DataFrame({"p": p, "fwd": fwd}).dropna()
+def calibracion(p: np.ndarray, fwd: np.ndarray, bins: int = 10, y: np.ndarray | None = None) -> pd.DataFrame:
+    """Qué pasó de verdad en cada tramo de probabilidad que dio el modelo. Con `y`, la columna 'sube'
+    es la frecuencia real del suceso predicho (p. ej. una caída fuerte)."""
+    df = pd.DataFrame({"p": p, "fwd": fwd, "y": (fwd > 0) if y is None else y}).dropna()
     if len(df) < bins * 20:
         bins = max(2, len(df) // 20)
     df["tramo"] = pd.qcut(df["p"], bins, duplicates="drop")
     t = df.groupby("tramo", observed=True).agg(
         p_media=("p", "mean"), p_min=("p", "min"), p_max=("p", "max"),
-        sube=("fwd", lambda x: float((x > 0).mean())), rent_media=("fwd", "mean"),
+        sube=("y", "mean"), rent_media=("fwd", "mean"),
         p10=("fwd", lambda x: float(np.percentile(x, 10))), p90=("fwd", lambda x: float(np.percentile(x, 90))),
         casos=("fwd", "size"))
     return t.reset_index(drop=True)
@@ -154,12 +182,15 @@ def calibrar(p: float, tabla: pd.DataFrame | list[dict]) -> dict:
             "tramo": int(fila.name) + 1, "tramos": len(t)}
 
 
-def walk_forward(panel: pd.DataFrame, anos_minimos: int = 3, paso: int = 5,
+def walk_forward(panel: pd.DataFrame, anos_minimos: int = 3, paso: int = 5, objetivo: str = "sube_1m",
                  progreso: Callable[[float, str], None] | None = None) -> dict:
     """Entrena con los años anteriores y predice el siguiente, año a año. Devuelve las
     predicciones 'fuera de muestra' (nunca vistas en el entrenamiento) y sus métricas."""
     from sklearn.metrics import roc_auc_score
 
+    obj = OBJETIVOS[objetivo]
+    h = obj["h"]
+    etiqueta = obj["y"](panel).where(panel[obj["col"]].notna())
     fechas = panel.index.get_level_values("fecha")
     anos = sorted(set(fechas.year))
     anos_test = [a for a in anos if a >= anos[0] + anos_minimos]
@@ -168,56 +199,60 @@ def walk_forward(panel: pd.DataFrame, anos_minimos: int = 3, paso: int = 5,
         if progreso:
             progreso(i / len(anos_test), f"Entrenando para predecir {ano}")
         inicio = pd.Timestamp(year=ano, month=1, day=1)
-        margen = inicio - pd.tseries.offsets.BDay(HORIZONTE + 2)  # que no se cuele el futuro
-        entreno = _muestra_entreno(panel, margen, paso)
+        margen = inicio - pd.tseries.offsets.BDay(h + 2)  # que no se cuele el futuro
+        entreno = _muestra_entreno(panel, margen, paso, obj["col"])
         prueba = panel[fechas.year == ano]
-        if len(entreno) < 2000 or prueba.empty:
+        y_entreno = etiqueta.loc[entreno.index].astype(bool)
+        if len(entreno) < 2000 or prueba.empty or y_entreno.nunique() < 2:
             continue
-        modelo = nuevo_modelo().fit(entreno[COLUMNAS], entreno["fwd"] > 0)
+        modelo = nuevo_modelo().fit(entreno[COLUMNAS], y_entreno)
         oos.append(pd.Series(modelo.predict_proba(prueba[COLUMNAS])[:, 1], index=prueba.index))
     if not oos:
         raise ValueError("No hay suficientes años de datos para validar el modelo.")
     pred = pd.concat(oos).rename("p")
-    res = panel[["fwd"]].join(pred, how="inner")
+    res = pd.DataFrame({"ret": panel[obj["ret"]], "y": etiqueta}).join(pred, how="inner")
     conocido = res.dropna()
-    y = conocido["fwd"] > 0
+    y = conocido["y"].astype(bool)
     base = float(y.mean())
     metricas = {
+        "objetivo": objetivo, "pregunta": obj["texto"],
         "casos": int(len(conocido)), "acciones": int(conocido.index.get_level_values("ticker").nunique()),
         "desde": str(conocido.index.get_level_values("fecha").min().date()),
         "hasta": str(conocido.index.get_level_values("fecha").max().date()),
         "acierto": float(((conocido["p"] > 0.5) == y).mean()),
         "referencia": max(base, 1 - base), "tasa_subidas": base,
-        "auc": float(roc_auc_score(y, conocido["p"])),
+        "auc": float(roc_auc_score(y, conocido["p"])) if y.nunique() == 2 else float("nan"),
         "brier": float(((conocido["p"] - y) ** 2).mean()),
     }
-    # Ventaja práctica: cada mes, ¿el 20% con mejor nota rindió más que el 20% con peor nota?
+    # Ventaja práctica: en fechas separadas por el horizonte, ¿el 20% con mejor nota rindió más que el 20% peor?
     fechas_c = conocido.index.get_level_values("fecha")
-    mensuales = pd.Index(fechas_c.unique()).sort_values()[::HORIZONTE]
-    m = conocido[fechas_c.isin(mensuales)]
+    separadas = pd.Index(fechas_c.unique()).sort_values()[::h]
+    m = conocido[fechas_c.isin(separadas)]
     q = m.groupby(level="fecha")["p"].rank(pct=True)
-    mejores = m[q >= 0.8].groupby(level="fecha")["fwd"].mean()
-    peores = m[q <= 0.2].groupby(level="fecha")["fwd"].mean()
-    todos = m.groupby(level="fecha")["fwd"].mean()
+    mejores = m[q >= 0.8].groupby(level="fecha")["ret"].mean()
+    peores = m[q <= 0.2].groupby(level="fecha")["ret"].mean()
+    todos = m.groupby(level="fecha")["ret"].mean()
     metricas.update(mejores_mes=float(mejores.mean()), peores_mes=float(peores.mean()),
                     todos_mes=float(todos.mean()),
                     meses_mejores_ganan=float((mejores > todos).mean()), meses=int(len(mejores)))
     por_ano = conocido.assign(ano=conocido.index.get_level_values("fecha").year).groupby("ano").apply(
-        lambda g: pd.Series({"acierto": float(((g["p"] > 0.5) == (g["fwd"] > 0)).mean()),
-                             "tasa_subidas": float((g["fwd"] > 0).mean()),
-                             "auc": float(roc_auc_score(g["fwd"] > 0, g["p"]))
-                             if (g["fwd"] > 0).nunique() == 2 else float("nan"),
+        lambda g: pd.Series({"acierto": float(((g["p"] > 0.5) == g["y"].astype(bool)).mean()),
+                             "tasa_subidas": float(g["y"].astype(bool).mean()),
+                             "auc": float(roc_auc_score(g["y"].astype(bool), g["p"]))
+                             if g["y"].astype(bool).nunique() == 2 else float("nan"),
                              "casos": len(g)}), include_groups=False)
-    return {"oos": res["p"], "metricas": metricas, "calibracion": calibracion(conocido["p"].to_numpy(),
-                                                                                conocido["fwd"].to_numpy()),
+    return {"oos": res["p"], "metricas": metricas,
+            "calibracion": calibracion(conocido["p"].to_numpy(), conocido["ret"].to_numpy(),
+                                       y=conocido["y"].astype(bool).to_numpy()),
             "por_ano": por_ano}
 
 
-def entrenar_final(panel: pd.DataFrame, paso: int = 5):
+def entrenar_final(panel: pd.DataFrame, paso: int = 5, objetivo: str = "sube_1m"):
     """Modelo con TODOS los datos conocidos, para las predicciones de hoy."""
+    obj = OBJETIVOS[objetivo]
     ultimo = panel.index.get_level_values("fecha").max() + pd.Timedelta(days=1)
-    entreno = _muestra_entreno(panel, ultimo, paso)
-    return nuevo_modelo().fit(entreno[COLUMNAS], entreno["fwd"] > 0)
+    entreno = _muestra_entreno(panel, ultimo, paso, obj["col"])
+    return nuevo_modelo().fit(entreno[COLUMNAS], obj["y"](entreno))
 
 
 def predecir_hoy(modelo, panel: pd.DataFrame, max_dias: int = 7) -> pd.Series:
@@ -229,13 +264,14 @@ def predecir_hoy(modelo, panel: pd.DataFrame, max_dias: int = 7) -> pd.Series:
     return pd.Series(p, index=ult.index.get_level_values("ticker"))
 
 
-def importancia(modelo, panel: pd.DataFrame, n: int = 6000, semilla: int = 0) -> pd.Series:
+def importancia(modelo, panel: pd.DataFrame, n: int = 6000, semilla: int = 0, objetivo: str = "sube_1m") -> pd.Series:
     """Qué datos pesan más en las predicciones (permutando cada columna y viendo cuánto empeora)."""
     from sklearn.inspection import permutation_importance
 
-    m = panel.dropna(subset=["fwd"])
+    obj = OBJETIVOS[objetivo]
+    m = panel.dropna(subset=[obj["col"]])
     m = m.sample(min(n, len(m)), random_state=semilla)
-    r = permutation_importance(modelo, m[COLUMNAS], m["fwd"] > 0, n_repeats=3, random_state=semilla,
+    r = permutation_importance(modelo, m[COLUMNAS], obj["y"](m), n_repeats=3, random_state=semilla,
                                scoring="roc_auc")
     return pd.Series(r.importances_mean, index=[NOMBRES[c] for c in COLUMNAS]).sort_values(ascending=False)
 

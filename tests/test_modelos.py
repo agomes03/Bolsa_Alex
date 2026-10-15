@@ -171,3 +171,13 @@ def test_avisos_cartera_y_mensaje():
     texto = avisos.mensaje_diario({"fecha": "2026-10-15", "resumen": ["Hola"], "ideas": ["SAN.MC"],
                                    "ranking": ranking}, a)
     assert "Santander" in texto and "Tu cartera" in texto
+
+
+@pytest.mark.parametrize("objetivo", list(modelo_ml.OBJETIVOS))
+def test_ningun_objetivo_ve_el_futuro(objetivo):
+    """Con datos aleatorios, ningún tipo de predicción puede acertar más que el azar (si lo hace, hay fuga)."""
+    # Las caídas fuertes son raras: hacen falta más acciones para que el azar no parezca señal.
+    n = 30 if objetivo.startswith("caida") else 12
+    panel = modelo_ml.construir_panel({f"T{i}.MC": hist(i, patron=False) for i in range(n)})
+    wf = modelo_ml.walk_forward(panel, objetivo=objetivo)
+    assert wf["metricas"]["auc"] < 0.56, wf["metricas"]["auc"]

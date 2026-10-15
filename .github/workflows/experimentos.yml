@@ -1,0 +1,38 @@
+name: Laboratorio de experimentos
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Primer domingo de cada mes: revisar con datos nuevos qué funciona y qué no.
+    - cron: "0 6 1-7 * 0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualizacion-diaria
+  cancel-in-progress: false
+
+jobs:
+  experimentos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      - name: Ejecutar experimentos
+        run: python scripts/experimentos.py
+      - name: Guardar resultados
+        run: |
+          git config user.name "actualizacion-bolsa[bot]"
+          git config user.email "actualizacion-bolsa@users.noreply.github.com"
+          git add informe/experimentos.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Resultados del laboratorio $(date -u +%Y-%m-%d)"
+            for i in 1 2 3; do git pull --rebase --autostash && git push && break; sleep $((i * 5)); done
+          fi

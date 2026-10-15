@@ -3,9 +3,12 @@ perfil del usuario y almacenamiento de carteras/estrategia."""
 
 from __future__ import annotations
 
+import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -148,3 +151,41 @@ def estrategia_actual() -> Parametros:
 
 def ultimo_precio(df: pd.DataFrame) -> float | None:
     return float(df["Close"].iloc[-1]) if df is not None and not df.empty else None
+
+
+# --------------------------------------------------------------------------- informe diario
+RUTA_INFORME = Path(__file__).resolve().parent / "informe" / "informe.json"
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _leer_informe(mtime: float) -> dict | None:
+    try:
+        return json.loads(RUTA_INFORME.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def cargar_informe() -> dict | None:
+    """Informe generado cada noche por la actualización automática (None si aún no existe)."""
+    if not RUTA_INFORME.exists():
+        return None
+    return _leer_informe(RUTA_INFORME.stat().st_mtime)
+
+
+def dias_informe(inf: dict) -> int:
+    return (date.today() - date.fromisoformat(inf.get("datos_hasta", inf["fecha"]))).days
+
+
+def fila_informe(ticker: str) -> dict | None:
+    inf = cargar_informe()
+    if not inf:
+        return None
+    return next((r for r in inf.get("ranking", []) if r["ticker"] == ticker), None)
+
+
+def ir_a(pagina: str, **estado):
+    """Navega a otra página (p. ej. 'analizar') guardando valores en la sesión."""
+    st.session_state.update(estado)
+    paginas = st.session_state.get("_paginas", {})
+    if pagina in paginas:
+        st.switch_page(paginas[pagina])
