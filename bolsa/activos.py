@@ -92,8 +92,12 @@ def estado(df: pd.DataFrame) -> dict | None:
             "volatilidad": float(rets.std() * np.sqrt(252) * 100) if len(rets) > 20 else None}
 
 
-def lectura(nombre: str, e: dict) -> str:
+def lectura(nombre: str, e: dict, clase: str | None = None) -> str:
     """Una frase en lenguaje sencillo sobre cómo está ese activo."""
+    if clase in ("Monetario y liquidez", "Renta fija") and e.get("var_1a") is not None:
+        que = "lo que pagan hoy los tipos de interés, casi sin riesgo" if clase == "Monetario y liquidez" else \
+            "con movimientos pequeños; amortigua las caídas de la bolsa"
+        return f"{nombre}: {e['var_1a']:+.1f} % en el último año, {que}.".replace(".", ",", 1)
     if e["alcista"] is None:
         tendencia = "sin historia suficiente para saber su tendencia"
     else:
@@ -111,7 +115,7 @@ def resumen(historicos: dict[str, pd.DataFrame]) -> list[dict]:
     for t, info in ACTIVOS.items():
         e = estado(historicos.get(t))
         if e:
-            salida.append({"ticker": t, **info, **e, "lectura": lectura(info["nombre"], e)})
+            salida.append({"ticker": t, **info, **e, "lectura": lectura(info["nombre"], e, info["clase"])})
     return salida
 
 

@@ -33,6 +33,11 @@ def estado_mercado(ticker: str, ahora: datetime | None = None) -> dict:
     ahora = ahora or datetime.now(timezone.utc)
     if ahora.tzinfo is None:
         ahora = ahora.replace(tzinfo=timezone.utc)
+    from .activos import es_cripto
+
+    if es_cripto(ticker):
+        return {"abierto": True, "texto": "Las criptomonedas cotizan las 24 horas, todos los días",
+                "apertura": ahora.astimezone(MADRID)}
     zona, abre, cierra = sesion(ticker)
     local = ahora.astimezone(zona)
     hoy_abre = local.replace(hour=abre.hour, minute=abre.minute, second=0, microsecond=0)

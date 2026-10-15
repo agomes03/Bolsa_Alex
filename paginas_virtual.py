@@ -313,7 +313,11 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
                                                                         "activación para que se ejecute aunque caiga deprisa.")
     validez = k[-1].date_input("Válida hasta", date.today() + timedelta(days=0 if tipo == "mercado" else 7),
                                min_value=date.today(), max_value=date.today() + timedelta(days=90),
-                               key=f"v_val_{ticker}_{sentido}", format="DD/MM/YYYY")
+                               key=f"v_val_{ticker}_{sentido}_{tipo}", format="DD/MM/YYYY")
+    estado = horario.estado_mercado(ticker)
+    if validez == date.today() and not estado["abierto"] and estado["apertura"].date() > date.today():
+        st.warning("El mercado ya ha cerrado por hoy: una orden válida solo hasta hoy caducará sin ejecutarse. "
+                   "Pon como validez el próximo día de mercado o más.")
     if sentido == "compra":
         j = st.columns(2)
         stop = j[0].number_input(f"Stop-loss tras la compra ({m}, 0 = sin stop)", 0.0,

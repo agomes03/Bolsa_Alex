@@ -120,3 +120,14 @@ def test_cotizacion_y_velas_de_ejecucion():
     assert q["apertura"] == 10.1 and q["maximo"] == 10.5 and q["minimo"] == 10.0
     b = datos.barras_ejecucion(diario, intra)
     assert len(b) == 4 and b.index.is_monotonic_increasing
+
+
+def test_cotizacion_usa_el_cierre_oficial_y_cripto_siempre_abierta():
+    diario = pd.DataFrame({"Open": [10, 12], "High": [11, 12.3], "Low": [9, 11.9], "Close": [10.5, 11.998],
+                           "Volume": [1, 5]}, index=pd.to_datetime(["2026-10-14", "2026-10-15"]))
+    intra = velas([(12.0, 12.1, 11.95, 12.02), (12.02, 12.03, 12.0, 12.008)])
+    q = datos.cotizacion(diario, intra)
+    assert q["precio"] == 11.998 and q["anterior"] == 10.5 and q["maximo"] == 12.3
+    domingo = datetime(2026, 10, 18, 3, 0, tzinfo=timezone.utc)
+    assert horario.estado_mercado("BTC-EUR", domingo)["abierto"]
+    assert not horario.estado_mercado("SAN.MC", domingo)["abierto"]

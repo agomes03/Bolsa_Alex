@@ -41,6 +41,11 @@ SUFIJO_MERCADO = {"continuo": ".MC", "mercado continuo": ".MC", "bme": ".MC", "m
                   "milan": ".MI", "lisboa": ".LS", "bruselas": ".BR", "londres": ".L", "london": ".L",
                   "nasdaq": "", "nyse": "", "eeuu": "", "usa": ""}
 
+# ISIN de ETF habituales -> su cotización en euros (Yahoo a veces solo devuelve la de Londres, en dólares).
+ISIN_CONOCIDOS = {"IE00B4L5Y983": "IWDA.AS", "IE00BK5BQT80": "VWCE.DE", "IE00B5BMR087": "SXR8.DE",
+                  "DE0002635307": "EXSA.DE", "IE00B14X4Q57": "IBGS.AS", "LU0290358497": "XEON.DE",
+                  "DE000A0S9GB0": "4GLD.DE"}
+
 PATRON_ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}\d$")
 
 
@@ -134,7 +139,8 @@ def leer_tabla(df: pd.DataFrame, resolver: Callable[[str], dict | None] | None =
                 ticker = ticker_txt + sufijo
             else:
                 ticker = buscar_ticker(ticker_txt) or ticker_txt
-        ticker = ticker or ticker_cripto(nombre) or ticker_cripto(ticker_txt) or buscar_ticker(nombre) or ""
+        ticker = ticker or ISIN_CONOCIDOS.get(isin) or ticker_cripto(nombre) or ticker_cripto(ticker_txt) \
+            or buscar_ticker(nombre) or ""
         if not ticker and resolver:
             hallado = resolver(isin) if isin else None
             hallado = hallado or (resolver(nombre) if nombre else None)

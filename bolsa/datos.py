@@ -103,6 +103,11 @@ def cotizacion(diario: pd.DataFrame, intradia_df: pd.DataFrame) -> dict | None:
         volumen = float(hoy["Volume"].sum())
         previos = diario[diario.index < dia] if diario is not None and not diario.empty else pd.DataFrame()
         anterior = float(previos["Close"].iloc[-1]) if len(previos) else None
+        if diario is not None and not diario.empty and diario.index[-1].normalize() == dia:
+            # La vela diaria de hoy incluye la subasta de cierre: es el precio oficial.
+            f = diario.iloc[-1]
+            ultimo, maximo, minimo = float(f["Close"]), float(f["High"]), float(f["Low"])
+            volumen = float(f["Volume"]) or volumen
     else:
         f = diario.iloc[-1]
         ultimo, hora = float(f["Close"]), diario.index[-1]

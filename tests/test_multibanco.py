@@ -106,3 +106,10 @@ def test_asesor_del_dia_prioriza_y_dice_cuando_no_hay_nada():
     assert [a["prioridad"] for a in plan] == sorted(a["prioridad"] for a in plan)
     vacio = asesor_diario.plan_del_dia({"clases": {}, "hallazgos": []}, [], {}, [], hoy=date(2026, 10, 15))
     assert vacio[0]["titulo"] == "Nada urgente hoy"
+
+
+def test_isin_de_etf_conocido_va_a_la_cotizacion_en_euros():
+    df = importador.leer_texto("Producto;ISIN;Participaciones;Coste medio\niShares Core MSCI World;IE00B4L5Y983;10;90\n",
+                               lambda q: {"symbol": "IWDA.L", "name": "x", "type": "ETF"})
+    assert df.iloc[0]["ticker"] == "IWDA.AS"
+    assert "tipos de interés" in activos.lectura("Monetario", {"var_1a": 2.0}, "Monetario y liquidez")
