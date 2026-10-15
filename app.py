@@ -5,20 +5,24 @@ Ejecutar:  streamlit run app.py
 
 from __future__ import annotations
 
+import re
+from concurrent.futures import ThreadPoolExecutor
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from bolsa import costes, datos, noticias, senales
+from bolsa import costes, datos, noticias, prediccion, senales
 from bolsa.indicadores import calcular_todo
 from bolsa.tickers import EEUU, ETFS, IBEX35, INDICES, TERMOMETROS, TODAS_LAS_ACCIONES, nombre_de, sector_de
 
-st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide",
+                   initial_sidebar_state="collapsed")
 
 AVISO = ("⚠️ **Herramienta educativa, no es asesoramiento financiero.** Ningún sistema puede "
-         "garantizar beneficios: invierte solo dinero que no vayas a necesitar en años y que "
-         "puedas permitirte ver bajar un 30% sin vender por miedo.")
+         "garantizar beneficios ni predecir la bolsa con certeza: invierte solo dinero que no vayas a "
+         "necesitar en años y que puedas permitirte ver bajar un 30% sin vender por miedo.")
 
 
 # --------------------------------------------------------------------------- caché de datos
@@ -37,12 +41,45 @@ def cargar_noticias() -> tuple[list[noticias.Noticia], list[str]]:
     return noticias.descargar()
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def cargar_fundamentales(ticker: str) -> dict:
+    return datos.fundamentales(ticker)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cargar_fundamentales_varios(tickers: tuple[str, ...]) -> dict[str, dict]:
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        return dict(zip(tickers, pool.map(datos.fundamentales, tickers)))
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def noticias_empresa(ticker: str) -> list[noticias.Noticia]:
-    nombre = TODAS_LAS_ACCIONES[ticker][0].split(" (")[0]
-    consulta = f'"{nombre}" acciones' if ticker.endswith(".MC") else f'"{nombre}" bolsa'
-    lista, _ = noticias.descargar({"Google News": noticias.url_google_news(consulta)}, max_por_fuente=15)
+    nombre = nombre_de(ticker)
+    extra = [noticias.Noticia(n["titulo"], n["enlace"], n["fuente"], n["fecha"], n["resumen"][:400])
+             for n in datos.noticias_yahoo(ticker)]
+    lista, _ = noticias.descargar(noticias.fuentes_empresa(ticker, nombre), max_por_fuente=25,
+                                  extra=extra, max_horas=24 * 10)
+    # Las fuentes de Google/Yahoo traen a veces noticias de otras empresas: quedarnos con las que la nombran.
+    if ticker in TODAS_LAS_ACCIONES and TODAS_LAS_ACCIONES[ticker][2]:
+        lista = [n for n in lista if ticker in n.empresas] or lista
     return lista
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cargar_predicciones(ticker: str) -> dict[str, prediccion.Prediccion]:
+    df = cargar_historico(ticker, "10y")
+    return prediccion.predecir_todos(df) if len(df) > 500 else {}
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def predicciones_radar(tickers: tuple[str, ...]) -> dict[str, prediccion.Prediccion]:
+    hist = cargar_varios(tickers, "10y")
+    salida = {}
+    for t, df in hist.items():
+        p = prediccion.predecir(df, 21, "1 mes", n_pruebas=80) if len(df) > 500 else None
+        if p:
+            salida[t] = p
+    return salida
 
 
 def mercado_alcista_para(ticker: str) -> bool | None:
@@ -65,19 +102,19 @@ def moneda_de(ticker: str) -> str:
     return "€" if ticker.endswith((".MC", ".AS")) else "$"
 
 
-# --------------------------------------------------------------------------- barra lateral
+def es_movil() -> bool:
+    try:
+        ua = st.context.headers.get("User-Agent", "") or ""
+    except Exception:  # noqa: BLE001
+        ua = ""
+    return bool(re.search(r"Mobi|Android|iPhone|iPad", ua))
+
+
+# --------------------------------------------------------------------------- barra lateral (perfil)
 with st.sidebar:
-    st.title("📈 Asistente de Bolsa")
-    pagina = st.radio("Ir a", [
-        "🏠 Resumen del día",
-        "📰 Noticias que mueven el mercado",
-        "🔍 Analizar una acción",
-        "📡 Radar del IBEX 35",
-        "🧮 Calculadoras",
-        "🎓 Aprende (empieza aquí)",
-    ])
-    st.divider()
-    st.subheader("Tu perfil")
+    st.title("⚙️ Tu perfil")
+    movil = st.toggle("📱 Vista para móvil", value=es_movil(),
+                      help="Gráficos más bajos y tablas con menos columnas. Se activa sola en el móvil.")
     capital = st.number_input("Dinero que tienes para invertir (€)", min_value=100.0, value=3000.0, step=100.0)
     riesgo = st.slider("Máximo que aceptas perder por operación (% de tu dinero)", 0.5, 5.0, 1.0, 0.5,
                        help="Regla de oro de los profesionales: no arriesgar más de un 1-2% del capital "
@@ -90,23 +127,25 @@ with st.sidebar:
             canon_fijo=st.number_input("Cánones fijos (€)", 0.0, 20.0, 1.0, 0.5),
         )
     st.divider()
-    st.caption("Cotizaciones de Yahoo Finance (retraso ~15 min). Noticias de RSS públicos. "
-               "Se actualizan solas cada 5-10 minutos.")
-    if st.button("🔄 Actualizar ahora"):
+    st.caption(f"Cotizaciones de Yahoo Finance (retraso ~15 min). Noticias de {len(noticias.FUENTES_RSS)} "
+               "fuentes RSS en español e inglés. Se actualizan solas cada 5-10 minutos.")
+    if st.button("🔄 Actualizar ahora", width="stretch"):
         st.cache_data.clear()
         st.rerun()
+
+ALTO_GRAFICO = 430 if movil else 560
 
 
 # --------------------------------------------------------------------------- componentes
 def tarjeta_noticia(n: noticias.Noticia, expandida: bool = False):
     estrellas = "🔥" * max(1, round(n.impacto / 2)) if n.impacto >= 4 else "·"
     empresas = ", ".join(nombre_de(t) for t in n.empresas)
-    cabecera = f"{n.etiqueta_sentimiento} · {estrellas} · {n.titulo}"
-    with st.expander(cabecera, expanded=expandida):
+    with st.expander(f"{n.etiqueta_sentimiento} · {estrellas} · {n.titulo}", expanded=expandida):
         st.markdown(f"**[{n.titulo}]({n.enlace})**")
         st.caption(f"{n.fuente} · {noticias.hace_cuanto(n)} · Impacto {n.impacto}/10"
+                   + (f" · Publicada en {n.repeticiones} medios" if n.repeticiones > 1 else "")
                    + (f" · Empresas: {empresas}" if empresas else ""))
-        if n.resumen and n.resumen.lower() not in n.titulo.lower():
+        if n.resumen and n.resumen.lower()[:60] not in n.titulo.lower():
             st.write(n.resumen)
         if n.explicaciones:
             st.markdown("**💡 Por qué importa:**")
@@ -122,7 +161,7 @@ def grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None = None) -> 
     fig.add_trace(go.Candlestick(x=d.index, open=d["Open"], high=d["High"], low=d["Low"], close=d["Close"],
                                  name="Precio", showlegend=False), row=1, col=1)
     for col, color in (("SMA50", "#f59e0b"), ("SMA200", "#6366f1")):
-        fig.add_trace(go.Scatter(x=d.index, y=d[col], name=f"Media {col[3:]} sesiones",
+        fig.add_trace(go.Scatter(x=d.index, y=d[col], name=f"Media {col[3:]}",
                                  line=dict(color=color, width=1.6)), row=1, col=1)
     if plan:
         for y, txt, color in ((plan.stop, "Stop-loss", "#dc2626"), (plan.objetivo, "Objetivo", "#16a34a")):
@@ -131,9 +170,99 @@ def grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None = None) -> 
     fig.add_hrect(y0=70, y1=100, fillcolor="#dc2626", opacity=0.08, line_width=0, row=2, col=1)
     fig.add_hrect(y0=0, y1=30, fillcolor="#16a34a", opacity=0.08, line_width=0, row=2, col=1)
     fig.update_yaxes(range=[0, 100], row=2, col=1, title_text="RSI")
-    fig.update_layout(title=titulo, height=560, xaxis_rangeslider_visible=False,
-                      legend=dict(orientation="h", y=1.08), margin=dict(l=10, r=10, t=60, b=10))
+    fig.update_layout(title=None if movil else titulo, height=ALTO_GRAFICO, xaxis_rangeslider_visible=False,
+                      legend=dict(orientation="h", y=1.08), margin=dict(l=5, r=5, t=40, b=5))
     return fig
+
+
+def grafico_prediccion(df: pd.DataFrame, preds: dict[str, prediccion.Prediccion]) -> go.Figure:
+    """Abanico: precio de los últimos meses y rango probable a 1 semana, 1 mes y 3 meses."""
+    c = df["Close"].tail(130)
+    ultimo = c.index[-1]
+    fechas = [ultimo] + [ultimo + pd.tseries.offsets.BDay(p.sesiones) for p in preds.values()]
+    precio = float(c.iloc[-1])
+    p10 = [precio] + [p.precio_p10 for p in preds.values()]
+    p50 = [precio] + [p.precio_mediana for p in preds.values()]
+    p90 = [precio] + [p.precio_p90 for p in preds.values()]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=c.index, y=c, name="Precio", line=dict(color="#334155")))
+    fig.add_trace(go.Scatter(x=fechas, y=p90, line=dict(width=0), showlegend=False, hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=fechas, y=p10, fill="tonexty", fillcolor="rgba(99,102,241,0.18)",
+                             line=dict(width=0), name="Rango probable (8 de cada 10 casos)"))
+    fig.add_trace(go.Scatter(x=fechas, y=p50, name="Escenario central", line=dict(color="#6366f1", dash="dash"),
+                             mode="lines+markers"))
+    fig.update_layout(height=ALTO_GRAFICO - 80, margin=dict(l=5, r=5, t=30, b=5),
+                      legend=dict(orientation="h", y=1.12))
+    return fig
+
+
+ICONO_FIAB = {"Alta": "🟢 Alta", "Media": "🟡 Media", "Baja": "🔴 Baja", "Sin datos": "⚪ Sin datos"}
+
+
+def bloque_predicciones(ticker: str, df: pd.DataFrame, preds: dict[str, prediccion.Prediccion]):
+    m = moneda_de(ticker)
+    cols = st.columns(1 if movil else len(preds))
+    for i, p in enumerate(preds.values()):
+        with cols[0 if movil else i]:
+            with st.container(border=True):
+                st.markdown(f"**{p.horizonte}** · {p.direccion}")
+                st.metric("Probabilidad de subir", f"{p.prob_subida * 100:.0f}%",
+                          f"central {p.rent_mediana * 100:+.1f}%")
+                st.caption(f"Rango probable: {eur(p.precio_p10, m)} – {eur(p.precio_p90, m)}")
+                if p.acierto is not None:
+                    st.caption(f"Fiabilidad: **{ICONO_FIAB[p.fiabilidad]}** · acertó {p.acierto * 100:.0f}% "
+                               f"(azar: {p.acierto_referencia * 100:.0f}%)")
+                if p.fiabilidad in ("Baja", "Sin datos"):
+                    st.caption("⚠️ No fiable para esta acción: tómalo solo como referencia.")
+    st.plotly_chart(grafico_prediccion(df, preds), width="stretch")
+    with st.expander("¿Cómo se calcula y cuánto me puedo fiar?"):
+        for p in preds.values():
+            st.markdown(f"**{p.horizonte}:** {prediccion.explicar(p)}")
+            if p.acierto_seguro is not None and p.n_seguro >= 10:
+                st.caption(f"Cuando el modelo estaba muy seguro (más de 65% o menos de 35%) acertó el "
+                           f"{p.acierto_seguro * 100:.0f}% de {p.n_seguro} veces.")
+        st.info("Un acierto del 55-60% ya es bueno en bolsa: los mejores fondos del mundo viven de pequeñas "
+                "ventajas repetidas muchas veces, con riesgo controlado. **Nadie** acierta el 90%. "
+                "Por eso la predicción solo suma puntos cuando ha demostrado acertar más que el azar, y "
+                "siempre debes usar stop-loss.")
+
+
+def bloque_fundamentales(ticker: str, f: dict):
+    if not f:
+        st.caption("No hay datos de la empresa disponibles.")
+        return
+    m = moneda_de(ticker)
+
+    def fmt(v, tipo):
+        if v is None:
+            return "—"
+        if tipo == "pct":
+            return f"{v * 100:.1f}%"
+        if tipo == "x":
+            return f"{v:.1f}"
+        if tipo == "cap":
+            return f"{v / 1e9:,.1f} mil M".replace(",", ".")
+        return eur(v, m)
+
+    filas = [
+        ("Tamaño (capitalización)", fmt(f.get("marketCap"), "cap"), "Lo que vale la empresa entera en bolsa."),
+        ("PER", fmt(f.get("trailingPE"), "x"), "Años de beneficios que pagas. <12 barato, 12-25 normal, >25 caro."),
+        ("PER futuro", fmt(f.get("forwardPE"), "x"), "Igual, pero con los beneficios esperados del año próximo."),
+        ("Rentabilidad por dividendo", fmt(f.get("trailingAnnualDividendYield"), "pct"),
+         "Lo que te pagan al año por cada 100 € invertidos."),
+        ("Margen de beneficio", fmt(f.get("profitMargins"), "pct"), "De cada 100 € que vende, cuántos gana."),
+        ("Crecimiento de ventas", fmt(f.get("revenueGrowth"), "pct"), "Respecto al mismo trimestre del año anterior."),
+        ("Rentabilidad sobre fondos propios (ROE)", fmt(f.get("returnOnEquity"), "pct"),
+         "Lo bien que usa el dinero de sus accionistas. >15% es muy bueno."),
+        ("Precio objetivo de analistas", fmt(f.get("targetMeanPrice"), "eur"),
+         f"Media de {f.get('numberOfAnalystOpinions', 0)} analistas. Rango "
+         f"{fmt(f.get('targetLowPrice'), 'eur')} – {fmt(f.get('targetHighPrice'), 'eur')}."),
+        ("Recomendación media", senales.RECOMENDACIONES.get(f.get("recommendationKey", ""), "—"), ""),
+    ]
+    tabla = pd.DataFrame(filas, columns=["Dato", "Valor", "Qué significa"])
+    if movil:
+        tabla = tabla[["Dato", "Valor"]]
+    st.dataframe(tabla, hide_index=True, width="stretch")
 
 
 def bloque_bankinter(ticker: str, ev: senales.Evaluacion, n_acciones: int):
@@ -175,12 +304,13 @@ def pagina_resumen():
         return
 
     st.subheader("Los grandes índices")
-    st.caption("Un índice es una 'cesta' con las principales empresas de una bolsa. Si sube, la mayoría de "
-               "acciones suben. Las flechas 🟢/🔴 indican si están por encima o por debajo de su media de 200 "
-               "sesiones (≈1 año), la forma más simple de saber si el mercado está en tendencia alcista.")
-    cols = st.columns(len(INDICES))
+    st.caption("Un índice es una 'cesta' con las principales empresas de una bolsa. 🟢/🔴 indica si está por "
+               "encima o por debajo de su media de 200 sesiones (≈1 año): la forma más simple de saber si el "
+               "mercado está en tendencia alcista.")
+    cols = st.columns(2 if movil else len(INDICES))
     alcistas = 0
-    for col, (t, info) in zip(cols, INDICES.items()):
+    for i, (t, info) in enumerate(INDICES.items()):
+        col = cols[i % len(cols)]
         if t not in hist:
             col.metric(info["nombre"], "sin datos")
             continue
@@ -197,13 +327,13 @@ def pagina_resumen():
             c = hist[t]["Close"]
             col.metric(info["nombre"], f"{c.iloc[-1]:.2f}", pct((c.iloc[-1] / c.iloc[-2] - 1) * 100),
                        delta_color="inverse" if t == "^VIX" else "normal", help=info["que_es"])
-            col.caption(info["que_es"])
+            if not movil:
+                col.caption(info["que_es"])
 
-    with st.spinner("Leyendo noticias..."):
-        lista, _ = cargar_noticias()
-    sent = noticias.sentimiento_medio([n for n in lista if n.impacto >= 4][:30])
+    with st.spinner("Leyendo noticias de todas las fuentes..."):
+        lista, fallos = cargar_noticias()
+    sent = noticias.sentimiento_medio([n for n in lista if n.impacto >= 4][:40])
 
-    # Semáforo general
     vix = float(hist["^VIX"]["Close"].iloc[-1]) if "^VIX" in hist else None
     st.subheader("🚦 Semáforo del mercado")
     if alcistas >= 4 and (vix is None or vix < 22):
@@ -217,8 +347,24 @@ def pagina_resumen():
                  "de 200 sesiones. Para un principiante lo prudente es esperar o, si inviertes a largo plazo "
                  "en índices, seguir con aportaciones pequeñas y periódicas.")
     tono = "positivo 🟢" if sent > 0.15 else "negativo 🔴" if sent < -0.15 else "neutro ⚪"
-    st.caption(f"Tono de las noticias importantes de hoy: **{tono}** ({sent:+.2f} en escala -1 a +1)."
+    st.caption(f"Tono de las noticias importantes: **{tono}** ({sent:+.2f} en escala -1 a +1), "
+               f"según {len(lista)} noticias de {len(noticias.FUENTES_RSS) - len(fallos)} fuentes."
                + (f" VIX: {vix:.1f}." if vix else ""))
+
+    st.subheader("🔮 Previsión de los índices a 1 mes")
+    cols = st.columns(1 if movil else 2)
+    for i, t in enumerate(("^IBEX", "^GSPC")):
+        p = cargar_predicciones(t).get("1 mes")
+        with cols[i % len(cols)].container(border=True):
+            if not p:
+                st.caption(f"{nombre_de(t)}: sin datos suficientes.")
+                continue
+            st.markdown(f"**{nombre_de(t)}** · {p.direccion}")
+            st.metric("Probabilidad de subir en 1 mes", f"{p.prob_subida * 100:.0f}%",
+                      f"central {p.rent_mediana * 100:+.1f}%")
+            st.caption(f"Rango probable {p.precio_p10:,.0f} – {p.precio_p90:,.0f}".replace(",", ".")
+                       + (f" · Fiabilidad {ICONO_FIAB[p.fiabilidad]} (acertó {p.acierto * 100:.0f}%)"
+                          if p.acierto is not None else ""))
 
     st.subheader("📰 Las 5 noticias más influyentes ahora")
     for n in lista[:5]:
@@ -227,13 +373,14 @@ def pagina_resumen():
 
 def pagina_noticias():
     st.title("📰 Noticias que mueven el mercado")
-    st.caption("Se ordenan por **impacto estimado** (0-10): temas que históricamente mueven las bolsas "
-               "(tipos de interés, inflación, aranceles, resultados, OPAs...) y lo recientes que son. "
-               "Despliega cada una para ver **por qué importa**.")
-    with st.spinner("Leyendo fuentes..."):
+    st.caption(f"Se leen **{len(noticias.FUENTES_RSS)} fuentes** (prensa española, Google News, CNBC, MarketWatch, "
+               "Yahoo Finance...) y se ordenan por **impacto estimado** (0-10): temas que históricamente mueven las "
+               "bolsas, cuántos medios publican la misma noticia y lo reciente que es. Despliega cada una para ver "
+               "**por qué importa**.")
+    with st.spinner("Leyendo todas las fuentes..."):
         lista, fallos = cargar_noticias()
-    if fallos:
-        st.caption(f"Fuentes no disponibles ahora: {', '.join(fallos)}")
+    st.caption(f"{len(lista)} noticias únicas de las últimas 72 h."
+               + (f" Fuentes no disponibles ahora: {', '.join(fallos)}." if fallos else ""))
     if not lista:
         st.error("No se han podido descargar noticias.")
         return
@@ -249,50 +396,55 @@ def pagina_noticias():
                  and (filtro_emp == "Todas" or filtro_emp in n.empresas)]
     st.write(f"**{len(filtradas)}** noticias")
 
-    # Empresas más mencionadas
     menciones: dict[str, list[int]] = {}
     for n in lista:
         for t in n.empresas:
             menciones.setdefault(t, []).append(n.sentimiento)
     if menciones:
-        with st.expander("🏢 Empresas más mencionadas hoy"):
-            filas = [{"Empresa": nombre_de(t), "Ticker": t, "Noticias": len(s),
-                      "Tono medio": round(sum(s) / len(s), 2)} for t, s in menciones.items()]
+        with st.expander("🏢 Empresas más mencionadas"):
+            filas = [{"Empresa": nombre_de(t), "Noticias": len(s), "Tono medio": round(sum(s) / len(s), 2)}
+                     for t, s in menciones.items()]
             st.dataframe(pd.DataFrame(filas).sort_values("Noticias", ascending=False),
                          hide_index=True, width="stretch")
             st.caption("Que una empresa salga mucho en las noticias no significa que haya que comprarla. "
-                       "Analízala en '🔍 Analizar una acción'.")
+                       "Analízala en '🔍 Analizar'.")
 
-    for i, n in enumerate(filtradas[:60]):
-        tarjeta_noticia(n, expandida=i < 3)
+    for i, n in enumerate(filtradas[:80]):
+        tarjeta_noticia(n, expandida=i < 3 and not movil)
 
 
 def pagina_analizar():
     st.title("🔍 Analizar una acción")
-    st.caption("Elige una empresa y el asistente revisa su tendencia, si está cara o barata a corto plazo, "
-               "su impulso y las noticias, y te dice en lenguaje claro si es buen momento.")
+    st.caption("Revisa tendencia, si está cara o barata, impulso, datos de la empresa, opinión de los analistas, "
+               "noticias y un modelo estadístico de predicción, y te lo explica en lenguaje claro.")
 
     grupos = {"IBEX 35 (España)": IBEX35, "EEUU": EEUU, "ETF (fondos indexados)": ETFS}
     c1, c2 = st.columns([1, 2])
     grupo = c1.selectbox("Mercado", list(grupos))
     ticker = c2.selectbox("Empresa", list(grupos[grupo]), format_func=lambda t: f"{nombre_de(t)} ({t})")
-    otro = st.text_input("…u otro ticker de Yahoo Finance (ej. ITX.MC, ASML.AS, KO)", "").strip().upper()
+    otro = st.text_input("…u otro ticker de Yahoo Finance (ej. ASML.AS, KO, SAP.DE)", "").strip().upper()
     if otro:
         ticker = otro
 
-    with st.spinner(f"Analizando {nombre_de(ticker)}..."):
-        df = cargar_historico(ticker)
+    with st.spinner(f"Analizando {nombre_de(ticker)}: cotizaciones, empresa, noticias y modelo..."):
+        df = cargar_historico(ticker, "10y")
         if df.empty or len(df) < 30:
             st.error("No hay datos suficientes para ese ticker. Comprueba que está bien escrito.")
             return
-        news = noticias_empresa(ticker) if ticker in TODAS_LAS_ACCIONES else []
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            f_fund = pool.submit(cargar_fundamentales, ticker)
+            f_news = pool.submit(noticias_empresa, ticker)
+            f_pred = pool.submit(cargar_predicciones, ticker)
+            fund, news, preds = f_fund.result(), f_news.result(), f_pred.result()
         recientes = [n for n in news if n.horas is None or n.horas < 24 * 7]
         ev = senales.evaluar(ticker, df,
                              sentimiento_noticias=noticias.sentimiento_medio(recientes) if recientes else None,
-                             n_noticias=len(recientes), mercado_alcista=mercado_alcista_para(ticker))
+                             n_noticias=len(recientes), mercado_alcista=mercado_alcista_para(ticker),
+                             fundamentales=fund, prediccion=preds.get("1 mes"))
 
     m = moneda_de(ticker)
-    st.header(f"{nombre_de(ticker)}  ·  {eur(ev.precio, m)}")
+    titulo = nombre_de(ticker) if ticker in TODAS_LAS_ACCIONES else fund.get("longName", ticker)
+    st.header(f"{titulo}  ·  {eur(ev.precio, m)}")
     st.caption(f"Sector: {sector_de(ticker)} · Hoy {pct(ev.datos['var_1d'])} · 1 mes {pct(ev.datos['var_1m'], 1)} "
                f"· 1 año {pct(ev.datos['var_1a'], 1)}")
 
@@ -305,15 +457,22 @@ def pagina_analizar():
     with c2:
         st.plotly_chart(grafico(df, "Último año: velas, medias móviles y RSI", ev.plan), width="stretch")
         st.caption("Cada vela es un día: verde si cerró por encima de lo que abrió, roja si por debajo. "
-                   "Línea naranja = media de 50 sesiones (≈3 meses). Línea morada = media de 200 sesiones (≈1 año). "
+                   "Naranja = media de 50 sesiones (≈3 meses). Morada = media de 200 sesiones (≈1 año). "
                    "Abajo, el RSI: zona roja = sobrecomprada, zona verde = sobrevendida.")
+
+    for a in ev.avisos:
+        st.warning(a)
+
+    st.subheader("🔮 Predicción")
+    if preds:
+        bloque_predicciones(ticker, df, preds)
+    else:
+        st.caption("Se necesitan al menos 2-3 años de historial para hacer predicciones.")
 
     st.subheader("🧠 Por qué dice esto (explicado paso a paso)")
     for mo in sorted(ev.motivos, key=lambda x: -abs(x.puntos)):
         with st.expander(f"{mo.icono} {mo.titulo}  ({mo.puntos:+d})"):
             st.write(mo.explicacion)
-    for a in ev.avisos:
-        st.warning(a)
 
     if ev.plan:
         st.subheader("📋 Tu plan de operación")
@@ -321,12 +480,12 @@ def pagina_analizar():
         n_riesgo = costes.tamano_por_riesgo(capital, riesgo, p.entrada, p.stop)
         importe = n_riesgo * p.entrada
         cc = costes.coste_compra(importe, ticker, tarifa)
-        c = st.columns(4)
+        c = st.columns(2 if movil else 4)
         c[0].metric("Precio de compra", eur(p.entrada, m))
         c[1].metric("Stop-loss (salida si falla)", eur(p.stop, m), f"-{p.riesgo_pct:.1f}%", delta_color="off")
-        c[2].metric("Objetivo", eur(p.objetivo, m), f"+{p.beneficio_pct:.1f}%")
-        c[3].metric("Acciones a comprar", n_riesgo, help="Calculado para que, si salta el stop-loss, "
-                    f"pierdas como mucho el {riesgo}% de tu dinero.")
+        c[2 % len(c)].metric("Objetivo", eur(p.objetivo, m), f"+{p.beneficio_pct:.1f}%")
+        c[3 % len(c)].metric("Acciones a comprar", n_riesgo, help="Calculado para que, si salta el stop-loss, "
+                             f"pierdas como mucho el {riesgo}% de tu dinero.")
         st.markdown(
             f"Con **{eur(capital)}** y un riesgo máximo del **{riesgo}%** ({eur(capital * riesgo / 100)}), "
             f"comprarías **{n_riesgo} acciones** por unos **{eur(importe, m)}**. "
@@ -345,20 +504,22 @@ def pagina_analizar():
         with st.expander("📱 Cómo hacerlo en la app de Bankinter"):
             bloque_bankinter(ticker, ev, n_riesgo)
 
-    st.subheader("📰 Noticias recientes de la empresa")
+    st.subheader("🏢 La empresa en números")
+    bloque_fundamentales(ticker, fund)
+
+    st.subheader(f"📰 Noticias de la empresa ({len(news)})")
     if news:
-        for n in news[:8]:
+        for n in news[:12]:
             tarjeta_noticia(n)
     else:
         st.caption("No se han encontrado noticias recientes.")
 
     with st.expander("🧪 ¿Funciona seguir la tendencia? Prueba con el pasado (10 años)"):
-        largo = cargar_historico(ticker, "10y")
-        bt = senales.backtest_media200(largo, tarifa.pct) if not largo.empty else {}
+        bt = senales.backtest_media200(df, tarifa.pct)
         if bt:
             curvas = pd.DataFrame({"Comprar y mantener": bt["curva_mantener"],
                                    "Solo por encima de la media 200": bt["curva_estrategia"]})
-            st.line_chart(curvas)
+            st.line_chart(curvas, height=ALTO_GRAFICO - 150)
             c = st.columns(2)
             c[0].metric("Comprar y mantener", pct(bt["rent_mantener"], 0), f"peor caída {bt['caida_mantener']:.0f}%",
                         delta_color="off")
@@ -373,13 +534,17 @@ def pagina_analizar():
 
 def pagina_radar():
     st.title("📡 Radar del IBEX 35")
-    st.caption("Analiza las 35 empresas a la vez y las ordena por puntuación. Úsalo para encontrar "
-               "candidatas y luego estúdialas una a una en '🔍 Analizar una acción'.")
-    with st.spinner("Analizando las 35 empresas (tarda unos segundos)..."):
-        hist = cargar_varios(tuple(IBEX35))
+    st.caption("Analiza las 35 empresas a la vez (tendencia, impulso, noticias, analistas y modelo estadístico) "
+               "y las ordena por puntuación. Úsalo para encontrar candidatas y luego estúdialas en '🔍 Analizar'.")
+    con_analistas = st.toggle("Incluir datos de empresa y analistas (más lento la primera vez)", value=True)
+    with st.spinner("Analizando las 35 empresas (la primera vez puede tardar 30-60 segundos)..."):
+        tickers = tuple(IBEX35)
+        hist = cargar_varios(tickers, "10y")
         ibex = cargar_historico("^IBEX")
         alcista = senales.estado_indice(ibex)["alcista"] if not ibex.empty else None
         lista, _ = cargar_noticias()
+        preds = predicciones_radar(tickers)
+        funds = cargar_fundamentales_varios(tickers) if con_analistas else {}
     if not hist:
         st.error("No se han podido descargar cotizaciones.")
         return
@@ -388,19 +553,30 @@ def pagina_radar():
         if len(df) < 60:
             continue
         rel = [n for n in lista if t in n.empresas]
-        ev = senales.evaluar(t, df, noticias.sentimiento_medio(rel) if rel else None, len(rel), alcista)
+        p = preds.get(t)
+        ev = senales.evaluar(t, df, noticias.sentimiento_medio(rel) if rel else None, len(rel), alcista,
+                             fundamentales=funds.get(t), prediccion=p)
+        objetivo = (funds.get(t) or {}).get("targetMeanPrice")
         filas.append({
-            "Empresa": nombre_de(t), "Ticker": t, "Sector": sector_de(t),
-            "Puntuación": ev.puntuacion, "Veredicto": ev.veredicto,
+            "Empresa": nombre_de(t), "Puntuación": ev.puntuacion, "Veredicto": ev.veredicto,
+            # Si el modelo no ha demostrado acertar con esta empresa, no mostramos su probabilidad.
+            "Prob. subir 1 mes": round(p.prob_subida * 100) if p and p.fiabilidad in ("Alta", "Media") else None,
+            "Fiabilidad modelo": ICONO_FIAB[p.fiabilidad] if p else "—",
             "Precio €": round(ev.precio, 2), "Hoy %": round(ev.datos["var_1d"], 2),
             "1 mes %": round(ev.datos["var_1m"], 1),
             "1 año %": round(ev.datos["var_1a"], 1) if not pd.isna(ev.datos["var_1a"]) else None,
-            "RSI": round(ev.datos["rsi"], 0) if ev.datos["rsi"] else None,
-            "Noticias hoy": len(rel),
+            "Potencial analistas %": round((objetivo / ev.precio - 1) * 100, 1) if objetivo else None,
+            "RSI": round(ev.datos["rsi"]) if ev.datos["rsi"] else None,
+            "Noticias": len(rel), "Sector": sector_de(t), "Ticker": t,
         })
     tabla = pd.DataFrame(filas).sort_values("Puntuación", ascending=False)
-    st.dataframe(tabla, hide_index=True, width="stretch", height=900,
-                 column_config={"Puntuación": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d")})
+    if movil:
+        tabla = tabla[["Empresa", "Puntuación", "Prob. subir 1 mes", "Hoy %"]]
+    st.dataframe(tabla, hide_index=True, width="stretch", height=35 * len(tabla) + 40,
+                 column_config={
+                     "Puntuación": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d"),
+                     "Prob. subir 1 mes": st.column_config.NumberColumn(format="%d%%"),
+                 })
     top = tabla[tabla["Puntuación"] >= 70]
     if len(top):
         st.success("En zona de compra según el asistente: " + ", ".join(top["Empresa"]) +
@@ -408,19 +584,25 @@ def pagina_radar():
                    "y no concentres todo en un mismo sector.")
     else:
         st.info("Ahora mismo ninguna empresa supera 70 puntos. No pasa nada: no invertir también es una decisión.")
+    examinadas = [p for p in preds.values() if p.acierto is not None]
+    if examinadas:
+        medio = sum(p.acierto for p in examinadas) / len(examinadas) * 100
+        ref = sum(p.acierto_referencia for p in examinadas) / len(examinadas) * 100
+        st.caption(f"Acierto medio del modelo a 1 mes en el IBEX 35, examinado con datos pasados: **{medio:.0f}%** "
+                   f"(decir siempre lo mismo: {ref:.0f}%). Fíate más de las empresas con fiabilidad 🟢.")
 
 
 def pagina_calculadoras():
     st.title("🧮 Calculadoras")
-    t1, t2, t3 = st.tabs(["💶 Coste de una compra", "🏛️ Impuestos al vender", "🌱 Invertir cada mes"])
+    t1, t2, t3 = st.tabs(["💶 Coste", "🏛️ Impuestos", "🌱 Cada mes"])
     with t1:
         importe = st.number_input("Importe que vas a invertir (€)", 50.0, 1_000_000.0, 1000.0, 50.0)
         espanola = st.checkbox("Es una acción española del IBEX (paga el Impuesto de Transacciones Financieras)", True)
         cc = costes.coste_compra(importe, "X.MC" if espanola else "X", tarifa)
-        c = st.columns(3)
+        c = st.columns(1 if movil else 3)
         c[0].metric("Comisión broker + cánones", eur(cc["comision"]))
-        c[1].metric("Impuesto Transacciones (0,2%)", eur(cc["itf"]))
-        c[2].metric("Total", eur(cc["total"]), f"{cc['pct']:.2f}% del importe", delta_color="off")
+        c[1 % len(c)].metric("Impuesto Transacciones (0,2%)", eur(cc["itf"]))
+        c[2 % len(c)].metric("Total", eur(cc["total"]), f"{cc['pct']:.2f}% del importe", delta_color="off")
         st.caption(f"Al vender pagarás de nuevo la comisión (≈{eur(tarifa.coste(importe))}). "
                    f"Para cubrir compra y venta la acción tiene que subir al menos un "
                    f"{(cc['total'] + tarifa.coste(importe)) / importe * 100:.2f}% antes de que ganes algo.")
@@ -429,10 +611,10 @@ def pagina_calculadoras():
         venta = st.number_input("Precio total de venta (€)", 0.0, 10_000_000.0, 1300.0, 50.0)
         g = venta - compra
         imp = costes.impuesto_ganancia(g)
-        c = st.columns(3)
+        c = st.columns(1 if movil else 3)
         c[0].metric("Ganancia", eur(g))
-        c[1].metric("IRPF aproximado", eur(imp))
-        c[2].metric("Te queda limpio", eur(g - imp))
+        c[1 % len(c)].metric("IRPF aproximado", eur(imp))
+        c[2 % len(c)].metric("Te queda limpio", eur(g - imp))
         st.caption("Tramos del ahorro: 19% hasta 6.000 €, 21% hasta 50.000 €, 23% hasta 200.000 €, "
                    "27% hasta 300.000 €, 30% a partir de ahí. Las pérdidas se pueden compensar con ganancias "
                    "(durante 4 años). Ojo con la 'regla de los 2 meses': si vendes con pérdidas y recompras la "
@@ -441,17 +623,17 @@ def pagina_calculadoras():
     with t3:
         st.write("Para la mayoría de personas, la forma más eficaz de hacer crecer el dinero es **aportar una "
                  "cantidad fija cada mes a un fondo indexado o ETF** (por ejemplo, del MSCI World o del S&P 500), "
-                 "sin intentar adivinar el mejor momento. A esto se le llama *Dollar Cost Averaging*.")
-        c = st.columns(4)
+                 "sin intentar adivinar el mejor momento.")
+        c = st.columns(2 if movil else 4)
         inicial = c[0].number_input("Dinero inicial (€)", 0.0, 1_000_000.0, 1000.0, 100.0)
         mensual = c[1].number_input("Aportación mensual (€)", 0.0, 10_000.0, 150.0, 10.0)
-        anos = c[2].slider("Años", 1, 40, 15)
-        rent = c[3].slider("Rentabilidad anual supuesta (%)", 0.0, 12.0, 7.0, 0.5,
-                           help="La bolsa mundial ha dado históricamente ~7% anual de media "
-                                "(con años de -40% y años de +30%). No está garantizado.")
+        anos = c[2 % len(c)].slider("Años", 1, 40, 15)
+        rent = c[3 % len(c)].slider("Rentabilidad anual supuesta (%)", 0.0, 12.0, 7.0, 0.5,
+                                    help="La bolsa mundial ha dado históricamente ~7% anual de media "
+                                         "(con años de -40% y años de +30%). No está garantizado.")
         filas = costes.simular_aportaciones(mensual, anos, rent, inicial)
         tabla = pd.DataFrame(filas).set_index("Año")
-        st.area_chart(tabla[["Aportado", "Ganancia"]])
+        st.area_chart(tabla[["Aportado", "Ganancia"]], height=ALTO_GRAFICO - 150)
         f = filas[-1]
         st.success(f"Aportando {eur(mensual)} al mes durante {anos} años habrías puesto **{eur(f['Aportado'])}** "
                    f"y tendrías unos **{eur(f['Valor'])}**. El interés compuesto hace el resto.")
@@ -462,68 +644,81 @@ def pagina_aprende():
     st.info(AVISO)
     st.markdown("""
 ### 1. La verdad incómoda primero
-- **Nadie acierta siempre el "momento perfecto"**: ni los profesionales. La mayoría de fondos de gestión activa
-  rinden *menos* que el índice a 10 años. Este asistente te ayuda a **evitar malos momentos** y a **tener un plan**,
-  no a adivinar el futuro.
+- **Nadie predice la bolsa con precisión**: ni los bancos, ni los fondos, ni ningún programa. Si alguien te
+  promete aciertos del 90%, te está engañando. En bolsa, acertar el **55-60%** de las veces con el riesgo
+  controlado ya es excelente.
+- Por eso este asistente **mide su propio acierto** con datos pasados y te lo enseña. Úsalo para **evitar
+  malos momentos** y **tener un plan**, no como una bola de cristal.
 - La "mayor rentabilidad" a largo plazo la consigue quien **está mucho tiempo invertido, diversifica,
   paga pocas comisiones y no vende por pánico**.
-- Por eso, una estrategia sensata para empezar es:
+- Estrategia sensata para empezar:
   - **70-80%** de lo que inviertas: aportaciones mensuales a un **ETF o fondo indexado** mundial o del S&P 500.
   - **20-30%**: acciones individuales elegidas con este asistente, para aprender y buscar algo extra.
-  - Ten antes un **colchón de emergencia** (3-6 meses de gastos) fuera de la bolsa.
+  - Antes, un **colchón de emergencia** (3-6 meses de gastos) fuera de la bolsa.
 
-### 2. Cómo usar este asistente (rutina de 10 minutos)
-1. **🏠 Resumen del día**: mira el semáforo. Si está en rojo, no hay prisa por comprar.
+### 2. Cómo leer la predicción 🔮
+- **Probabilidad de subir**: de las situaciones del pasado más parecidas a la de hoy, en cuántas subió.
+  60% no significa que vaya a subir: significa que de cada 10 veces así, unas 6 subió y 4 bajó.
+- **Rango probable**: entre qué precios quedó en 8 de cada 10 casos parecidos.
+- **Fiabilidad**: 🟢 Alta / 🟡 Media si en el examen con el pasado acertó claramente más que el azar;
+  🔴 Baja si no. **Con fiabilidad baja, ignora la predicción.**
+
+### 3. Cómo usar este asistente (rutina de 10 minutos)
+1. **🏠 Resumen**: mira el semáforo y la previsión de los índices. Si está en rojo, no hay prisa por comprar.
 2. **📰 Noticias**: lee las 3-5 más influyentes y su "por qué importa".
-3. **📡 Radar**: busca empresas con puntuación alta (≥ 70).
-4. **🔍 Analizar**: entra en la candidata, lee los motivos y el plan.
+3. **📡 Radar**: busca empresas con puntuación alta (≥ 70) y fiabilidad 🟢/🟡.
+4. **🔍 Analizar**: entra en la candidata, lee motivos, predicción, analistas y el plan.
 5. **Bankinter**: compra con **orden limitada** y pon el **stop-loss** inmediatamente.
 6. Apunta por qué compraste. Revisa una vez por semana, no cada hora.
 
-### 3. Diccionario rápido
+### 4. Diccionario rápido
 | Término | Qué significa |
 |---|---|
 | **Acción** | Un trocito de una empresa. Si a la empresa le va bien, suele subir de precio y/o pagar dividendos. |
 | **Índice (IBEX 35, S&P 500)** | Una cesta con las principales empresas de una bolsa. Sirve de termómetro. |
 | **ETF** | Un fondo que se compra como una acción y replica un índice: con una compra tienes cientos de empresas. |
 | **Dividendo** | Parte del beneficio que la empresa reparte entre sus accionistas. |
-| **Media móvil (50 / 200)** | El precio medio de las últimas 50 o 200 sesiones. Suaviza el ruido y muestra la tendencia. |
+| **PER** | Precio / beneficio: cuántos años de beneficios pagas al comprar. |
+| **Precio objetivo** | Precio al que los analistas creen que llegará la acción en 12 meses. |
+| **Media móvil (50 / 200)** | El precio medio de las últimas 50 o 200 sesiones. Muestra la tendencia. |
 | **RSI** | Indicador de 0 a 100. >70: ha subido demasiado rápido. <30: ha caído demasiado rápido. |
 | **MACD** | Indicador de impulso: dice si el precio está acelerando al alza o a la baja. |
 | **ATR** | Lo que se mueve una acción en un día normal. Sirve para colocar el stop-loss. |
 | **Orden limitada** | Compras/vendes solo si el precio llega al que tú fijas. **Úsala siempre.** |
-| **Orden a mercado** | Compras/vendes al precio que haya en ese momento. Rápida, pero puedes pagar de más. |
 | **Stop-loss** | Orden que vende automáticamente si el precio cae hasta un nivel. Limita las pérdidas. |
 | **Volatilidad** | Cuánto sube y baja el precio. Más volatilidad = más riesgo. |
 | **OPA** | Oferta de una empresa para comprar otra. |
 | **VIX** | El "índice del miedo" de Wall Street. |
 
-### 4. Reglas de oro
+### 5. Reglas de oro
 1. **No inviertas dinero que vayas a necesitar** en los próximos 3-5 años.
 2. **Diversifica**: varias empresas de distintos sectores, o directamente un ETF.
 3. **No arriesgues más del 1-2% de tu capital en una operación** (el asistente calcula cuántas acciones comprar).
 4. **Pon siempre stop-loss** en acciones individuales, y no lo muevas hacia abajo.
 5. **Compra en varias veces** en lugar de todo de golpe.
 6. **No persigas** una acción que ha subido un 20% en una semana.
-7. **Las noticias ya están en el precio** muy rápido: cuando lees un titular, los profesionales ya han operado.
-   Úsalas para entender el contexto, no para comprar con prisa.
+7. **Las noticias ya están en el precio** muy rápido: úsalas para entender el contexto, no para comprar con prisa.
 8. **Controla las comisiones**: operar mucho con poco dinero hace que el broker gane más que tú.
-9. **Las emociones son tu mayor enemigo**: miedo cuando cae, euforia cuando sube. Ten un plan y síguelo.
+9. **Las emociones son tu mayor enemigo**: ten un plan y síguelo.
 
-### 5. Calendario que mueve los mercados
+### 6. Calendario que mueve los mercados
 - **Reuniones del BCE** (cada ~6 semanas, jueves) y de la **Fed** (8 al año, miércoles por la tarde en España).
 - **IPC / inflación** (EEUU: hacia mediados de mes) y **empleo de EEUU** (primer viernes de mes, 14:30 h).
 - **Temporada de resultados**: enero-febrero, abril-mayo, julio-agosto y octubre-noviembre.
 - **Horario de la Bolsa española**: 9:00 a 17:30. **Wall Street**: 15:30 a 22:00 (hora España).
+
+### 7. Tenerla en el móvil 📱
+Abre el enlace de la app en el navegador del móvil y usa **"Añadir a pantalla de inicio"**
+(Safari: botón compartir; Chrome: menú ⋮). Quedará como un icono más, junto a la app de Bankinter.
 """)
 
 
-PAGINAS = {
-    "🏠 Resumen del día": pagina_resumen,
-    "📰 Noticias que mueven el mercado": pagina_noticias,
-    "🔍 Analizar una acción": pagina_analizar,
-    "📡 Radar del IBEX 35": pagina_radar,
-    "🧮 Calculadoras": pagina_calculadoras,
-    "🎓 Aprende (empieza aquí)": pagina_aprende,
-}
-PAGINAS[pagina]()
+nav = st.navigation([
+    st.Page(pagina_resumen, title="Resumen", icon="🏠", default=True),
+    st.Page(pagina_noticias, title="Noticias", icon="📰"),
+    st.Page(pagina_analizar, title="Analizar", icon="🔍"),
+    st.Page(pagina_radar, title="Radar IBEX", icon="📡"),
+    st.Page(pagina_calculadoras, title="Calculadoras", icon="🧮"),
+    st.Page(pagina_aprende, title="Aprende", icon="🎓"),
+], position="top")
+nav.run()

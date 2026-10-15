@@ -9,7 +9,9 @@ adivina el futuro. Ningún sistema lo hace.
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import pandas as pd
 
@@ -77,7 +79,8 @@ def _ok(x) -> bool:
 
 
 def evaluar(ticker: str, historico: pd.DataFrame, sentimiento_noticias: float | None = None,
-            n_noticias: int = 0, mercado_alcista: bool | None = None) -> Evaluacion:
+            n_noticias: int = 0, mercado_alcista: bool | None = None,
+            fundamentales: dict | None = None, prediccion=None) -> Evaluacion:
     """Evalúa una acción.
 
     historico: DataFrame diario con Open/High/Low/Close/Volume (ideal: 1-2 años).
@@ -204,6 +207,27 @@ def evaluar(ticker: str, historico: pd.DataFrame, sentimiento_noticias: float | 
             "El índice de referencia está por debajo de su media de 200 sesiones. En mercados bajistas "
             "incluso las buenas empresas suelen caer.")
 
+    # 9) Fundamentales y analistas.
+    if fundamentales:
+        for p, titulo, explicacion in _motivos_fundamentales(fundamentales, precio):
+            add(p, titulo, explicacion)
+        avisos.extend(_avisos_fundamentales(fundamentales))
+
+    # 10) Modelo estadístico (solo puntúa si ha demostrado acertar más que el azar).
+    if prediccion is not None:
+        prob = prediccion.prob_subida * 100
+        if prediccion.fiabilidad in ("Alta", "Media"):
+            peso = 1.0 if prediccion.fiabilidad == "Alta" else 0.6
+            p = int(round(max(-10, min(10, (prob - 50) * 0.5)) * peso))
+            add(p, f"Modelo estadístico: {prob:.0f}% de probabilidad de subir en {prediccion.horizonte.lower()}",
+                f"En situaciones pasadas parecidas, subió en el {prob:.0f}% de los casos. Su fiabilidad para esta "
+                f"acción es {prediccion.fiabilidad.lower()}: acertó el {prediccion.acierto * 100:.0f}% de las veces "
+                f"en {prediccion.pruebas} pruebas con datos pasados.")
+        else:
+            add(0, f"Modelo estadístico: {prob:.0f}% (no fiable para esta acción)",
+                "En las pruebas con datos pasados el modelo no acertó más que el azar con esta acción, "
+                "así que no se tiene en cuenta en la puntuación.")
+
     # Volatilidad: no puntúa, pero avisa.
     vol = volatilidad_anual(df["Close"])
     if _ok(vol) and vol > 40:
@@ -237,6 +261,60 @@ def evaluar(ticker: str, historico: pd.DataFrame, sentimiento_noticias: float | 
         "min52": float(min52) if _ok(min52) else None,
     }
     return Evaluacion(ticker, precio, puntos, veredicto, color, resumen, motivos, avisos, plan, datos)
+
+
+RECOMENDACIONES = {
+    "strong_buy": "Compra fuerte", "buy": "Comprar", "hold": "Mantener",
+    "underperform": "Peor que el mercado", "sell": "Vender", "strong_sell": "Venta fuerte",
+}
+
+
+def _motivos_fundamentales(f: dict, precio: float) -> list[tuple[int, str, str]]:
+    out = []
+    objetivo, n = f.get("targetMeanPrice"), f.get("numberOfAnalystOpinions") or 0
+    if objetivo and n >= 3 and precio > 0:
+        pot = (objetivo / precio - 1) * 100
+        rec = RECOMENDACIONES.get(f.get("recommendationKey", ""), "—")
+        texto = (f"{n} analistas profesionales siguen la empresa. Su precio objetivo medio es {objetivo:.2f} "
+                 f"({pot:+.0f}% desde el precio actual) y su recomendación media es '{rec}'. "
+                 "Los analistas se equivocan a menudo, pero su consenso es una referencia útil.")
+        if pot > 15:
+            out.append((6, f"Los analistas ven un {pot:.0f}% de recorrido", texto))
+        elif pot > 5:
+            out.append((3, f"Los analistas ven un {pot:.0f}% de recorrido", texto))
+        elif pot < -5:
+            out.append((-6, f"Cotiza por encima del objetivo de los analistas ({pot:.0f}%)", texto))
+        else:
+            out.append((0, "Cotiza cerca del objetivo de los analistas", texto))
+    per = f.get("forwardPE") or f.get("trailingPE")
+    if per is not None:
+        if per <= 0:
+            out.append((-4, "La empresa no gana dinero (PER negativo)",
+                        "El PER compara el precio con los beneficios. Si es negativo, la empresa está en pérdidas."))
+        elif per < 12:
+            out.append((3, f"PER {per:.1f}: barata respecto a lo que gana",
+                        "El PER indica cuántos años de beneficios pagas al comprar la acción. Por debajo de 12 "
+                        "se considera barato (aunque a veces es barato por algo)."))
+        elif per > 40:
+            out.append((-3, f"PER {per:.0f}: cara respecto a lo que gana",
+                        "Pagas más de 40 años de beneficios: el mercado espera mucho crecimiento. "
+                        "Si decepciona, puede caer con fuerza."))
+    div = f.get("trailingAnnualDividendYield")
+    if div and div > 0.04:
+        out.append((2, f"Buen dividendo ({div * 100:.1f}% anual)",
+                    "Reparte una parte importante de sus beneficios cada año: te pagan por esperar."))
+    return out
+
+
+def _avisos_fundamentales(f: dict) -> list[str]:
+    avisos = []
+    ts = f.get("earningsTimestampStart") or f.get("earningsTimestamp")
+    if ts:
+        dias = (ts - time.time()) / 86400
+        if 0 <= dias <= 10:
+            avisos.append(f"📅 Presenta resultados el {datetime.fromtimestamp(ts):%d/%m}. Ese día la acción puede "
+                          "moverse mucho (±5-10%). Muchos prefieren esperar a ver los resultados antes de comprar.")
+    return avisos
 
 
 def estado_indice(historico: pd.DataFrame) -> dict:

@@ -44,3 +44,53 @@ def varios(tickers: list[str], periodo: str = "2y") -> dict[str, pd.DataFrame]:
         if not df.empty:
             salida[t] = _sin_zona(df.copy())
     return salida
+
+
+CAMPOS_FUNDAMENTALES = [
+    "longName", "currency", "marketCap", "trailingPE", "forwardPE", "priceToBook",
+    "trailingAnnualDividendYield", "payoutRatio", "returnOnEquity", "profitMargins",
+    "revenueGrowth", "earningsGrowth", "debtToEquity", "beta", "targetMeanPrice", "targetLowPrice",
+    "targetHighPrice", "numberOfAnalystOpinions", "recommendationKey", "recommendationMean",
+    "earningsTimestamp", "earningsTimestampStart",
+]
+
+
+def fundamentales(ticker: str) -> dict:
+    """Datos de la empresa (PER, dividendo, opinión de analistas, próxima fecha de resultados...)."""
+    import yfinance as yf
+
+    try:
+        info = yf.Ticker(ticker).info or {}
+    except Exception:  # noqa: BLE001
+        return {}
+    return {k: info.get(k) for k in CAMPOS_FUNDAMENTALES if info.get(k) is not None}
+
+
+def noticias_yahoo(ticker: str) -> list[dict]:
+    """Titulares de Yahoo Finance para un ticker: [{titulo, enlace, fuente, fecha(datetime)}]."""
+    from datetime import datetime, timezone
+
+    import yfinance as yf
+
+    try:
+        brutas = yf.Ticker(ticker).news or []
+    except Exception:  # noqa: BLE001
+        return []
+    salida = []
+    for item in brutas:
+        c = item.get("content", item)  # yfinance cambió el formato en 2025
+        titulo = c.get("title")
+        enlace = (c.get("canonicalUrl") or {}).get("url") or c.get("link", "")
+        fuente = (c.get("provider") or {}).get("displayName") or c.get("publisher", "Yahoo Finance")
+        fecha = None
+        if c.get("pubDate"):
+            try:
+                fecha = datetime.fromisoformat(c["pubDate"].replace("Z", "+00:00"))
+            except ValueError:
+                pass
+        elif c.get("providerPublishTime"):
+            fecha = datetime.fromtimestamp(c["providerPublishTime"], tz=timezone.utc)
+        if titulo:
+            salida.append({"titulo": titulo, "enlace": enlace, "fuente": f"Yahoo · {fuente}", "fecha": fecha,
+                           "resumen": c.get("summary", "") or ""})
+    return salida

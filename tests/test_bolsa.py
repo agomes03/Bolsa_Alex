@@ -118,3 +118,70 @@ def test_aportaciones():
     filas = costes.simular_aportaciones(100, 2, 0)
     assert filas[-1]["Valor"] == pytest.approx(2400)
     assert costes.simular_aportaciones(100, 10, 7)[-1]["Ganancia"] > 0
+
+
+# ----------------------------------------------------------------- predicción
+from bolsa import prediccion  # noqa: E402
+
+
+def test_prediccion_estructura():
+    p = prediccion.predecir(serie(0.0005, n=900), 21, "1 mes", n_pruebas=60)
+    assert p is not None
+    assert 0 <= p.prob_subida <= 1
+    assert p.rent_p10 <= p.rent_mediana <= p.rent_p90
+    assert p.pruebas > 30 and p.acierto is not None
+    assert p.fiabilidad in ("Alta", "Media", "Baja", "Sin datos")
+    assert "situaciones" in prediccion.explicar(p)
+
+
+def test_prediccion_azar_no_es_fiable():
+    # Paseo aleatorio puro: el modelo NO debe presumir de fiabilidad alta.
+    fiabilidades = [prediccion.predecir(serie(0.0, n=1200, semilla=s), 21, n_pruebas=80).fiabilidad
+                    for s in range(4)]
+    assert fiabilidades.count("Alta") <= 1
+
+
+def test_prediccion_detecta_patron():
+    # Serie con ciclos regulares: lo pasado sí informa del futuro, el modelo debe batir al azar.
+    n = 1500
+    t = np.arange(n)
+    rng = np.random.default_rng(3)
+    close = 100 * np.exp(0.15 * np.sin(2 * np.pi * t / 120) + np.cumsum(rng.normal(0, 0.004, n)))
+    df = pd.DataFrame({"Open": close, "High": close * 1.005, "Low": close * 0.995, "Close": close,
+                       "Volume": 1}, index=pd.bdate_range("2019-01-01", periods=n))
+    p = prediccion.predecir(df, 21, n_pruebas=100)
+    assert p.acierto > p.acierto_referencia + 0.1
+
+
+def test_prediccion_sin_historial():
+    assert prediccion.predecir(serie(0.001, n=150), 21) is None
+
+
+def test_evaluar_con_prediccion_y_fundamentales():
+    df = serie(0.001, n=900)
+    p = prediccion.predecir(df, 21, "1 mes", n_pruebas=50)
+    fund = {"targetMeanPrice": float(df["Close"].iloc[-1]) * 1.3, "numberOfAnalystOpinions": 10,
+            "recommendationKey": "buy", "forwardPE": 9.0}
+    ev = senales.evaluar("X", df, fundamentales=fund, prediccion=p)
+    titulos = " ".join(m.titulo for m in ev.motivos)
+    assert "analistas" in titulos and "PER" in titulos and "Modelo estadístico" in titulos
+
+
+# ----------------------------------------------------------------- noticias (más fuentes)
+def test_noticia_en_ingles():
+    n = _n("Stocks tumble as Fed signals rate hike; Nvidia shares slide")
+    assert n.sentimiento == -1
+    assert "NVDA" in n.empresas
+    assert n.impacto >= 6
+
+
+def test_combinar_repetidas():
+    ahora = datetime.now(timezone.utc)
+    brutas = [noticias.Noticia("El BCE baja los tipos de interés - Expansión", "a", "A", ahora),
+              noticias.Noticia("El BCE baja los tipos de interés - El País", "b", "B", ahora),
+              noticias.Noticia("El BCE baja los tipos de interés", "c", "C", ahora - timedelta(hours=1)),
+              noticias.Noticia("Noticia vieja", "d", "D", ahora - timedelta(days=10))]
+    lista = noticias.combinar(brutas)
+    assert len(lista) == 1
+    assert lista[0].repeticiones == 3
+    assert lista[0].fecha == ahora - timedelta(hours=1)
