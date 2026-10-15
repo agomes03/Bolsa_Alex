@@ -8,9 +8,22 @@ from dataclasses import dataclass
 # Tramos del IRPF de la base del ahorro (España, 2025-2026). Revísalos cada año.
 TRAMOS_AHORRO = [(6_000, 19.0), (50_000, 21.0), (200_000, 23.0), (300_000, 27.0), (math.inf, 30.0)]
 
-# Impuesto sobre Transacciones Financieras: 0,2% al COMPRAR acciones españolas de empresas
-# con capitalización superior a 1.000 M€ (casi todo el IBEX 35).
+# Impuesto sobre Transacciones Financieras al COMPRAR acciones de grandes empresas:
+# España 0,2% (capitalización > 1.000 M€, casi todo el IBEX), Francia 0,3%, Italia 0,1%.
+# Los ETF no lo pagan.
 ITF_PCT = 0.2
+ITF_POR_MERCADO = {".MC": 0.2, ".PA": 0.3, ".MI": 0.1}
+
+
+def itf_pct(ticker: str) -> float:
+    from .tickers import ETFS
+
+    if ticker in ETFS:
+        return 0.0
+    for sufijo, pct in ITF_POR_MERCADO.items():
+        if ticker.endswith(sufijo):
+            return pct
+    return 0.0
 
 
 @dataclass
@@ -33,7 +46,7 @@ def es_espanola(ticker: str) -> bool:
 
 def coste_compra(importe: float, ticker: str, tarifa: Tarifa) -> dict:
     comision = tarifa.coste(importe)
-    itf = importe * ITF_PCT / 100 if es_espanola(ticker) and not ticker.startswith("BBVAI") else 0.0
+    itf = importe * itf_pct(ticker) / 100
     total = comision + itf
     return {"comision": comision, "itf": itf, "total": total,
             "pct": total / importe * 100 if importe else 0.0}

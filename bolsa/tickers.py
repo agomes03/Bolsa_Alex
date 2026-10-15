@@ -67,7 +67,64 @@ IBEX35 = {
     "UNI.MC": ("Unicaja", "Banca", ["unicaja"]),
 }
 
-# Grandes empresas de EEUU muy seguidas (Bankinter permite operar en el mercado americano).
+# Mercado Continuo: empresas españolas líquidas fuera del IBEX 35.
+CONTINUO = {
+    "VIS.MC": ("Viscofan", "Consumo", ["viscofan"]),
+    "EBRO.MC": ("Ebro Foods", "Consumo", ["ebro foods"]),
+    "FAE.MC": ("Faes Farma", "Salud", ["faes"]),
+    "ALM.MC": ("Almirall", "Salud", ["almirall"]),
+    "PSG.MC": ("Prosegur", "Servicios", ["prosegur"]),
+    "TUB.MC": ("Tubacex", "Materiales", ["tubacex"]),
+    "GEST.MC": ("Gestamp", "Automoción", ["gestamp"]),
+    "A3M.MC": ("Atresmedia", "Medios", ["atresmedia"]),
+    "PHM.MC": ("Pharma Mar", "Salud", ["pharma mar", "pharmamar"]),
+    "MEL.MC": ("Meliá Hotels", "Turismo", ["meliá", "melia"]),
+    "CAF.MC": ("CAF", "Industria", ["construcciones y auxiliar de ferrocarriles"]),
+    "VID.MC": ("Vidrala", "Materiales", ["vidrala"]),
+    "ENO.MC": ("Elecnor", "Construcción", ["elecnor"]),
+    "ENC.MC": ("Ence", "Materiales", ["ence"]),
+    "CIE.MC": ("CIE Automotive", "Automoción", ["cie automotive"]),
+    "GRE.MC": ("Grenergy", "Energía", ["grenergy"]),
+    "ECR.MC": ("Ercros", "Materiales", ["ercros"]),
+}
+
+# Grandes empresas europeas (Euro Stoxx 50 y similares).
+EUROPA = {
+    "ASML.AS": ("ASML", "Tecnología", ["asml"]),
+    "SAP.DE": ("SAP", "Tecnología", ["sap se"]),
+    "SIE.DE": ("Siemens", "Industria", ["siemens"]),
+    "MC.PA": ("LVMH", "Lujo", ["lvmh", "louis vuitton"]),
+    "RMS.PA": ("Hermès", "Lujo", ["hermès", "hermes"]),
+    "OR.PA": ("L'Oréal", "Consumo", ["l'oréal", "loreal", "l'oreal"]),
+    "TTE.PA": ("TotalEnergies", "Petróleo", ["totalenergies"]),
+    "SAN.PA": ("Sanofi", "Salud", ["sanofi"]),
+    "AIR.PA": ("Airbus", "Industria", ["airbus"]),
+    "SAF.PA": ("Safran", "Industria", ["safran"]),
+    "SU.PA": ("Schneider Electric", "Industria", ["schneider electric"]),
+    "AI.PA": ("Air Liquide", "Materiales", ["air liquide"]),
+    "BNP.PA": ("BNP Paribas", "Banca", ["bnp paribas", "bnp"]),
+    "CS.PA": ("AXA", "Seguros", ["axa"]),
+    "DG.PA": ("Vinci", "Construcción", ["vinci"]),
+    "EL.PA": ("EssilorLuxottica", "Salud", ["essilorluxottica", "essilor"]),
+    "ALV.DE": ("Allianz", "Seguros", ["allianz"]),
+    "MUV2.DE": ("Munich Re", "Seguros", ["munich re"]),
+    "DTE.DE": ("Deutsche Telekom", "Telecomunicaciones", ["deutsche telekom"]),
+    "ADS.DE": ("Adidas", "Consumo", ["adidas"]),
+    "BAS.DE": ("BASF", "Materiales", ["basf"]),
+    "BAYN.DE": ("Bayer", "Salud", ["bayer"]),
+    "BMW.DE": ("BMW", "Automoción", ["bmw"]),
+    "MBG.DE": ("Mercedes-Benz", "Automoción", ["mercedes-benz", "mercedes"]),
+    "VOW3.DE": ("Volkswagen", "Automoción", ["volkswagen"]),
+    "ENEL.MI": ("Enel", "Eléctricas", ["enel"]),
+    "ENI.MI": ("Eni", "Petróleo", ["eni"]),
+    "ISP.MI": ("Intesa Sanpaolo", "Banca", ["intesa sanpaolo", "intesa"]),
+    "UCG.MI": ("UniCredit", "Banca", ["unicredit"]),
+    "INGA.AS": ("ING", "Banca", ["ing group", "ing bank"]),
+    "ABI.BR": ("AB InBev", "Consumo", ["ab inbev", "anheuser"]),
+    "NOKIA.HE": ("Nokia", "Tecnología", ["nokia"]),
+}
+
+# Grandes empresas de EEUU (Bankinter permite operar en el mercado americano).
 EEUU = {
     "AAPL": ("Apple", "Tecnología", ["apple", "iphone"]),
     "MSFT": ("Microsoft", "Tecnología", ["microsoft"]),
@@ -76,16 +133,69 @@ EEUU = {
     "GOOGL": ("Alphabet (Google)", "Tecnología", ["google", "alphabet"]),
     "META": ("Meta (Facebook)", "Tecnología", ["meta platforms", "facebook", "zuckerberg"]),
     "TSLA": ("Tesla", "Automoción", ["tesla", "musk"]),
+    "BRK-B": ("Berkshire Hathaway", "Financiero", ["berkshire", "buffett"]),
+    "JPM": ("JPMorgan", "Banca", ["jpmorgan", "jp morgan"]),
+    "BAC": ("Bank of America", "Banca", ["bank of america"]),
+    "GS": ("Goldman Sachs", "Banca", ["goldman sachs", "goldman"]),
+    "V": ("Visa", "Financiero", []),
+    "MA": ("Mastercard", "Financiero", ["mastercard"]),
+    "UNH": ("UnitedHealth", "Salud", ["unitedhealth"]),
+    "JNJ": ("Johnson & Johnson", "Salud", ["johnson & johnson", "johnson and johnson"]),
+    "LLY": ("Eli Lilly", "Salud", ["eli lilly", "lilly"]),
+    "ABBV": ("AbbVie", "Salud", ["abbvie"]),
+    "MRK": ("Merck", "Salud", ["merck"]),
+    "PFE": ("Pfizer", "Salud", ["pfizer"]),
+    "XOM": ("ExxonMobil", "Petróleo", ["exxon", "exxonmobil"]),
+    "CVX": ("Chevron", "Petróleo", ["chevron"]),
+    "PG": ("Procter & Gamble", "Consumo", ["procter"]),
+    "KO": ("Coca-Cola", "Consumo", ["coca-cola", "coca cola"]),
+    "PEP": ("PepsiCo", "Consumo", ["pepsico", "pepsi"]),
+    "WMT": ("Walmart", "Consumo", ["walmart"]),
+    "COST": ("Costco", "Consumo", ["costco"]),
+    "MCD": ("McDonald's", "Consumo", ["mcdonald's", "mcdonalds"]),
+    "NKE": ("Nike", "Consumo", ["nike"]),
+    "HD": ("Home Depot", "Consumo", ["home depot"]),
+    "DIS": ("Disney", "Medios", ["disney"]),
+    "NFLX": ("Netflix", "Medios", ["netflix"]),
+    "AVGO": ("Broadcom", "Tecnología", ["broadcom"]),
+    "AMD": ("AMD", "Tecnología", ["amd"]),
+    "INTC": ("Intel", "Tecnología", ["intel"]),
+    "ORCL": ("Oracle", "Tecnología", ["oracle"]),
+    "CRM": ("Salesforce", "Tecnología", ["salesforce"]),
+    "ADBE": ("Adobe", "Tecnología", ["adobe"]),
+    "CSCO": ("Cisco", "Tecnología", ["cisco"]),
+    "BA": ("Boeing", "Industria", ["boeing"]),
+    "CAT": ("Caterpillar", "Industria", ["caterpillar"]),
 }
 
 # Fondos cotizados (ETF): una sola compra = cientos de empresas. Lo más recomendable para empezar.
 ETFS = {
-    "CSPX.L": ("iShares Core S&P 500 (acumulación)", "ETF EEUU", []),
-    "IWDA.AS": ("iShares Core MSCI World (acumulación)", "ETF Mundial", []),
+    "VWCE.DE": ("Vanguard FTSE All-World (acumulación, en €)", "ETF Mundial", []),
+    "IWDA.AS": ("iShares Core MSCI World (acumulación, en €)", "ETF Mundial", []),
+    "SXR8.DE": ("iShares Core S&P 500 (acumulación, en €)", "ETF EEUU", []),
+    "CSPX.L": ("iShares Core S&P 500 (acumulación, en $)", "ETF EEUU", []),
+    "EXSA.DE": ("iShares STOXX Europe 600 (en €)", "ETF Europa", []),
     "BBVAI.MC": ("BBVA Accion IBEX 35 ETF", "ETF España", []),
+    "IBGS.AS": ("iShares Euro Government Bond 1-3 años", "Renta fija", []),
+    "XEON.DE": ("Xtrackers EUR Overnight Rate (monetario)", "Monetario", []),
 }
 
-TODAS_LAS_ACCIONES = {**IBEX35, **EEUU, **ETFS}
+# Índices mundiales y datos macro para buscar patrones (no se compran directamente).
+INDICES_MUNDIALES = {
+    "^FCHI": "CAC 40 (Francia)", "^FTSE": "FTSE 100 (Reino Unido)", "^N225": "Nikkei 225 (Japón)",
+    "^HSI": "Hang Seng (Hong Kong)", "^DJI": "Dow Jones (EEUU)", "^RUT": "Russell 2000 (pequeñas EEUU)",
+    "^TNX": "Rentabilidad del bono de EEUU a 10 años", "GC=F": "Oro",
+}
+
+MERCADOS = {
+    "IBEX 35": IBEX35,
+    "Mercado Continuo": CONTINUO,
+    "Europa": EUROPA,
+    "EEUU": EEUU,
+    "ETF": ETFS,
+}
+
+TODAS_LAS_ACCIONES = {**IBEX35, **CONTINUO, **EUROPA, **EEUU, **ETFS}
 
 
 def nombre_de(ticker: str) -> str:
@@ -93,6 +203,8 @@ def nombre_de(ticker: str) -> str:
         return INDICES[ticker]["nombre"]
     if ticker in TERMOMETROS:
         return TERMOMETROS[ticker]["nombre"]
+    if ticker in INDICES_MUNDIALES:
+        return INDICES_MUNDIALES[ticker]
     if ticker in TODAS_LAS_ACCIONES:
         return TODAS_LAS_ACCIONES[ticker][0]
     return ticker
@@ -100,3 +212,23 @@ def nombre_de(ticker: str) -> str:
 
 def sector_de(ticker: str) -> str:
     return TODAS_LAS_ACCIONES.get(ticker, ("", "—", []))[1]
+
+
+def mercado_de(ticker: str) -> str:
+    for nombre, grupo in MERCADOS.items():
+        if ticker in grupo:
+            return nombre
+    return "Otros"
+
+
+def indice_de_referencia(ticker: str) -> str:
+    """Índice con el que se compara una acción (para el 'ambiente del mercado')."""
+    if ticker.endswith(".MC"):
+        return "^IBEX"
+    if ticker.endswith((".AS", ".PA", ".DE", ".MI", ".BR", ".HE")):
+        return "^STOXX50E"
+    return "^GSPC"
+
+
+def es_etf(ticker: str) -> bool:
+    return ticker in ETFS

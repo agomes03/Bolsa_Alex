@@ -12,7 +12,7 @@ import streamlit as st
 
 from bolsa import almacen, costes, datos, noticias, prediccion, senales
 from bolsa.simulador import Parametros
-from bolsa.tickers import TODAS_LAS_ACCIONES, nombre_de
+from bolsa.tickers import TODAS_LAS_ACCIONES, indice_de_referencia, nombre_de
 
 
 # --------------------------------------------------------------------------- caché de datos
@@ -73,8 +73,7 @@ def predicciones_radar(tickers: tuple[str, ...]) -> dict[str, prediccion.Predicc
 
 
 def mercado_alcista_para(ticker: str) -> bool | None:
-    indice = "^IBEX" if ticker.endswith(".MC") else "^GSPC"
-    h = cargar_historico(indice)
+    h = cargar_historico(indice_de_referencia(ticker))
     return senales.estado_indice(h)["alcista"] if not h.empty else None
 
 

@@ -1,0 +1,72 @@
+name: Actualización diaria
+
+on:
+  schedule:
+    # De lunes a viernes a las 22:15 UTC, después del cierre de Wall Street.
+    - cron: "15 22 * * 1-5"
+    # Sábado por la mañana: reentrenamiento semanal de la estrategia.
+    - cron: "0 7 * * 6"
+  workflow_dispatch:
+    inputs:
+      entrenar:
+        description: "Reentrenar la estrategia ahora"
+        type: boolean
+        default: false
+      iteraciones:
+        description: "Combinaciones de reglas a probar"
+        type: string
+        default: "80"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualizacion-diaria
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt pytest
+
+      - name: Pruebas rápidas
+        run: python -m pytest -q
+
+      - name: Generar informe
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          ITERACIONES: ${{ inputs.iteraciones || '80' }}
+          ENTRENAR: ${{ inputs.entrenar || 'false' }}
+        run: |
+          case "$ITERACIONES" in ''|*[!0-9]*) ITERACIONES=80 ;; esac
+          ARGS="--iteraciones $ITERACIONES"
+          if [ "$ENTRENAR" = "true" ]; then ARGS="$ARGS --entrenar"; fi
+          python scripts/actualizar.py $ARGS
+
+      - name: Guardar el informe en el repositorio
+        run: |
+          git config user.name "actualizacion-bolsa[bot]"
+          git config user.email "actualizacion-bolsa@users.noreply.github.com"
+          git add informe
+          if git diff --cached --quiet; then
+            echo "Sin cambios"
+          else
+            git commit -m "Informe diario $(date -u +%Y-%m-%d)"
+            for i in 1 2 3; do
+              git pull --rebase --autostash && git push && break
+              sleep $((i * 5))
+            done
+          fi

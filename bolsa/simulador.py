@@ -28,9 +28,10 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from .costes import ITF_PCT, Tarifa
+from .costes import Tarifa, itf_pct
 from .indicadores import calcular_todo
 from .prediccion import serie_probabilidad
+from .tickers import indice_de_referencia, sector_de
 
 
 # --------------------------------------------------------------------------- parámetros
@@ -43,6 +44,8 @@ class Parametros:
     peso_modelo: float = 1.0       # cuánto cuenta el modelo estadístico (0 = nada)
     max_posiciones: int = 6        # nº máximo de acciones distintas a la vez
     riesgo_pct: float = 1.0        # % del dinero que se arriesga por operación
+    filtro_mercado: bool = True    # no abrir compras si el índice de referencia está en tendencia bajista
+    max_por_sector: int = 2        # nº máximo de empresas del mismo sector a la vez
 
     def describir(self) -> list[str]:
         obj = ("sin objetivo fijo: el stop-loss va subiendo con el precio para dejar correr las ganancias"
@@ -57,6 +60,10 @@ class Parametros:
                                       f"cuenta al **{self.peso_modelo * 100:.0f}%**."),
             f"Como mucho **{self.max_posiciones}** empresas a la vez, arriesgando un **{self.riesgo_pct:g}%** "
             "del dinero en cada una.",
+            ("**No compra** cuando su índice está en tendencia bajista (por debajo de la media de 200)."
+             if self.filtro_mercado else "Compra aunque el mercado general esté en tendencia bajista."),
+            ("Sin límite por sector." if self.max_por_sector >= 99 else
+             f"Como mucho **{self.max_por_sector}** empresa(s) del mismo sector, para diversificar."),
         ]
 
     def a_dict(self) -> dict:
@@ -75,6 +82,8 @@ ESPACIO = {
     "ratio_objetivo": [0.0, 1.5, 2.0, 3.0],
     "peso_modelo": [0.0, 0.5, 1.0],
     "max_posiciones": [4, 6, 8],
+    "filtro_mercado": [False, True],
+    "max_por_sector": [1, 2, 99],
 }
 
 OBJETIVOS: dict[str, Callable[[dict], float]] = {
@@ -133,32 +142,50 @@ class Universo:
     BASE: np.ndarray       # puntuación técnica (NaN si ese día no cotizó)
     PROB: np.ndarray       # probabilidad del modelo (NaN si aún no hay)
     inicio: int            # primer día operable (con medias de 200 calculadas)
+    MKT: np.ndarray | None = None    # 1 si su índice está en tendencia alcista, 0 si no, NaN si no se sabe
+    sectores: list[str] | None = None
 
     def indice_de(self, fecha) -> int:
         return int(self.fechas.searchsorted(pd.Timestamp(fecha), side="left"))
 
 
-def preparar_universo(historicos: dict[str, pd.DataFrame], indice: pd.DataFrame | None = None,
-                      con_modelo: bool = True, progreso: Callable[[float, str], None] | None = None) -> Universo:
+def preparar_universo(historicos: dict[str, pd.DataFrame], indice=None, con_modelo: bool = True,
+                      progreso: Callable[[float, str], None] | None = None,
+                      probabilidades: dict[str, pd.Series] | None = None) -> Universo:
+    """Prepara los datos de muchas acciones para simular. `probabilidades` permite usar las
+    predicciones del modelo conjunto (calculadas sin mirar el futuro) en lugar del modelo por acción."""
     historicos = {t: df for t, df in historicos.items() if len(df) >= 300}
     if not historicos:
         raise ValueError("No hay datos suficientes para simular.")
-    mercado = mercado_alcista(indice) if indice is not None and not indice.empty else None
+    # `indice` puede ser un único histórico o un diccionario {ticker_indice: histórico}; en ese caso
+    # cada acción se compara con su índice de referencia (IBEX, Euro Stoxx o S&P 500).
+    if isinstance(indice, dict):
+        mercados = {k: mercado_alcista(v) for k, v in indice.items() if v is not None and not v.empty}
+    else:
+        mercados = {None: mercado_alcista(indice)} if indice is not None and not indice.empty else {}
     fechas = pd.DatetimeIndex(sorted(set().union(*[df.index for df in historicos.values()])))
     tickers = list(historicos)
     T, N = len(fechas), len(tickers)
-    O, H, L, C, A, B, P = (np.full((T, N), np.nan) for _ in range(7))
+    O, H, L, C, A, B, P, M = (np.full((T, N), np.nan) for _ in range(8))
     for j, t in enumerate(tickers):
         if progreso:
             progreso(j / N, f"Preparando {t}...")
         d = calcular_todo(historicos[t])
+        mercado = mercados.get(indice_de_referencia(t), mercados.get(None)) if mercados else None
         base = puntuacion_tecnica(d, mercado)
-        prob = serie_probabilidad(historicos[t]) if con_modelo else pd.Series(np.nan, index=d.index)
+        if probabilidades is not None:
+            prob = probabilidades.get(t, pd.Series(np.nan, index=d.index))
+        elif con_modelo:
+            prob = serie_probabilidad(historicos[t])
+        else:
+            prob = pd.Series(np.nan, index=d.index)
         r = d.reindex(fechas)
         O[:, j], H[:, j], L[:, j] = r["Open"], r["High"], r["Low"]
         C[:, j] = r["Close"].ffill()
         A[:, j] = r["ATR"].ffill()
         B[:, j] = base.reindex(fechas)
+        if mercado is not None:
+            M[:, j] = mercado.reindex(fechas, method="ffill")
         P[:, j] = prob.reindex(fechas).ffill(limit=5)
     # Primer día en el que al menos la mitad de las acciones tienen su media de 200 calculada.
     sma_ok = np.array([pd.Series(C[:, j]).rolling(200).mean().notna().to_numpy() for j in range(N)]).T
@@ -166,7 +193,7 @@ def preparar_universo(historicos: dict[str, pd.DataFrame], indice: pd.DataFrame 
     inicio = int(listo[0]) if len(listo) else 200
     if progreso:
         progreso(1.0, "Datos listos")
-    return Universo(fechas, tickers, O, H, L, C, A, B, P, max(inicio, 1))
+    return Universo(fechas, tickers, O, H, L, C, A, B, P, max(inicio, 1), M, [sector_de(t) for t in tickers])
 
 
 # --------------------------------------------------------------------------- motor de simulación
@@ -191,7 +218,7 @@ def simular(u: Universo, p: Parametros, tarifa: Tarifa, capital: float = 10_000.
     inicio = max(inicio if inicio is not None else u.inicio, 1)
     fin = min(fin if fin is not None else T, T)
     S = puntuaciones(u, p) if score is None else score
-    es_es = np.array([t.endswith(".MC") for t in u.tickers])
+    itf_t = np.array([itf_pct(t) / 100 for t in u.tickers])
     Cv = np.nan_to_num(u.C)
 
     efectivo = float(capital)
@@ -229,16 +256,24 @@ def simular(u: Universo, p: Parametros, tarifa: Tarifa, capital: float = 10_000.
         if libres > 0:
             ok = (~np.isnan(s_ant)) & (s_ant >= p.umbral_compra) & (acc == 0) & ~np.isnan(o_hoy) \
                  & ~np.isnan(u.ATR[t - 1])
+            if p.filtro_mercado and u.MKT is not None:
+                ok &= u.MKT[t - 1] != 0
             cand = np.nonzero(ok)[0]
-            cand = cand[np.argsort(-s_ant[cand], kind="stable")][:libres]
+            cand = cand[np.argsort(-s_ant[cand], kind="stable")]
             patrimonio = efectivo + float((acc * Cv[t - 1]).sum())
             for j in cand:
+                if u.sectores is not None and p.max_por_sector < 99:
+                    en_sector = sum(1 for k in np.nonzero(acc > 0)[0] if u.sectores[k] == u.sectores[j])
+                    if en_sector >= p.max_por_sector:
+                        continue
+                if int((acc > 0).sum()) >= p.max_posiciones:
+                    break
                 precio = float(o_hoy[j])
                 st_ = max(precio - p.stop_atr * u.ATR[t - 1, j], precio * 0.80)
                 riesgo_acc = precio - st_
                 if riesgo_acc <= 0:
                     continue
-                itf = ITF_PCT / 100 if es_es[j] else 0.0
+                itf = itf_t[j]
                 n = math.floor(min(patrimonio * p.riesgo_pct / 100 / riesgo_acc,
                                    patrimonio / p.max_posiciones / precio,
                                    max(efectivo - tarifa.minimo - tarifa.canon_fijo, 0)
@@ -317,7 +352,7 @@ def comprar_y_mantener(u: Universo, tarifa: Tarifa, capital: float, inicio: int,
     acc = np.zeros(len(precios))
     efectivo = capital
     for j in np.nonzero(ok)[0]:
-        coste = tarifa.coste(parte) + (parte * ITF_PCT / 100 if u.tickers[j].endswith(".MC") else 0)
+        coste = tarifa.coste(parte) + parte * itf_pct(u.tickers[j]) / 100
         acc[j] = (parte - coste) / precios[j]
         efectivo -= parte
     valores = efectivo + (np.nan_to_num(u.C[inicio:fin]) * acc).sum(axis=1)
