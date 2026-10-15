@@ -1016,8 +1016,13 @@ def posicion_detalle(f: dict, cr: dict):
             guardar_datos()
             st.rerun()
         precio_v = c[1].number_input("Vendida a (precio)", 0.0, value=float(f["precio"] or 0.0), key=f"pv_{t}")
+        por_que = c[1].text_input("¿Por qué vendes? (va a tu 📓 diario)", key=f"pq_{t}")
         if c[1].button("Registrar venta", key=f"vend_{t}"):
-            cartera.vender(cr, t, pos["acciones"], precio_v, pf.tarifa, motivo="Venta registrada", fx=f["fx"])
+            cartera.vender(cr, t, pos["acciones"], precio_v, pf.tarifa, motivo=por_que.strip() or "Venta registrada",
+                           fx=f["fx"])
+            if por_que.strip():
+                from bolsa import diario
+                diario.nueva(datos_usuario().setdefault("diario", []), t, f["nombre"], "Venta", precio_v, por_que)
             guardar_datos()
             st.rerun()
         if c[2].button("🗑️ Quitar sin vender", key=f"del_{t}"):

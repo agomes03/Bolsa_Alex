@@ -26,6 +26,7 @@ from paginas_extra import pagina_bankinter, pagina_cartera_virtual, pagina_simul
 from paginas_hoy import pagina_carteras, pagina_hoy, pagina_plan  # noqa: E402
 from paginas_mercados import pagina_resumen  # noqa: E402
 from paginas_noticias import pagina_noticias  # noqa: E402
+from paginas_seguimiento import pagina_seguimiento  # noqa: E402
 
 st.session_state["_perfil"] = barra_lateral()
 
@@ -39,6 +40,7 @@ PAGINAS = {
     "mercados": st.Page(pagina_resumen, title="Mercados", icon="🌍"),
     "bankinter": st.Page(pagina_bankinter, title="Mi cartera", icon="🏦"),
     "virtual": st.Page(pagina_cartera_virtual, title="Cartera virtual", icon="🎮"),
+    "seguimiento": st.Page(pagina_seguimiento, title="Seguimiento", icon="📒"),
     "simulador": st.Page(pagina_simulador, title="Simulador y modelos", icon="🧪"),
     "calculadoras": st.Page(pagina_calculadoras, title="Calculadoras", icon="🧮"),
     "aprende": st.Page(pagina_aprende, title="Aprende", icon="🎓"),
@@ -50,7 +52,7 @@ nav = st.navigation({
     "Inicio": [PAGINAS["hoy"], PAGINAS["plan"], PAGINAS["chat"]],
     "Invertir": [PAGINAS["analizar"], PAGINAS["radar"], PAGINAS["carteras"], PAGINAS["noticias"],
                  PAGINAS["mercados"]],
-    "Mis carteras": [PAGINAS["bankinter"], PAGINAS["virtual"]],
+    "Mis carteras": [PAGINAS["bankinter"], PAGINAS["seguimiento"], PAGINAS["virtual"]],
     "Aprender y probar": [PAGINAS["acierto"], PAGINAS["simulador"], PAGINAS["calculadoras"], PAGINAS["aprende"]],
 }, position="top")
 _hueco_aviso = st.empty()

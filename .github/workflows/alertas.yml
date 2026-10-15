@@ -1,0 +1,38 @@
+name: Avisos de precio
+
+# Cada hora de lunes a viernes, de las 8-9 h a las 22-23 h de Madrid (según el horario de verano), para que los avisos de precio lleguen al móvil en
+# menos de una hora. Solo hace algo si tienes avisos activos en la app (📒 Seguimiento).
+on:
+  schedule:
+    - cron: "7 7-21 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avisos-de-precio
+  cancel-in-progress: true
+
+jobs:
+  avisos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Comprobar avisos
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+        run: python scripts/alertas.py

@@ -22,7 +22,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
-from bolsa import almacen, avisos, informe  # noqa: E402
+from bolsa import agenda, almacen, avisos, informe  # noqa: E402
 
 
 def main() -> int:
@@ -43,17 +43,19 @@ def main() -> int:
 
     token, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if token and chat:
-        propios, semana = [], ""
+        propios, semana, pendientes = [], "", ""
         if os.environ.get("GIST_TOKEN") and os.environ.get("GIST_ID"):
             try:
                 datos = almacen.Almacen(gist_token=os.environ["GIST_TOKEN"], gist_id=os.environ["GIST_ID"]).cargar()
                 umbral = inf["estrategia"]["parametros"].get("umbral_venta", 40)
                 propios = avisos.avisos_cartera(datos.get("cartera_real"), inf["ranking"], umbral)
+                pendientes = agenda.texto_telegram(datos)
                 if datetime.now(timezone.utc).weekday() == 4:      # viernes: resumen de la semana
                     semana = avisos.mensaje_semanal(datos.get("cartera_real"), inf.get("noticias", {}).get("top"))
             except Exception as e:  # noqa: BLE001
                 log(f"No se pudo leer la cartera del Gist: {e}")
-        mensaje = avisos.mensaje_diario(inf, propios) + (f"\n\n{semana}" if semana else "")
+        mensaje = avisos.mensaje_diario(inf, propios) + (f"\n\n{pendientes}" if pendientes else "") + (
+            f"\n\n{semana}" if semana else "")
         ok = avisos.enviar_telegram(token, chat, mensaje)
         log("Aviso de Telegram enviado" if ok else "Fallo al enviar el aviso de Telegram")
     log("Terminado.")

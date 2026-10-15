@@ -23,7 +23,8 @@ APP = str(Path(__file__).resolve().parent.parent / "app.py")
 SESIONES = {"10y": 2500, "5y": 1260, "max": 5000, "1y": 250, "6mo": 126, "1mo": 21, "5d": 5}
 
 PAGINAS = ["pagina_hoy", "pagina_plan", "pagina_chat", "pagina_analizar", "pagina_radar", "pagina_carteras",
-           "pagina_noticias", "pagina_resumen", "pagina_bankinter", "pagina_cartera_virtual", "pagina_acierto",
+           "pagina_noticias", "pagina_resumen", "pagina_bankinter", "pagina_seguimiento", "pagina_cartera_virtual",
+           "pagina_acierto",
            "pagina_simulador", "pagina_calculadoras", "pagina_aprende"]
 
 
@@ -120,7 +121,8 @@ def test_pagina_en_ordenador(pagina):
     sin_fallos(abrir(pagina))
 
 
-@pytest.mark.parametrize("pagina", ["pagina_hoy", "pagina_resumen", "pagina_bankinter", "pagina_cartera_virtual",
+@pytest.mark.parametrize("pagina", ["pagina_hoy", "pagina_resumen", "pagina_bankinter", "pagina_seguimiento",
+                                    "pagina_cartera_virtual",
                                     "pagina_analizar", "pagina_aprende"])
 def test_pagina_en_movil(pagina):
     at = abrir(pagina, movil=True)
@@ -167,3 +169,47 @@ def test_contrasena_bloquea_y_deja_pasar():
 def test_sin_contrasena_avisa_en_la_barra():
     at = abrir("pagina_hoy")
     assert any("sin contraseña" in c.value for c in at.sidebar.caption)
+
+
+def _datos_seguimiento() -> dict:
+    cr = cartera_de_prueba()
+    cartera.vender(cr, "SAN.MC", 1000, 14.0, costes.Tarifa(), "2026-03-02")
+    return {"cartera_real": cr,
+            "alertas": [{"id": 1, "ticker": "IDR.MC", "nombre": "Indra", "tipo": "baja", "precio": 1e6, "nota": "",
+                         "creada": "2026-01-02", "disparada": None, "precio_disparo": None}],
+            "aportacion": {"importe": 300.0, "dia": 1, "hechas": []},
+            "diario": [{"id": 1, "fecha": "2026-01-02", "ticker": "IDR.MC", "nombre": "Indra", "accion": "Compra",
+                        "precio": 100.0, "motivo": "Defensa", "revisar": "2026-02-02", "revisada": None,
+                        "leccion": ""}]}
+
+
+def test_seguimiento_con_datos_y_pendientes_en_hoy():
+    at = abrir("pagina_hoy", datos_usuario=_datos_seguimiento())
+    sin_fallos(at)
+    textos = " ".join(m.value for m in at.markdown)
+    assert "Tus pendientes" in textos and "Toca tu aportación mensual" in textos
+    assert "ha bajado de" in textos               # el aviso a 1.000.000 € salta con cualquier precio
+    assert at.session_state["_datos"]["alertas"][0]["disparada"]
+
+
+def test_seguimiento_crear_aviso_aportacion_y_apunte():
+    at = abrir("pagina_seguimiento", datos_usuario=_datos_seguimiento())
+    sin_fallos(at)
+    # Aviso nuevo de subida muy por encima del precio: se crea y queda vigilando.
+    at.radio(key="alerta_origen").set_value("De mi cartera").run()
+    formulario = [r for r in at.radio if r.label == "Avísame si…"][0]
+    formulario.set_value("sube")
+    [n for n in at.number_input if n.label == "Precio"][0].set_value(99_999.0)
+    [b for b in at.button if "Crear aviso" in b.label][0].click().run()
+    sin_fallos(at)
+    assert len(at.session_state["_datos"]["alertas"]) == 2
+    # Aportación del mes: reparto y marcarla como hecha.
+    assert any("A dónde llevarla" in s.value for s in at.subheader)
+    [b for b in at.button if "Ya he hecho la aportación" in b.label][0].click().run()
+    assert len(at.session_state["_datos"]["aportacion"]["hechas"]) == 1
+    # Diario: el apunte vencido se puede revisar.
+    [b for b in at.button if b.label == "Marcar como revisado"][0].click().run()
+    assert at.session_state["_datos"]["diario"][0]["revisada"]
+    # Renta: la venta de Santander aparece con su resultado y se puede descargar.
+    assert any("Ganancias y pérdidas patrimoniales" in s.value for s in at.subheader)
+    sin_fallos(at)
