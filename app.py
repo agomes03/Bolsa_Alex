@@ -17,8 +17,8 @@ from bolsa.indicadores import calcular_todo
 from bolsa.tickers import (IBEX35, INDICES, MERCADOS, TERMOMETROS, TODAS_LAS_ACCIONES, mercado_de, nombre_de,
                           sector_de)
 from paginas_extra import acciones_rapidas, pagina_bankinter, pagina_cartera_virtual, pagina_simulador
-from paginas_hoy import (bloque_fases, bloque_modelo_conjunto, bloque_que_puede_pasar_accion, pagina_hoy,
-                         pagina_plan, pagina_radar_global)
+from paginas_hoy import (bloque_fases, bloque_modelo_conjunto, bloque_que_puede_pasar_accion, pagina_carteras,
+                         pagina_hoy, pagina_plan, pagina_radar_global)
 from ui_comun import (Perfil, cargar_fundamentales, cargar_fundamentales_varios, cargar_historico,
                       cargar_informe, cargar_noticias, cargar_predicciones, cargar_varios, datos_usuario, es_movil,
                       estrategia_actual, eur, fila_informe, mercado_alcista_para, moneda_de, noticias_empresa, pct,
@@ -399,12 +399,13 @@ def pagina_analizar():
     for a in ev.avisos:
         st.warning(a)
 
-    st.subheader("🔮 Predicción")
+    st.subheader("🔮 Qué dicen los modelos")
     bloque_modelo_conjunto(ticker, fila_informe(ticker))
-    if preds:
-        bloque_predicciones(ticker, df, preds)
-    else:
-        st.caption("Se necesitan al menos 2-3 años de historial para hacer predicciones.")
+    with st.expander("🧪 Predicción por situaciones parecidas de esta acción (experimental)"):
+        if preds:
+            bloque_predicciones(ticker, df, preds)
+        else:
+            st.caption("Se necesitan al menos 2-3 años de historial para hacer predicciones.")
 
     st.subheader("🧠 Por qué dice esto (explicado paso a paso)")
     for mo in sorted(ev.motivos, key=lambda x: -abs(x.puntos)):
@@ -685,6 +686,7 @@ PAGINAS = {
     "plan": st.Page(pagina_plan, title="Mi plan", icon="🎯"),
     "analizar": st.Page(pagina_analizar, title="Analizar", icon="🔍"),
     "radar": st.Page(pagina_radar, title="Radar", icon="📡"),
+    "carteras": st.Page(pagina_carteras, title="Carteras modelo", icon="📦"),
     "noticias": st.Page(pagina_noticias, title="Noticias", icon="📰"),
     "mercados": st.Page(pagina_resumen, title="Mercados", icon="🌍"),
     "bankinter": st.Page(pagina_bankinter, title="Mi Bankinter", icon="🏦"),
@@ -696,7 +698,8 @@ PAGINAS = {
 st.session_state["_paginas"] = PAGINAS
 nav = st.navigation({
     "Inicio": [PAGINAS["hoy"], PAGINAS["plan"]],
-    "Invertir": [PAGINAS["analizar"], PAGINAS["radar"], PAGINAS["noticias"], PAGINAS["mercados"]],
+    "Invertir": [PAGINAS["analizar"], PAGINAS["radar"], PAGINAS["carteras"], PAGINAS["noticias"],
+                 PAGINAS["mercados"]],
     "Mis carteras": [PAGINAS["bankinter"], PAGINAS["virtual"]],
     "Aprender y probar": [PAGINAS["simulador"], PAGINAS["calculadoras"], PAGINAS["aprende"]],
 }, position="top")

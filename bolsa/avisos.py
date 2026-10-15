@@ -47,9 +47,15 @@ def mensaje_diario(informe: dict, avisos_propios: list[str] | None = None) -> st
         lineas += ["", "💡 Ideas del día:"]
         for t in informe["ideas"]:
             r = por_ticker.get(t, {})
-            prob = f" · prob. subir 1 mes {r['prob_modelo'] * 100:.0f}%" if r.get("prob_modelo") else ""
+            nota = f"nota {r['nota']}/100" if r.get("nota") is not None else f"{r.get('puntuacion')} pts"
+            riesgo = f" · riesgo de caída {r['riesgo_nivel']}" if r.get("riesgo_nivel") else ""
             stop = f" · stop {r['stop']:.2f}" if r.get("stop") else ""
-            lineas.append(f"  - {r.get('nombre', t)}: {r.get('puntuacion')} pts{prob}{stop}")
+            lineas.append(f"  - {r.get('nombre', t)}: {nota}{riesgo}{stop}")
+    for clave, c in informe.get("carteras", {}).items():
+        if c.get("composicion"):
+            lineas += ["", f"📦 {c['nombre']} este mes: " + ", ".join(por_ticker.get(x["ticker"], {}).get("nombre", x["ticker"])
+                                                                for x in c["composicion"][:10])]
+            break
     if avisos_propios:
         lineas += ["", "🏦 Tu cartera:"] + avisos_propios
     lineas += ["", "Herramienta educativa, no es asesoramiento financiero."]

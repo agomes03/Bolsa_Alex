@@ -18,18 +18,17 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Callable
 
 import numpy as np
 import pandas as pd
 
-from . import asesor, datos, modelo_ml, noticias, patrones, senales, simulador
+from . import asesor, datos, estrategias, modelo_ml, noticias, patrones, senales, simulador
 from .costes import Tarifa
 from .tickers import (ETFS, INDICES, INDICES_MUNDIALES, TERMOMETROS, TODAS_LAS_ACCIONES, indice_de_referencia,
                       mercado_de, nombre_de, sector_de)
 
-VERSION = 1
+VERSION = 2
 INDICES_LARGOS = ("^IBEX", "^GSPC", "^STOXX50E")
 INDICES_REFERENCIA = ("^IBEX", "^STOXX50E", "^GSPC")
 
@@ -88,53 +87,76 @@ def fundamentales_todos(tickers: list[str], hilos: int = 4) -> dict[str, dict]:
 
 
 # --------------------------------------------------------------------------- pasos
+def _fiabilidad(m: dict) -> str:
+    ventaja = m["acierto"] - m["referencia"]
+    if m["objetivo"].startswith("caida"):  # suceso raro: lo que importa es si separa el riesgo (AUC)
+        return "Alta" if m["auc"] >= 0.62 else "Media" if m["auc"] >= 0.57 else "Baja"
+    return ("Alta" if m["auc"] >= 0.58 and ventaja >= 0.03 else
+            "Media" if m["auc"] >= 0.54 and ventaja >= 0.01 else "Baja")
+
+
 def paso_modelo(acciones, indices, log) -> dict:
+    """Entrena el modelo de dirección (se publica por transparencia) y el de riesgo de caída (el que sí
+    ha demostrado funcionar con datos reales)."""
     log("Modelo conjunto: construyendo panel...")
     panel = modelo_ml.construir_panel(acciones, {k: indices[k] for k in INDICES_REFERENCIA if k in indices},
                                       indices.get("^VIX"))
     log(f"  {len(panel):,} situaciones de {panel.index.get_level_values('ticker').nunique()} valores")
-    wf = modelo_ml.walk_forward(panel, progreso=lambda x, t: log(f"  {t}"))
-    final = modelo_ml.entrenar_final(panel)
-    hoy = modelo_ml.predecir_hoy(final, panel)
-    m = wf["metricas"]
-    ventaja = m["acierto"] - m["referencia"]
-    fiabilidad = ("Alta" if m["auc"] >= 0.58 and ventaja >= 0.03 else
-                  "Media" if m["auc"] >= 0.54 and ventaja >= 0.01 else "Baja")
-    log(f"  acierto {m['acierto']:.3f} (ref {m['referencia']:.3f}) AUC {m['auc']:.3f} -> fiabilidad {fiabilidad}")
-    try:
-        imp = modelo_ml.importancia(final, panel[panel.index.get_level_values("fecha")
-                                                >= panel.index.get_level_values("fecha").max() - pd.Timedelta(days=730)])
-    except Exception as e:  # noqa: BLE001
-        log(f"  (sin importancias: {e})")
-        imp = pd.Series(dtype=float)
-    return {"wf": wf, "hoy": hoy, "fiabilidad": fiabilidad, "importancia": imp}
+    salida = {"panel_filas": len(panel)}
+    for objetivo in ("sube_1m", "caida_1m"):
+        wf = modelo_ml.walk_forward(panel, objetivo=objetivo)
+        final = modelo_ml.entrenar_final(panel, objetivo=objetivo)
+        hoy = modelo_ml.predecir_hoy(final, panel)
+        m = wf["metricas"]
+        fiab = _fiabilidad(m)
+        log(f"  {objetivo}: AUC {m['auc']:.3f}, acierto {m['acierto']:.3f} (ref {m['referencia']:.3f}) -> {fiab}")
+        try:
+            reciente = panel[panel.index.get_level_values("fecha")
+                             >= panel.index.get_level_values("fecha").max() - pd.Timedelta(days=730)]
+            imp = modelo_ml.importancia(final, reciente, objetivo=objetivo)
+        except Exception as e:  # noqa: BLE001
+            log(f"  (sin importancias: {e})")
+            imp = pd.Series(dtype=float)
+        salida[objetivo] = {"wf": wf, "hoy": hoy, "fiabilidad": fiab, "importancia": imp}
+    return salida
+
+
+def nivel_riesgo(prob: float | None, base: float) -> str | None:
+    if prob is None:
+        return None
+    return "alto" if prob >= base * 1.3 else "bajo" if prob <= base * 0.8 else "normal"
 
 
 def paso_ranking(acciones, indices, fundamentales, lista_noticias, modelo, params: simulador.Parametros) -> list[dict]:
     estados = {k: senales.estado_indice(indices[k]) for k in INDICES_REFERENCIA if k in indices}
-    calib = modelo["wf"]["calibracion"]
-    met = modelo["wf"]["metricas"]
+    riesgo = modelo["caida_1m"]
+    cal_r = riesgo["wf"]["calibracion"]
+    base_r = riesgo["wf"]["metricas"]["tasa_subidas"]  # frecuencia real de caídas >10% en un mes
+    usar_riesgo = riesgo["fiabilidad"] != "Baja"
+    cal_d = modelo["sube_1m"]["wf"]["calibracion"]
+    cierres = estrategias.cierres_acciones(acciones)
+    momentum = estrategias.momentum_hoy(cierres)
     filas = []
     for t, df in acciones.items():
         rel = [n for n in lista_noticias if t in n.empresas]
-        bruta = modelo["hoy"].get(t)
-        cal = modelo_ml.calibrar(bruta, calib) if bruta is not None else {}
-        pred = SimpleNamespace(prob_subida=cal["prob"], fiabilidad=modelo["fiabilidad"], horizonte="1 mes",
-                               acierto=met["acierto"], pruebas=met["casos"]) if cal else None
+        cal_dir = modelo_ml.calibrar(modelo["sube_1m"]["hoy"].get(t), cal_d) if t in modelo["sube_1m"]["hoy"] else {}
+        cal_rie = modelo_ml.calibrar(riesgo["hoy"].get(t), cal_r) if t in riesgo["hoy"] else {}
         ref = indice_de_referencia(t)
         alcista = estados.get(ref, {}).get("alcista")
         f = fundamentales.get(t, {})
         ev = senales.evaluar(t, df, noticias.sentimiento_medio(rel) if rel else None, len(rel), alcista,
-                             fundamentales=f, prediccion=pred, stop_atr=params.stop_atr,
-                             ratio_objetivo=params.ratio_objetivo)
+                             fundamentales=f, stop_atr=params.stop_atr, ratio_objetivo=params.ratio_objetivo,
+                             riesgo={"prob": cal_rie.get("prob"), "base": base_r} if usar_riesgo and cal_rie else None)
         objetivo = f.get("targetMeanPrice")
         filas.append({
             "ticker": t, "nombre": nombre_de(t), "mercado": mercado_de(t), "sector": sector_de(t),
             "etf": t in ETFS, "precio": ev.precio, "var_1d": ev.datos["var_1d"], "var_1m": ev.datos["var_1m"],
             "var_1a": ev.datos["var_1a"], "puntuacion": ev.puntuacion, "veredicto": ev.veredicto, "color": ev.color,
             "rsi": ev.datos["rsi"], "volatilidad": ev.datos["volatilidad"],
-            "prob_modelo": cal.get("prob"), "prob_bruta": bruta, "rent_media_1m": cal.get("rent_media"),
-            "p10_1m": cal.get("p10"), "p90_1m": cal.get("p90"),
+            "momentum": momentum.get(t), "riesgo_caida": cal_rie.get("prob"),
+            "riesgo_nivel": nivel_riesgo(cal_rie.get("prob"), base_r) if usar_riesgo else None,
+            "prob_modelo": cal_dir.get("prob"), "rent_media_1m": cal_dir.get("rent_media"),
+            "p10_1m": cal_dir.get("p10"), "p90_1m": cal_dir.get("p90"),
             "potencial_analistas": (objetivo / ev.precio - 1) if objetivo else None,
             "analistas": f.get("numberOfAnalystOpinions"), "per": f.get("forwardPE") or f.get("trailingPE"),
             "dividendo": f.get("trailingAnnualDividendYield"),
@@ -147,14 +169,28 @@ def paso_ranking(acciones, indices, fundamentales, lista_noticias, modelo, param
             "tono_noticias": noticias.sentimiento_medio(rel) if rel else None,
             "motivos": [{"p": m.puntos, "t": m.titulo} for m in sorted(ev.motivos, key=lambda x: -abs(x.puntos))[:5]],
         })
-    filas.sort(key=lambda r: r["puntuacion"], reverse=True)
+    # Nota global (0-100): puesto entre todas las acciones combinando lo que ha funcionado con datos reales:
+    # momentum 12-1 (50%), puntuación técnica (30%) y menor riesgo de caída (20%).
+    tabla = pd.DataFrame([r for r in filas if not r["etf"]]).set_index("ticker")
+    if not tabla.empty:
+        compuesto = (0.5 * tabla["momentum"].rank(pct=True).fillna(0.5)
+                     + 0.3 * tabla["puntuacion"].rank(pct=True)
+                     + 0.2 * (1 - tabla["riesgo_caida"].rank(pct=True)).fillna(0.5))
+        notas = (compuesto.rank(pct=True) * 100).round()
+        puestos = compuesto.rank(ascending=False, method="min")
+        for r in filas:
+            if r["ticker"] in notas.index:
+                r["nota"] = int(notas[r["ticker"]])
+                r["puesto"] = int(puestos[r["ticker"]])
+                r["de"] = len(notas)
+    filas.sort(key=lambda r: (r.get("nota") or -1, r["puntuacion"]), reverse=True)
     return filas
 
 
 def paso_estrategia(acciones, indices, modelo, tarifa, entrenar, previo, iteraciones, log) -> dict:
     """Entrena (o reutiliza) las reglas de compra/venta con todas las acciones y el modelo conjunto."""
     hist = {t: df for t, df in acciones.items() if t not in ETFS}
-    probs = modelo_ml.probabilidades_por_accion(modelo["wf"]["oos"])
+    probs = modelo_ml.probabilidades_por_accion(modelo["sube_1m"]["wf"]["oos"])
     refs = {k: indices[k] for k in INDICES_REFERENCIA if k in indices}
     u = simulador.preparar_universo(hist, refs, probabilidades=probs)
     if not entrenar and previo and previo.get("parametros"):
@@ -231,30 +267,33 @@ def paso_noticias(lista) -> dict:
     }
 
 
-def resumen_texto(mercado, noticias_inf, ideas, modelo_met, fiabilidad) -> list[str]:
+def resumen_texto(mercado, noticias_inf, ideas, proteccion, carteras) -> list[str]:
     frases = []
     f_ibex = mercado["fases"].get("^IBEX", {}).get("fase")
     f_sp = mercado["fases"].get("^GSPC", {}).get("fase")
     color = {"verde": "🟢 verde", "ambar": "🟡 ámbar", "rojo": "🔴 rojo"}[mercado["semaforo"]]
     if f_ibex or f_sp:
         frases.append(f"Semáforo {color}: el IBEX está en fase «{f_ibex or '—'}» y el S&P 500 en «{f_sp or '—'}».")
+    fuera = [nombre_de(t) for t, p in proteccion.items() if p.get("estado") == "fuera"]
+    if fuera:
+        frases.append("🛡️ La regla de protección indica estar FUERA de: " + ", ".join(fuera) +
+                      " (cotizan más de un 2% por debajo de su media de 200 sesiones).")
+    elif proteccion:
+        frases.append("🛡️ La regla de protección indica seguir invertido en los grandes índices.")
     tono = noticias_inf["tono"]
     tono_txt = "positivo" if tono > 0.15 else "negativo" if tono < -0.15 else "neutro"
     if noticias_inf["top"]:
         frases.append(f"Tono de las noticias: {tono_txt}. La más influyente: «{noticias_inf['top'][0]['titulo']}».")
     if ideas:
-        frases.append("Ideas del día (sectores distintos): " + ", ".join(i["nombre"] for i in ideas[:5]) + ".")
+        frases.append("Ideas del día (mejor nota, sectores distintos y riesgo no alto): "
+                      + ", ".join(i["nombre"] for i in ideas[:5]) + ".")
     else:
         frases.append("Hoy ninguna acción cumple todas las condiciones de compra: no pasa nada, paciencia.")
-    if modelo_met:
-        frases.append(f"El modelo conjunto acertó la dirección a 1 mes el {modelo_met['acierto'] * 100:.0f}% de las "
-                      f"veces en años que no había visto (decir siempre lo mismo: {modelo_met['referencia'] * 100:.0f}%). "
-                      f"Fiabilidad: {fiabilidad.lower()}.")
     return frases
 
 
 # --------------------------------------------------------------------------- historiales
-COLUMNAS_IDEAS = ["fecha", "ticker", "precio", "puntuacion", "prob_modelo", "indice", "precio_indice"]
+COLUMNAS_IDEAS = ["fecha", "ticker", "precio", "puntuacion", "nota", "riesgo_caida", "indice", "precio_indice"]
 
 
 def _leer_csv(ruta: Path, columnas: list[str]) -> pd.DataFrame:
@@ -267,7 +306,8 @@ def _leer_csv(ruta: Path, columnas: list[str]) -> pd.DataFrame:
 def archivar_ideas(ruta: Path, hoy: str, ideas: list[dict], indices) -> pd.DataFrame:
     previo = _leer_csv(ruta, COLUMNAS_IDEAS)
     nuevas = pd.DataFrame(columns=COLUMNAS_IDEAS, data=[{"fecha": hoy, "ticker": i["ticker"], "precio": i["precio"],
-                            "puntuacion": i["puntuacion"], "prob_modelo": i.get("prob_modelo"),
+                            "puntuacion": i["puntuacion"], "nota": i.get("nota"),
+                            "riesgo_caida": i.get("riesgo_caida"),
                             "indice": i["indice"],
                             "precio_indice": float(indices[i["indice"]]["Close"].iloc[-1])
                             if i["indice"] in indices else None} for i in ideas])
@@ -401,25 +441,43 @@ def actualizar(carpeta: str | Path = "informe", entrenar: bool | None = None, it
 
     log("Puntuando cada valor...")
     ranking = paso_ranking(acciones, indices, fundamentales, lista, modelo, params)
-    candidatas = [r for r in ranking if not (params.filtro_mercado and r["mercado_alcista"] is False)]
-    ideas = asesor.ideas_diversificadas(candidatas, max_ideas=5, min_puntuacion=max(65, params.umbral_compra - 5),
-                                        max_por_sector=1)
+    candidatas = [r for r in ranking if r["mercado_alcista"] is not False and r["puntuacion"] >= 55]
+    ideas = asesor.ideas_diversificadas(candidatas, max_ideas=5, min_puntuacion=75, max_por_sector=1)
     mercado = paso_mercado(indices, largos)
     noticias_inf = paso_noticias(lista)
 
+    log("Carteras modelo y regla de protección...")
+    cierres = estrategias.cierres_acciones(acciones)
+    perm = estrategias.permitido(cierres, {k: indices[k] for k in INDICES_REFERENCIA if k in indices})
+    carteras = {}
+    for clave, c in estrategias.CARTERAS.items():
+        ev_c = estrategias.evaluar_cartera(cierres, perm, c, tarifa)
+        carteras[clave] = {"nombre": c.nombre, "perfil": c.perfil, "descripcion": c.descripcion, "n": c.n,
+                           "filtro_mercado": c.filtro_mercado,
+                           "composicion": estrategias.composicion_hoy(cierres, perm, c), **ev_c}
+        m = ev_c["metricas"]
+        log(f"  {c.nombre}: {m['cagr_pct']:.1f}%/año, peor caída {m['max_caida_pct']:.1f}% "
+            f"(todas: {ev_c['referencia']['cagr_pct']:.1f}%/año)")
+    proteccion = estrategias.proteccion_indices({t: largos.get(t) if largos.get(t) is not None and not largos[t].empty
+                                                 else indices.get(t) for t in INDICES_LARGOS})
+
     hist_ideas = archivar_ideas(carpeta / "historico_ideas.csv", hoy, ideas, indices)
     hist_not = archivar_noticias(carpeta / "historico_noticias.csv", hoy, lista) if con_noticias else None
-    met = modelo["wf"]["metricas"]
+    def resumen_modelo(clave: str) -> dict:
+        mo = modelo[clave]
+        return {"metricas": mo["wf"]["metricas"], "fiabilidad": mo["fiabilidad"],
+                "calibracion": mo["wf"]["calibracion"].to_dict("records"),
+                "por_ano": mo["wf"]["por_ano"].reset_index().to_dict("records"),
+                "importancia": [{"dato": k, "peso": v} for k, v in mo["importancia"].head(10).items()]}
+
     informe = {
         "version": VERSION, "fecha": hoy, "generado": datetime.now(timezone.utc).isoformat(timespec="minutes"),
         "datos_hasta": max(df.index.max() for df in acciones.values()).date().isoformat(),
-        "resumen": resumen_texto(mercado, noticias_inf, ideas, met, modelo["fiabilidad"]),
+        "resumen": resumen_texto(mercado, noticias_inf, ideas, proteccion, carteras),
         "mercado": mercado, "noticias": noticias_inf, "ideas": [i["ticker"] for i in ideas],
         "ranking": ranking,
-        "modelo": {"metricas": met, "fiabilidad": modelo["fiabilidad"],
-                   "calibracion": modelo["wf"]["calibracion"].to_dict("records"),
-                   "por_ano": modelo["wf"]["por_ano"].reset_index().to_dict("records"),
-                   "importancia": [{"dato": k, "peso": v} for k, v in modelo["importancia"].head(10).items()]},
+        "modelo": resumen_modelo("sube_1m"), "modelo_riesgo": resumen_modelo("caida_1m"),
+        "carteras": carteras, "proteccion": proteccion,
         "estrategia": estrategia,
         "historial_ideas": evaluar_ideas(hist_ideas, acciones, indices),
         "patron_noticias": patron_noticias(hist_not, indices.get("^IBEX")),

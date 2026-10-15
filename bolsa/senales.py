@@ -81,7 +81,7 @@ def _ok(x) -> bool:
 def evaluar(ticker: str, historico: pd.DataFrame, sentimiento_noticias: float | None = None,
             n_noticias: int = 0, mercado_alcista: bool | None = None,
             fundamentales: dict | None = None, prediccion=None,
-            stop_atr: float = 2.0, ratio_objetivo: float = 2.0) -> Evaluacion:
+            stop_atr: float = 2.0, ratio_objetivo: float = 2.0, riesgo: dict | None = None) -> Evaluacion:
     """Evalúa una acción.
 
     historico: DataFrame diario con Open/High/Low/Close/Volume (ideal: 1-2 años).
@@ -228,6 +228,21 @@ def evaluar(ticker: str, historico: pd.DataFrame, sentimiento_noticias: float | 
             add(0, f"Modelo estadístico: {prob:.0f}% (no fiable para esta acción)",
                 "En las pruebas con datos pasados el modelo no acertó más que el azar con esta acción, "
                 "así que no se tiene en cuenta en la puntuación.")
+
+    # 11) Riesgo de caída fuerte (modelo validado con datos reales: sí distingue el riesgo).
+    if riesgo and riesgo.get("prob") is not None:
+        prob, base = riesgo["prob"] * 100, riesgo.get("base", 0.14) * 100
+        if prob >= base * 1.3:
+            add(-8, f"Riesgo alto de caída fuerte: {prob:.0f}% (lo normal es {base:.0f}%)",
+                "El modelo de riesgo, entrenado con todas las empresas, estima la probabilidad de que la acción "
+                "llegue a caer más de un 10% en algún momento del próximo mes. Este modelo sí ha demostrado "
+                "distinguir el riesgo en años que no había visto. Si compras, hazlo con menos dinero.")
+        elif prob <= base * 0.8:
+            add(4, f"Riesgo bajo de caída fuerte: {prob:.0f}% (lo normal es {base:.0f}%)",
+                "Situaciones como la actual han tenido menos caídas bruscas de lo habitual en el mes siguiente.")
+        else:
+            add(0, f"Riesgo de caída fuerte normal: {prob:.0f}%",
+                f"Parecido a lo habitual ({base:.0f}% de probabilidad de una caída de más del 10% en un mes).")
 
     # Volatilidad: no puntúa, pero avisa.
     vol = volatilidad_anual(df["Close"])

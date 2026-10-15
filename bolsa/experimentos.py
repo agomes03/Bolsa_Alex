@@ -95,7 +95,10 @@ def simular_rotacion(cierres: pd.DataFrame, senal: pd.DataFrame, n: int, tarifa:
                 acc[j] += faltan
         curva[k] = efectivo + float(np.nansum(acc * np.nan_to_num(p)))
     serie = pd.Series(curva, index=fechas[i0:])
-    return serie, resumen_curva(serie, capital, gastos, ops)
+    resumen = resumen_curva(serie, capital, gastos, ops)
+    resumen["cartera_final"] = {tickers[j]: int(acc[j]) for j in np.nonzero(acc > 0)[0]}
+    resumen["efectivo_final"] = efectivo
+    return serie, resumen
 
 
 def senales_basicas(cierres: pd.DataFrame) -> dict[str, pd.DataFrame]:

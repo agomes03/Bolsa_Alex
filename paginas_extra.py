@@ -8,10 +8,10 @@ from datetime import date, datetime
 import pandas as pd
 import streamlit as st
 
-from bolsa import bankinter, cartera, senales, simulador
+from bolsa import bankinter, cartera, estrategias, experimentos, senales, simulador
 from bolsa.costes import tamano_por_riesgo
 from bolsa.simulador import Parametros
-from bolsa.tickers import EEUU, IBEX35, TODAS_LAS_ACCIONES, nombre_de, sector_de
+from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de, sector_de
 from ui_comun import (almacen_actual, cargar_fundamentales_varios, cargar_historico, cargar_varios,
                       datos_usuario, estrategia_actual, eur, guardar_datos, mercado_alcista_para, moneda_de, pct,
                       perfil, ultimo_precio)
@@ -357,9 +357,20 @@ def robot():
                 "**en tiempo real y sin trampas**: desde el día que lo creas, nadie conoce el futuro. "
                 "Vuelve cada pocos días y mira si de verdad gana dinero.")
     if not rb:
-        c = st.columns(2)
-        cap = c[0].number_input("Dinero virtual del robot (€)", 1_000.0, 1_000_000.0, 10_000.0, 1_000.0)
-        universo = c[1].selectbox("Acciones con las que opera", list(UNIVERSOS), key="rb_univ")
+        tipo = st.radio("¿Qué hará el robot?", ["📦 Seguir una cartera modelo cada mes (recomendado)",
+                                                 "🎯 Comprar y vender con reglas y stop-loss"])
+        cap = st.number_input("Dinero virtual del robot (€)", 1_000.0, 1_000_000.0, 10_000.0, 1_000.0)
+        if tipo.startswith("📦"):
+            clave = st.selectbox("Cartera modelo", list(estrategias.CARTERAS),
+                                 format_func=lambda k: estrategias.CARTERAS[k].nombre)
+            st.caption(estrategias.CARTERAS[clave].descripcion + " Es la opción que mejor ha funcionado con datos "
+                       "reales; las reglas de compra/venta diarias rindieron menos que comprar y mantener.")
+            if st.button("🤖 Crear robot", type="primary"):
+                d["robot"] = {"tipo": "cartera", "cartera": clave, "creado": date.today().isoformat(), "capital": cap}
+                guardar_datos()
+                st.rerun()
+            return
+        universo = st.selectbox("Acciones con las que opera", list(UNIVERSOS), key="rb_univ")
         p = estrategia_actual()
         with st.expander("Reglas que seguirá"):
             for linea in p.describir():
@@ -368,10 +379,14 @@ def robot():
                 st.caption("Son las reglas por defecto. Si entrenas la estrategia en 🧪 Simulador, el robot "
                            "nuevo usará las entrenadas.")
         if st.button("🤖 Crear robot", type="primary"):
-            d["robot"] = {"creado": date.today().isoformat(), "capital": cap, "universo": universo,
+            d["robot"] = {"tipo": "reglas", "creado": date.today().isoformat(), "capital": cap, "universo": universo,
                           "parametros": p.a_dict()}
             guardar_datos()
             st.rerun()
+        return
+    if rb.get("tipo") == "cartera":
+        robot_cartera(rb)
+        boton_reiniciar_robot(d)
         return
 
     u = universo_con_barra(rb["universo"])
@@ -416,12 +431,61 @@ def robot():
         m = manana.head(p.max_posiciones).copy()
         m["Empresa"] = m["Empresa"].map(nombre_de)
         st.dataframe(m.round(2), hide_index=True, width="stretch")
+    boton_reiniciar_robot(d)
+
+
+def boton_reiniciar_robot(d: dict):
     with st.expander("♻️ Reiniciar el robot"):
-        st.caption("Borra el robot actual. Podrás crear uno nuevo con las últimas reglas entrenadas.")
+        st.caption("Borra el robot actual. Podrás crear uno nuevo.")
         if st.button("Borrar robot"):
             d.pop("robot", None)
             guardar_datos()
             st.rerun()
+
+
+def robot_cartera(rb: dict):
+    """Robot que replica una cartera modelo con rotación mensual desde el día en que se creó."""
+    pf = perfil()
+    c = estrategias.CARTERAS[rb["cartera"]]
+    st.caption(f"{c.nombre} · creado el {rb['creado']} con {eur(rb['capital'])}")
+    with st.spinner("Calculando la cartera del robot con datos de todas las empresas..."):
+        acciones = tuple(t for t in TODAS_LAS_ACCIONES if t not in ETFS)
+        hist = cargar_varios(acciones, "2y")
+        refs = {k: cargar_historico(k, "2y") for k in ("^IBEX", "^STOXX50E", "^GSPC")}
+        cierres = estrategias.cierres_acciones(hist)
+        perm = estrategias.permitido(cierres, {k: v for k, v in refs.items() if not v.empty})
+    if cierres.empty:
+        st.error("No se han podido descargar cotizaciones.")
+        return
+    inicio = cierres.index[cierres.index > pd.Timestamp(rb["creado"])]
+    if inicio.empty:
+        st.info("Todavía no ha habido ninguna sesión desde que creaste el robot. En la próxima comprará esto:")
+        comp = estrategias.composicion_hoy(cierres, perm, c)
+        st.dataframe(pd.DataFrame([{"Empresa": nombre_de(x["ticker"]), "Precio": round(x["precio"], 2)} for x in comp]),
+                     hide_index=True, width="stretch")
+        return
+    sig = estrategias.senal(cierres, c.senal)
+    curva, met = experimentos.simular_rotacion(cierres, sig, c.n, pf.tarifa, rb["capital"],
+                                               perm if c.filtro_mercado else None, inicio=inicio[0])
+    unos = pd.DataFrame(1.0, index=cierres.index, columns=cierres.columns)
+    ref, met_ref = experimentos.simular_rotacion(cierres, unos, len(cierres.columns), pf.tarifa, rb["capital"],
+                                                 inicio=inicio[0])
+    valor = float(curva.iloc[-1])
+    cols = st.columns(2 if pf.movil else 3)
+    cols[0].metric("Valor del robot", eur(valor), pct((valor / rb["capital"] - 1) * 100, 2))
+    cols[1].metric("Todas a partes iguales", eur(float(ref.iloc[-1])),
+                   pct((float(ref.iloc[-1]) / rb["capital"] - 1) * 100, 2))
+    cols[2 % len(cols)].metric("Comisiones pagadas", eur(met.get("gastos", 0.0)))
+    if len(curva) > 1:
+        st.line_chart(pd.DataFrame({"Robot": curva, "Todas a partes iguales": ref}), height=280)
+    filas = [{"Empresa": nombre_de(t), "Acciones": n, "Precio": round(float(cierres[t].iloc[-1]), 2),
+              "Valor": eur(n * float(cierres[t].iloc[-1]), moneda_de(t))} for t, n in met["cartera_final"].items()]
+    st.markdown("**Lo que tiene ahora el robot**")
+    if filas:
+        st.dataframe(pd.DataFrame(filas), hide_index=True, width="stretch")
+    st.caption(f"Liquidez: {eur(met['efectivo_final'])}. Se revisa cada 21 sesiones (≈1 mes) desde su creación.")
+    if len(curva) < 60:
+        st.caption("Con pocas semanas el resultado es casi azar. Dale al menos 6 meses antes de sacar conclusiones.")
 
 
 # --------------------------------------------------------------------------- 🏦 Mi cartera Bankinter

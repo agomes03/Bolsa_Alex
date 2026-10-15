@@ -50,15 +50,25 @@ def texto_fase(nombre: str, f: dict) -> str:
             f"{pct(h['peor'] * 100, 1)}.")
 
 
+ICONO_RIESGO = {"bajo": "🟢 bajo", "normal": "🟡 normal", "alto": "🔴 alto", None: "—"}
+
+
 def tarjeta_idea(r: dict, clave: str):
     pf = perfil()
     m = moneda_de(r["ticker"])
     with st.container(border=True):
         st.markdown(f"**{r['nombre']}**  \n{r['sector']} · {r['mercado']}")
-        st.metric("Puntuación", f"{r['puntuacion']}/100", pct(r.get("var_1d"), 1))
-        if r.get("prob_modelo") is not None:
-            st.caption(f"Prob. de subir en 1 mes: **{r['prob_modelo'] * 100:.0f}%** · rango habitual "
-                       f"{pct(r['p10_1m'] * 100, 0)} a {pct(r['p90_1m'] * 100, 0)}")
+        if r.get("nota") is not None:
+            st.metric("Nota global", f"{r['nota']}/100", f"puesto {r['puesto']} de {r['de']}", delta_color="off")
+        else:
+            st.metric("Puntuación", f"{r['puntuacion']}/100")
+        detalles = []
+        if r.get("momentum") is not None:
+            detalles.append(f"último año {pct(r['momentum'] * 100, 0)}")
+        if r.get("riesgo_nivel"):
+            detalles.append(f"riesgo de caída {ICONO_RIESGO[r['riesgo_nivel']]}")
+        if detalles:
+            st.caption(" · ".join(detalles))
         if r.get("stop"):
             st.caption(f"Precio {eur(r['precio'], m)} · stop-loss {eur(r['stop'], m)}")
         positivos = [mo["t"] for mo in r.get("motivos", []) if mo["p"] > 0][:2]
@@ -66,6 +76,16 @@ def tarjeta_idea(r: dict, clave: str):
             st.caption("Por qué: " + "; ".join(positivos))
         if st.button("Ver análisis completo", key=f"idea_{clave}_{r['ticker']}", width="stretch"):
             ir_a("analizar", analizar_ticker=r["ticker"])
+
+
+def texto_proteccion(t: str, p: dict) -> str:
+    if p.get("estado") == "dentro":
+        return (f"🟢 **{nombre_de(t)}**: seguir invertido (desde el {p['desde']}). Se saldría si baja de "
+                f"{p['salir_si_baja_de']:,.0f} ({pct((p['salir_si_baja_de'] / p['precio'] - 1) * 100, 1)}).").replace(",", ".")
+    if p.get("estado") == "fuera":
+        return (f"🔴 **{nombre_de(t)}**: la regla dice estar fuera (desde el {p['desde']}). Se volvería a entrar si "
+                f"supera {p['entrar_si_sube_de']:,.0f} ({pct((p['entrar_si_sube_de'] / p['precio'] - 1) * 100, 1)}).").replace(",", ".")
+    return f"⚪ **{nombre_de(t)}**: sin datos suficientes."
 
 
 # --------------------------------------------------------------------------- 🧭 Hoy
@@ -100,6 +120,25 @@ def pagina_hoy():
         st.info("Hoy ninguna acción cumple todas las condiciones. No pasa nada: la opción más segura sigue siendo "
                 "la aportación mensual a un ETF mundial (mira 🧭 Mi plan).")
 
+    prot = inf.get("proteccion", {})
+    if prot:
+        st.subheader("🛡️ Regla de protección de los índices")
+        for t, p in prot.items():
+            st.markdown("- " + texto_proteccion(t, p))
+        st.caption("Regla sencilla con 100 años de historia: seguir invertido mientras el índice esté por encima de su "
+                   "media de 200 sesiones y salir solo si cae más de un 2% por debajo. Redujo a casi la mitad las peores "
+                   "caídas con una rentabilidad parecida. Más detalle en 📦 Carteras modelo.")
+    carteras = inf.get("carteras", {})
+    if carteras:
+        st.subheader("📦 Carteras modelo de este mes")
+        for c in carteras.values():
+            nombres = [por_ticker.get(x["ticker"], {}).get("nombre", x["ticker"]) for x in c["composicion"]]
+            st.markdown(f"- **{c['nombre']}** (perfil {c['perfil'].lower()}): "
+                        + (", ".join(nombres[:6]) + ("…" if len(nombres) > 6 else "") if nombres else
+                           "este mes en liquidez (mercados en tendencia bajista)"))
+        if st.button("Ver carteras modelo y cómo replicarlas", width="stretch"):
+            ir_a("carteras")
+
     st.subheader("🔮 Qué puede pasar")
     for t, nombre in (("^IBEX", "El IBEX 35"), ("^GSPC", "El S&P 500"), ("^STOXX50E", "El Euro Stoxx 50")):
         f = mer.get("fases", {}).get(t)
@@ -114,10 +153,11 @@ def pagina_hoy():
         if n["explicaciones"]:
             st.caption("💡 " + n["explicaciones"][0])
 
-    m = inf["modelo"]["metricas"]
-    st.caption(f"🤖 El modelo conjunto se ha entrenado con {m['casos']:,} situaciones de {m['acciones']} valores. ".replace(",", ".")
-               + f"En años que no había visto acertó la dirección a 1 mes el {m['acierto'] * 100:.0f}% de las veces "
-               f"(decir siempre lo mismo: {m['referencia'] * 100:.0f}%).")
+    mr = inf.get("modelo_riesgo", {}).get("metricas")
+    if mr:
+        st.caption(f"🤖 Los modelos se reentrenan cada noche con {mr['casos']:,} situaciones de {mr['acciones']} valores. ".replace(",", ".")
+                   + "Con datos reales, predecir si una acción subirá es casi imposible, pero el **riesgo de caída fuerte** "
+                   f"sí se puede estimar (AUC {mr['auc']:.2f}): por eso las ideas evitan las de riesgo alto.")
 
 
 # --------------------------------------------------------------------------- 🧭 Mi plan
@@ -158,8 +198,14 @@ def pagina_plan():
         st.warning(a)
 
     inf = cargar_informe()
-    ranking = inf["ranking"] if inf else []
-    ideas = [r for r in ranking if r["ticker"] in (inf or {}).get("ideas", [])]
+    ranking = {r["ticker"]: r for r in (inf["ranking"] if inf else [])}
+    cartera_perfil = next((c for c in (inf or {}).get("carteras", {}).values()
+                           if c["perfil"] == perfil_inv.nombre), None)
+    if cartera_perfil:
+        candidatas = [ranking[x["ticker"]] for x in cartera_perfil["composicion"] if x["ticker"] in ranking]
+        ideas = asesor.ideas_diversificadas(candidatas, max_ideas=10, min_puntuacion=0, max_por_sector=2)
+    else:
+        ideas = [ranking[t] for t in (inf or {}).get("ideas", []) if t in ranking]
     plan = asesor.plan_inversion(p["importe"], p["mensual"], perfil_inv, ideas)
     fase = (inf or {}).get("mercado", {}).get("fases", {}).get("^IBEX", {}).get("fase")
     st.info("⏱️ " + asesor.ritmo_de_entrada(fase))
@@ -175,7 +221,13 @@ def pagina_plan():
     for a in plan["avisos"]:
         st.caption("ℹ️ " + a)
     if plan["acciones"]:
-        st.markdown("**Acciones individuales sugeridas hoy** (sectores distintos, con stop-loss):")
+        if cartera_perfil:
+            m = cartera_perfil["metricas"]
+            st.markdown(f"**Acciones individuales: las primeras de la {cartera_perfil['nombre']}**, la que encaja con "
+                        f"tu perfil. En la simulación desde 2017 ganó {pct(m['cagr_pct'], 1)} al año con una peor caída "
+                        f"de {pct(m['max_caida_pct'], 0)}. Revísala una vez al mes (📦 Carteras modelo).")
+        else:
+            st.markdown("**Acciones individuales sugeridas hoy** (sectores distintos, con stop-loss):")
         filas = []
         for a in plan["acciones"]:
             n = int(a["euros"] // a["precio"]) if a.get("precio") else 0
@@ -250,33 +302,33 @@ def pagina_radar_global() -> bool:
     mercados = c[0].multiselect("Mercados", list(MERCADOS), default=[m for m in MERCADOS if m != "ETF"])
     sectores = sorted(df["sector"].dropna().unique())
     sector = c[1 % len(c)].selectbox("Sector", ["Todos"] + sectores)
-    solo = c[2 % len(c)].toggle("Solo en zona de compra", value=False)
+    solo = c[2 % len(c)].toggle("Solo candidatas (nota ≥75, riesgo no alto)", value=False)
     buscar = st.text_input("Buscar empresa", "").strip().lower()
     f = df[df["mercado"].isin(mercados)]
     if sector != "Todos":
         f = f[f["sector"] == sector]
     if solo:
-        f = f[f["puntuacion"] >= 70]
+        f = f[(f["nota"].fillna(0) >= 75) & (f["puntuacion"] >= 55) & (f["riesgo_nivel"] != "alto")]
     if buscar:
         f = f[f["nombre"].str.lower().str.contains(buscar) | f["ticker"].str.lower().str.contains(buscar)]
     tabla = pd.DataFrame({
         "": ["⭐" if t in ideas else "" for t in f["ticker"]],
-        "Empresa": f["nombre"], "Mercado": f["mercado"], "Puntuación": f["puntuacion"], "Veredicto": f["veredicto"],
-        "Prob. subir 1 mes": (f["prob_modelo"] * 100).round(0),
-        "Rango 1 mes": [f"{pct(a * 100, 0)} / {pct(b * 100, 0)}" if pd.notna(a) else "—"
-                        for a, b in zip(f["p10_1m"], f["p90_1m"])],
-        "Hoy %": f["var_1d"].round(2), "1 año %": f["var_1a"].round(1),
+        "Empresa": f["nombre"], "Mercado": f["mercado"], "Nota": f.get("nota"),
+        "Riesgo caída": f["riesgo_nivel"].map(ICONO_RIESGO) if "riesgo_nivel" in f else None,
+        "Último año %": (f["momentum"] * 100).round(0) if "momentum" in f else None,
+        "Técnica": f["puntuacion"], "Veredicto": f["veredicto"],
+        "Hoy %": f["var_1d"].round(2),
         "Analistas %": (f["potencial_analistas"] * 100).round(1), "PER": f["per"].round(1),
         "Dividendo %": (f["dividendo"] * 100).round(1), "Ticker": f["ticker"],
     })
     if pf.movil:
-        tabla = tabla[["", "Empresa", "Puntuación", "Prob. subir 1 mes", "Hoy %", "Ticker"]]
-    st.caption(f"{len(tabla)} valores. ⭐ = idea del día. **Toca una fila** para ver su análisis completo.")
+        tabla = tabla[["", "Empresa", "Nota", "Riesgo caída", "Hoy %", "Ticker"]]
+    st.caption(f"{len(tabla)} valores, ordenados por **nota global**: el puesto de cada acción combinando su "
+               "momentum del último año (50%), su puntuación técnica (30%) y su menor riesgo de caída (20%), que es "
+               "lo que ha funcionado con datos reales. ⭐ = idea del día. **Toca una fila** para ver su análisis.")
     sel = st.dataframe(tabla, hide_index=True, width="stretch", height=min(38 * len(tabla) + 40, 900),
                        on_select="rerun", selection_mode="single-row",
-                       column_config={"Puntuación": st.column_config.ProgressColumn(min_value=0, max_value=100,
-                                                                                     format="%d"),
-                                      "Prob. subir 1 mes": st.column_config.NumberColumn(format="%d%%"),
+                       column_config={"Nota": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d"),
                                       "Ticker": None if not pf.movil else st.column_config.TextColumn(width="small")})
     filas = sel.selection.rows if sel and sel.selection else []
     if filas:
@@ -287,17 +339,26 @@ def pagina_radar_global() -> bool:
 # --------------------------------------------------------------------------- bloques para Analizar
 def bloque_modelo_conjunto(ticker: str, fila: dict | None):
     inf = cargar_informe()
-    if not inf or not fila or fila.get("prob_modelo") is None:
+    if not inf or not fila:
         return
-    m = inf["modelo"]["metricas"]
-    st.markdown("**🤖 Modelo conjunto (aprende de todas las empresas)**")
+    st.markdown("**🤖 Lo que dicen los modelos entrenados con todas las empresas**")
     c = st.columns(2)
-    c[0].metric("Probabilidad de subir en 1 mes", f"{fila['prob_modelo'] * 100:.0f}%",
-                f"media histórica {pct(fila['rent_media_1m'] * 100, 1)}")
-    c[1].metric("Rango habitual a 1 mes", f"{pct(fila['p10_1m'] * 100, 0)} / {pct(fila['p90_1m'] * 100, 0)}")
-    st.caption(f"Cuando el modelo dio una nota así en años que no había visto, la acción subió en ese porcentaje de "
-               f"casos. Acierto global: {m['acierto'] * 100:.0f}% (azar {m['referencia'] * 100:.0f}%). "
-               f"Fiabilidad: **{inf['modelo']['fiabilidad'].lower()}**. Datos del cierre del {inf['datos_hasta']}.")
+    if fila.get("nota") is not None:
+        c[0].metric("Nota global", f"{fila['nota']}/100", f"puesto {fila['puesto']} de {fila['de']}", delta_color="off",
+                    help="Combina momentum del último año, puntuación técnica y riesgo de caída.")
+    mr = inf.get("modelo_riesgo", {})
+    if fila.get("riesgo_caida") is not None and mr:
+        base = mr["metricas"]["tasa_subidas"]
+        c[1].metric("Riesgo de caída >10% en 1 mes", f"{fila['riesgo_caida'] * 100:.0f}%",
+                    f"lo normal: {base * 100:.0f}%", delta_color="off")
+        st.caption(f"Nivel de riesgo: **{ICONO_RIESGO.get(fila.get('riesgo_nivel'))}**. Este modelo sí distingue el "
+                   f"riesgo en años que no había visto (AUC {mr['metricas']['auc']:.2f}; 0,5 sería azar). "
+                   f"Fiabilidad: {mr['fiabilidad'].lower()}.")
+    m = inf["modelo"]
+    if fila.get("prob_modelo") is not None:
+        st.caption(f"Predecir si subirá es mucho más difícil: el modelo de dirección da un "
+                   f"{fila['prob_modelo'] * 100:.0f}% de probabilidad de subir en 1 mes, pero su fiabilidad es "
+                   f"**{m['fiabilidad'].lower()}** (AUC {m['metricas']['auc']:.2f}). Tómalo solo como referencia.")
 
 
 def bloque_que_puede_pasar_accion(ticker: str, df: pd.DataFrame, importe: float):
@@ -368,37 +429,9 @@ def bloque_entrenamiento_diario():
                 + f" situaciones de {m['metricas']['acciones']} valores**, y cada semana la estrategia prueba "
                 f"**{e.get('iteraciones', '—')} combinaciones de reglas** con {e.get('acciones', '—')} acciones "
                 f"(último entrenamiento: {e.get('fecha', '—')}).")
-    st.subheader("🤖 Modelo conjunto: acierto en años no vistos")
-    mm = m["metricas"]
-    c = st.columns(1 if pf.movil else 4)
-    c[0].metric("Acierto de dirección a 1 mes", f"{mm['acierto'] * 100:.1f}%", f"azar {mm['referencia'] * 100:.1f}%",
-                delta_color="off")
-    c[1 % len(c)].metric("AUC", f"{mm['auc']:.3f}", help="0,5 = azar; 0,55-0,60 ya es útil en bolsa.")
-    c[2 % len(c)].metric("20% mejor valoradas (al mes)", pct(mm["mejores_mes"] * 100, 2),
-                         f"todas {pct(mm['todos_mes'] * 100, 2)}", delta_color="off")
-    c[3 % len(c)].metric("20% peor valoradas (al mes)", pct(mm["peores_mes"] * 100, 2))
-    st.caption(f"Las mejor valoradas rindieron más que la media en el {mm['meses_mejores_ganan'] * 100:.0f}% de los "
-               f"{mm['meses']} meses evaluados ({mm['desde']} → {mm['hasta']}). Fiabilidad: **{m['fiabilidad']}**.")
-    cal = pd.DataFrame(m["calibracion"])
-    if not cal.empty:
-        with st.expander("📏 Calibración: lo que dijo el modelo y lo que pasó de verdad"):
-            st.dataframe(pd.DataFrame({
-                "El modelo decía": [f"{a * 100:.0f}-{b * 100:.0f}%" for a, b in zip(cal["p_min"], cal["p_max"])],
-                "Subió de verdad": (cal["sube"] * 100).round(0).astype(int).astype(str) + "%",
-                "Rentabilidad media": [pct(x * 100, 1) for x in cal["rent_media"]],
-                "Casos": cal["casos"]}), hide_index=True, width="stretch")
-            st.caption("Si 'Subió de verdad' crece de arriba abajo, el modelo distingue algo real. "
-                       "La app siempre te enseña la columna 'Subió de verdad', no la cifra bruta del modelo.")
-    if m.get("importancia"):
-        with st.expander("🔎 Qué patrones pesan más"):
-            st.bar_chart(pd.DataFrame(m["importancia"]).set_index("dato")["peso"], horizontal=True)
-    if m.get("por_ano"):
-        with st.expander("📆 Acierto año a año"):
-            pa = pd.DataFrame(m["por_ano"])
-            st.dataframe(pd.DataFrame({"Año": pa["ano"], "Acierto": (pa["acierto"] * 100).round(1),
-                                       "Subidas reales %": (pa["tasa_subidas"] * 100).round(1),
-                                       "AUC": pa["auc"].round(3), "Casos": pa["casos"]}),
-                         hide_index=True, width="stretch")
+    if inf.get("modelo_riesgo"):
+        bloque_un_modelo(inf["modelo_riesgo"], "🛡️ Modelo de riesgo de caída fuerte (el que sí funciona)", riesgo=True)
+    bloque_un_modelo(m, "🎲 Modelo de dirección: ¿subirá en 1 mes? (se publica por transparencia)")
 
     if e.get("fuera_de_muestra"):
         st.subheader("🏋️ Estrategia completa: años no vistos")
@@ -416,6 +449,149 @@ def bloque_entrenamiento_diario():
         with st.expander("Reglas vigentes"):
             for linea in Parametros.desde_dict(e["parametros"]).describir():
                 st.markdown(f"- {linea}")
+
+
+def bloque_un_modelo(mod: dict, titulo: str, riesgo: bool = False):
+    pf = perfil()
+    mm = mod["metricas"]
+    st.subheader(titulo)
+    c = st.columns(1 if pf.movil else 3)
+    c[0].metric("AUC (0,5 = azar)", f"{mm['auc']:.3f}", nivel_auc(mm["auc"]), delta_color="off")
+    if riesgo:
+        cal = pd.DataFrame(mod["calibracion"])
+        c[1 % len(c)].metric("Caídas con riesgo 'muy bajo'", f"{cal['sube'].iloc[0] * 100:.0f}%")
+        c[2 % len(c)].metric("Caídas con riesgo 'muy alto'", f"{cal['sube'].iloc[-1] * 100:.0f}%",
+                             f"media {mm['tasa_subidas'] * 100:.0f}%", delta_color="off")
+        st.caption("Frecuencia real con la que la acción llegó a caer más de un 10% en el mes siguiente, según el "
+                   "riesgo que había estimado el modelo, en años que no había visto.")
+    else:
+        c[1 % len(c)].metric("Acierto de dirección a 1 mes", f"{mm['acierto'] * 100:.1f}%",
+                             f"azar {mm['referencia'] * 100:.1f}%", delta_color="off")
+        c[2 % len(c)].metric("20% mejor valoradas (al mes)", pct(mm["mejores_mes"] * 100, 2),
+                             f"todas {pct(mm['todos_mes'] * 100, 2)}", delta_color="off")
+    st.caption(f"{mm['casos']:,} casos de {mm['acciones']} valores ({mm['desde']} → {mm['hasta']}). ".replace(",", ".")
+               + f"Fiabilidad: **{mod['fiabilidad']}**.")
+    cal = pd.DataFrame(mod["calibracion"])
+    if not cal.empty:
+        with st.expander("📏 Calibración: lo que dijo el modelo y lo que pasó de verdad"):
+            st.dataframe(pd.DataFrame({
+                "El modelo decía": [f"{a * 100:.0f}-{b * 100:.0f}%" for a, b in zip(cal["p_min"], cal["p_max"])],
+                "Ocurrió de verdad": (cal["sube"] * 100).round(0).astype(int).astype(str) + "%",
+                "Rentabilidad media": [pct(x * 100, 1) for x in cal["rent_media"]],
+                "Casos": cal["casos"]}), hide_index=True, width="stretch")
+            st.caption("Si 'Ocurrió de verdad' cambia claramente de arriba abajo, el modelo distingue algo real. "
+                       "La app siempre te enseña lo que ocurrió de verdad, no la cifra bruta del modelo.")
+    if mod.get("importancia"):
+        with st.expander("🔎 Qué patrones pesan más"):
+            st.bar_chart(pd.DataFrame(mod["importancia"]).set_index("dato")["peso"], horizontal=True)
+    if mod.get("por_ano"):
+        with st.expander("📆 Año a año"):
+            pa = pd.DataFrame(mod["por_ano"])
+            st.dataframe(pd.DataFrame({"Año": pa["ano"], "AUC": pa["auc"].round(3),
+                                       "Acierto": (pa["acierto"] * 100).round(1),
+                                       "Frecuencia real %": (pa["tasa_subidas"] * 100).round(1), "Casos": pa["casos"]}),
+                         hide_index=True, width="stretch")
+
+
+# --------------------------------------------------------------------------- 📦 Carteras modelo
+def pagina_carteras():
+    pf = perfil()
+    st.title("📦 Carteras modelo")
+    inf = cargar_informe()
+    if not inf or not inf.get("carteras"):
+        sin_informe()
+        return
+    aviso_antiguedad(inf)
+    st.markdown("Tres formas sencillas de invertir en acciones que **han funcionado con datos reales** y que puedes "
+                "replicar en Bankinter. Se revisan **una vez al mes** (el primer día hábil): es lo contrario a estar "
+                "comprando y vendiendo cada día.")
+    st.warning("⚠️ Las simulaciones usan las grandes empresas de **hoy**; las que fracasaron por el camino no están, "
+               "y eso hace los resultados algo optimistas (sobre todo para el momentum). Rentabilidades pasadas no "
+               "garantizan las futuras. Úsalas solo para la parte de acciones de tu plan (🎯 Mi plan).")
+    por_ticker = {r["ticker"]: r for r in inf["ranking"]}
+    claves = list(inf["carteras"])
+    perfil_guardado = datos_usuario().get("perfil_inversor")
+    sugerida = 0
+    if perfil_guardado:
+        nombre = asesor.perfil_inversor(perfil_guardado["horizonte"], perfil_guardado["reaccion"],
+                                        perfil_guardado["experiencia"], perfil_guardado["colchon"]).nombre
+        sugerida = next((i for i, k in enumerate(claves) if inf["carteras"][k]["perfil"] == nombre), 0)
+    tabs = st.tabs([inf["carteras"][k]["nombre"].split(" (")[0] for k in claves])
+    for tab, k in zip(tabs, claves):
+        c = inf["carteras"][k]
+        with tab:
+            if claves.index(k) == sugerida and perfil_guardado:
+                st.success("👉 Es la que encaja con tu perfil.")
+            st.markdown(f"**{c['nombre']}** · perfil {c['perfil'].lower()}")
+            st.caption(c["descripcion"])
+            m, ref = c["metricas"], c["referencia"]
+            cols = st.columns(1 if pf.movil else 3)
+            cols[0].metric("Rentabilidad anual simulada", pct(m["cagr_pct"], 1), f"todas: {pct(ref['cagr_pct'], 1)}",
+                           delta_color="off")
+            cols[1 % len(cols)].metric("Peor caída", pct(m["max_caida_pct"], 0), f"todas: {pct(ref['max_caida_pct'], 0)}",
+                                       delta_color="off")
+            cols[2 % len(cols)].metric("Comisiones pagadas", eur(m["gastos"] * 10_000 / c["capital_simulado"]),
+                                       f"{m['operaciones']} operaciones", delta_color="off")
+            curvas = pd.DataFrame({"Esta cartera": pd.Series(c["curva"]["valores"], index=pd.to_datetime(c["curva"]["fechas"])),
+                                   "Todas a partes iguales": pd.Series(c["curva_referencia"]["valores"],
+                                                                       index=pd.to_datetime(c["curva_referencia"]["fechas"]))})
+            st.line_chart(curvas, height=260 if pf.movil else 340)
+            st.caption(f"10.000 € invertidos el {m['desde']} siguiendo la regla (comisiones e impuesto de "
+                       "transacciones incluidos; sin IRPF).")
+            with st.expander("📆 Año a año"):
+                st.dataframe(pd.DataFrame([{"Año": a["ano"], "Esta cartera": pct(a["cartera"], 1),
+                                            "Todas a partes iguales": pct(a["todas"], 1)} for a in c["por_ano"]]),
+                             hide_index=True, width="stretch")
+            st.markdown("**Composición de este mes**")
+            if not c["composicion"]:
+                st.info("Este mes la cartera está en **liquidez**: los mercados de sus acciones están en tendencia "
+                        "bajista. La regla vuelve a comprar cuando se recuperen.")
+                continue
+            importe = st.number_input("¿Cuánto quieres dedicar a esta cartera? (€)", 1_000.0, 1_000_000.0,
+                                      float(max(1_000.0, c["n"] * 600.0)), 500.0, key=f"imp_{k}")
+            por_valor = importe / c["n"]
+            filas = []
+            for x in c["composicion"]:
+                r = por_ticker.get(x["ticker"], {})
+                n = int(por_valor // x["precio"]) if x["precio"] else 0
+                filas.append({"Empresa": r.get("nombre", x["ticker"]), "Sector": r.get("sector", "—"),
+                              "Mercado": r.get("mercado", "—"), "Precio": round(x["precio"], 2), "Acciones": n,
+                              "Importe": eur(n * x["precio"], moneda_de(x["ticker"])),
+                              "Riesgo caída": ICONO_RIESGO.get(r.get("riesgo_nivel")), "Ticker": x["ticker"]})
+            st.dataframe(pd.DataFrame(filas), hide_index=True, width="stretch")
+            if por_valor < 600:
+                st.warning(f"Con {eur(por_valor)} por empresa, las comisiones mínimas se comerían buena parte de la "
+                           "ganancia. Mejor dedicar más dinero, elegir menos empresas o usar un ETF.")
+            st.caption("Cómo seguirla: el primer día hábil de cada mes, vende las que ya no estén en la lista, compra "
+                       "las nuevas y reparte a partes iguales. La app te avisa en 🧭 Hoy y por Telegram.")
+            with st.expander("📋 Órdenes para copiar en Bankinter"):
+                for x, fila in zip(c["composicion"], filas):
+                    if fila["Acciones"]:
+                        st.code(bankinter.ticket(x["ticker"], "Compra", fila["Acciones"], round(x["precio"], 2),
+                                                 dias_validez=3), language=None)
+
+    st.header("🛡️ Regla de protección para tus fondos indexados / ETF")
+    st.markdown("Para la parte de tu dinero en fondos indexados: **seguir invertido mientras el índice esté por encima "
+                "de su media de 200 sesiones, y pasar a liquidez solo si cae más de un 2% por debajo**. Volver a "
+                "entrar cuando supere la media en un 2%.")
+    filas = []
+    for t, p in inf.get("proteccion", {}).items():
+        st.markdown("- " + texto_proteccion(t, p))
+        h = p.get("historia", {})
+        if h:
+            filas.append({"Índice": nombre_de(t), "Desde": h["mantener"]["desde"][:4],
+                          "Mantener %/año": round(h["mantener"]["cagr_pct"], 1),
+                          "Mantener peor caída": pct(h["mantener"]["max_caida_pct"], 0),
+                          "Con la regla %/año": round(h["filtro"]["cagr_pct"], 1),
+                          "Con la regla peor caída": pct(h["filtro"]["max_caida_pct"], 0),
+                          "Cambios al año": round(h["cambios_por_ano"], 1)})
+    if filas:
+        st.dataframe(pd.DataFrame(filas), hide_index=True, width="stretch")
+        st.caption("Índices sin dividendos; con la regla, el tiempo fuera se remunera al 2% anual. La regla no evita "
+                   "las caídas rápidas (como marzo de 2020), pero sí las largas (2000-2003, 2008).")
+    st.info("💡 **Truco fiscal en España**: entre **fondos de inversión** indexados puedes hacer *traspasos* sin pagar "
+            "impuestos. Si piensas aplicar esta regla, es mejor usar fondos indexados (p. ej. un fondo MSCI World) y un "
+            "fondo monetario que ETF, porque vender un ETF sí tributa.")
 
 
 def bloque_historial_ideas():

@@ -115,9 +115,13 @@ def ideas_diversificadas(ranking: list[dict], max_ideas: int = 5, min_puntuacion
                          max_por_sector: int = 1) -> list[dict]:
     """Elige las mejores acciones sin repetir sector y descartando las que presentan resultados ya."""
     elegidas, por_sector = [], {}
-    candidatas = [r for r in ranking if not r.get("etf") and r.get("puntuacion", 0) >= min_puntuacion
-                  and not r.get("resultados_pronto")]
-    candidatas.sort(key=lambda r: (r.get("puntuacion", 0) + 20 * (r.get("prob_modelo", 0.5) - 0.5)), reverse=True)
+
+    def nota(r: dict) -> float:
+        return r["nota"] if r.get("nota") is not None else r.get("puntuacion", 0)
+
+    candidatas = [r for r in ranking if not r.get("etf") and nota(r) >= min_puntuacion
+                  and not r.get("resultados_pronto") and r.get("riesgo_nivel") != "alto"]
+    candidatas.sort(key=nota, reverse=True)
     for r in candidatas:
         s = r.get("sector", "—")
         if por_sector.get(s, 0) >= max_por_sector:
