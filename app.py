@@ -15,6 +15,7 @@ from plotly.subplots import make_subplots
 from bolsa import aprendizaje, asesor, bankinter, costes, noticias, senales
 from bolsa.indicadores import calcular_todo
 from bolsa.tickers import INDICES, MERCADOS, TERMOMETROS, TODAS_LAS_ACCIONES, mercado_de, nombre_de, sector_de
+from paginas_chat import pagina_chat
 from paginas_extra import bloque_operar, pagina_bankinter, pagina_cartera_virtual, pagina_simulador
 from paginas_hoy import (bloque_fases, bloque_que_puede_pasar_accion, pagina_carteras, pagina_hoy, pagina_plan,
                          pagina_radar_global)
@@ -709,10 +710,11 @@ PAGINAS = {
     "simulador": st.Page(pagina_simulador, title="Simulador y modelos", icon="🧪"),
     "calculadoras": st.Page(pagina_calculadoras, title="Calculadoras", icon="🧮"),
     "aprende": st.Page(pagina_aprende, title="Aprende", icon="🎓"),
+    "chat": st.Page(pagina_chat, title="Pregunta a Claude", icon="💬"),
 }
 st.session_state["_paginas"] = PAGINAS
 nav = st.navigation({
-    "Inicio": [PAGINAS["hoy"], PAGINAS["plan"]],
+    "Inicio": [PAGINAS["hoy"], PAGINAS["plan"], PAGINAS["chat"]],
     "Invertir": [PAGINAS["analizar"], PAGINAS["radar"], PAGINAS["carteras"], PAGINAS["noticias"],
                  PAGINAS["mercados"]],
     "Mis carteras": [PAGINAS["bankinter"], PAGINAS["virtual"]],

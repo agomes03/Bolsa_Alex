@@ -379,6 +379,21 @@ GLOSARIO: list[Termino] = [
     Termino("Letras del Tesoro", "Fondos y otros productos",
             "Deuda del Estado español a 3, 6, 9 o 12 meses. Se compran en tesoro.es (Banco de España) o en el banco. "
             "Muy seguras.", "", ("Bono", "Fondo monetario")),
+    Termino("Oro", "Fondos y otros productos",
+            "Activo «refugio»: suele aguantar mejor en algunas crisis y con inflación alta, pero no paga intereses ni "
+            "dividendos y puede pasar años sin subir (tras su máximo de 2011 tardó hasta 2020 en recuperarlo). Desde "
+            "España se invierte con un ETC de oro físico en euros (por ejemplo, Xetra-Gold) o con fondos.",
+            "Muchos manuales proponen como mucho un 5-10 % del dinero en oro.", ("Diversificación", "Criptomonedas")),
+    Termino("Criptomonedas", "Fondos y otros productos",
+            "Monedas digitales como bitcoin o ethereum. Muy volátiles: bitcoin ha caído más de un 70 % desde sus "
+            "máximos varias veces (por ejemplo en 2018 y en 2022) y no generan rentas. En España sus ganancias "
+            "tributan en la base del ahorro, y si las tienes en plataformas extranjeras por más de 50.000 € hay que "
+            "informar a Hacienda (modelo 721).",
+            "Con un 2 % de tu dinero en cripto, una caída del 70 % te resta un 1,4 % del total: se soporta. Con un "
+            "30 %, te resta un 21 %.", ("Bitcoin", "Volatilidad")),
+    Termino("Bitcoin", "Fondos y otros productos",
+            "La primera y mayor criptomoneda. Su número está limitado a 21 millones, lo que sus defensores comparan "
+            "con el oro; su precio depende solo de lo que otros estén dispuestos a pagar.", "", ("Criptomonedas",)),
     # ------------------------------------------------------------------ Economía
     Termino("Tipos de interés", "Economía",
             "Precio del dinero que fijan los bancos centrales. Si suben, los préstamos encarecen y la bolsa suele "
@@ -459,7 +474,9 @@ ALIAS: dict[str, tuple[str, ...]] = {
     "Stop relacionadas": ("OCO", "órdenes relacionadas", "one cancels other"),
     "Stop-loss": ("stop loss", "stoploss", "parar pérdidas", "limitar pérdidas"),
     "Objetivo de precio": ("take profit", "recoger beneficios"),
-    "Ganancia patrimonial": ("plusvalía", "minusvalía", "plusvalías", "beneficio al vender"),
+    "Ganancia patrimonial": ("plusvalía", "minusvalía", "plusvalías", "beneficio al vender", "tributa", "tributar",
+                             "tributan", "hacienda", "irpf", "impuestos"),
+    "Compensación de pérdidas": ("compensar pérdidas", "con pérdidas", "vender con pérdidas"),
     "Tasa Tobin": ("ITF", "impuesto sobre transacciones financieras"),
     "Fondo indexado": ("indexado", "gestión pasiva", "index fund", "fondo índice"),
     "Comprar / Vender (largo)": ("long", "posición larga", "estar largo"),
@@ -473,6 +490,7 @@ ALIAS: dict[str, tuple[str, ...]] = {
     "Precio / valor contable": ("P/VC", "PVC", "price to book"),
     "BPA": ("EPS", "beneficio por acción"),
     "Fed": ("Reserva Federal", "FOMC"),
+    "Informe fiscal": ("declaración de la renta", "declaracion de la renta", "renta"),
     "BCE": ("Banco Central Europeo",),
     "Capitalización": ("market cap", "valor en bolsa"),
     "Dividendo flexible (scrip)": ("scrip dividend", "dividendo en acciones"),
@@ -486,6 +504,9 @@ ALIAS: dict[str, tuple[str, ...]] = {
     "Blue chip": ("valores grandes", "grandes empresas"),
     "Volatilidad": ("cuánto se mueve",),
     "Apalancamiento": ("leverage", "apalancado"),
+    "Oro": ("gold", "etc de oro", "metales preciosos"),
+    "Criptomonedas": ("cripto", "criptos", "criptomoneda", "crypto", "ethereum"),
+    "Bitcoin": ("btc",),
     "Interés compuesto": ("interés sobre interés",),
 }
 
@@ -513,7 +534,7 @@ def buscar(texto: str = "", categoria: str | None = None) -> list[Termino]:
     return sorted(salida, key=lambda t: (bool(q) and not any(_contiene(q, n) for n in _nombres(t)), _norm(t.termino)))
 
 
-def parecidos(texto: str, n: int = 5) -> list[Termino]:
+def parecidos(texto: str, n: int = 5, corte: float = 0.6) -> list[Termino]:
     """Términos con un nombre parecido (para errores al escribir: «stoploss», «dividedno»...)."""
     import difflib
 
@@ -521,7 +542,7 @@ def parecidos(texto: str, n: int = 5) -> list[Termino]:
     if not q:
         return []
     por_nombre = {n_: t for t in GLOSARIO for n_ in _nombres(t)}
-    encontrados = difflib.get_close_matches(q, list(por_nombre), n=n * 2, cutoff=0.6)
+    encontrados = difflib.get_close_matches(q, list(por_nombre), n=n * 2, cutoff=corte)
     salida = []
     for nombre in encontrados:
         t = por_nombre[nombre]
