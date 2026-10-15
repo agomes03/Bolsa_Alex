@@ -59,8 +59,8 @@ def test_palabras_de_cada_pagina_estan_en_el_diccionario():
     nombres = {t.termino for t in aprendizaje.GLOSARIO}
     raiz = pathlib.Path(__file__).resolve().parent.parent
     usados = []
-    for archivo in ["app.py", "paginas_hoy.py", "paginas_extra.py", "paginas_virtual.py"]:
-        for nodo in ast.walk(ast.parse((raiz / archivo).read_text(encoding="utf-8"))):
+    for archivo in sorted(raiz.glob("paginas_*.py")):
+        for nodo in ast.walk(ast.parse(archivo.read_text(encoding="utf-8"))):
             if isinstance(nodo, ast.Call) and getattr(nodo.func, "id", "") == "palabras_de_la_pagina":
                 usados += [e.value for e in nodo.args[0].elts]
     assert len(usados) > 40
