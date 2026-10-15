@@ -521,7 +521,7 @@ ESTILOS = """
 /* Cifras un poco más pequeñas: caben más sin hacer scroll. */
 [data-testid="stMetricValue"] { font-size: clamp(1.3rem, 2.4vw, 1.9rem); }
 @media (max-width: 640px) {
-  [data-testid="stMainBlockContainer"] { padding: 2.75rem 0.85rem 4rem 0.85rem; }
+  [data-testid="stMainBlockContainer"] { padding: 2.75rem 0.85rem 3rem 0.85rem; }
   h1 { font-size: 1.75rem !important; }
   h2 { font-size: 1.35rem !important; }
   h3 { font-size: 1.15rem !important; }
@@ -533,10 +533,12 @@ ESTILOS = """
   [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]):not(:has([data-testid="stPlotlyChart"], [data-testid="stDataFrame"], [data-testid="stButton"], [data-testid="stExpander"], [data-testid="stForm"])) > [data-testid="stColumn"] {
     flex: 1 1 calc(50% - 0.75rem) !important; min-width: calc(50% - 0.75rem) !important;
     width: calc(50% - 0.75rem) !important; }
-  /* Menú de abajo: siempre a mano, como en la app de un banco. */
-  .st-key-nav_movil { position: fixed; bottom: 0; left: 0; right: 0; z-index: 999990;
-    background: var(--background-color, #fff); border-top: 1px solid rgba(128, 128, 128, 0.25);
-    padding: 0.2rem 0.3rem calc(0.2rem + env(safe-area-inset-bottom)) 0.3rem; }
+  /* Menú fijo arriba, justo debajo de la cabecera de Streamlit: abajo a la derecha Streamlit Cloud pone el botón
+     «Manage app» (solo lo ve el dueño) y taparía el menú. */
+  .st-key-nav_movil { position: fixed; top: 60px; left: 0; right: 0; z-index: 999990;
+    background: var(--background-color, #fff); border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06); padding: 0.15rem 0.3rem; }
+  [data-testid="stMainBlockContainer"]:has(.st-key-nav_movil) { padding-top: 7.25rem; }
   .st-key-nav_movil [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important;
     gap: 0.1rem !important; }
   .st-key-nav_movil [data-testid="stColumn"] { min-width: 0 !important; width: 20% !important; flex: 1 1 0 !important; }
@@ -560,7 +562,7 @@ def estilos() -> None:
 
 
 def barra_movil(grupos: dict[str, list]) -> None:
-    """Menú fijo abajo en el móvil con las 4 páginas que más se usan y «Más» con todas las demás."""
+    """Menú fijo arriba en el móvil con las 4 páginas que más se usan y «Más» con todas las demás."""
     def enlazar(destino, pagina, **kw):
         try:
             destino.page_link(pagina, **kw)
