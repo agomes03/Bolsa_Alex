@@ -152,8 +152,10 @@ Street) y los sábados (reentrenamiento semanal de la estrategia). Ejecuta `scri
 4. Guarda `informe/informe.json` en el repositorio (la app lo lee al instante) y archiva las ideas y el tono de
    las noticias para medir su **acierto real** con el paso del tiempo.
 
-Puedes lanzarla a mano en GitHub → *Actions* → *Actualización diaria* → *Run workflow*. Consume unos pocos
-minutos al día del cupo gratuito de GitHub Actions.
+Puedes lanzarla a mano en GitHub → *Actions* → *Actualización diaria* → *Run workflow*. Cada ejecución tarda
+unos 2-3 minutos (≈60 minutos al mes, muy por debajo de los 2.000 gratuitos de un repositorio privado). Si un día
+falla (por ejemplo, Yahoo no responde), la app sigue mostrando el último informe y avisa de su antigüedad, y
+GitHub te envía un correo.
 
 **Avisos al móvil por Telegram (opcional):** crea un bot con @BotFather y añade en GitHub → *Settings →
 Secrets and variables → Actions* los secretos `TELEGRAM_TOKEN` y `TELEGRAM_CHAT_ID`. Si además añades
