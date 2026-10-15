@@ -196,6 +196,115 @@ MERCADOS = {
 
 TODAS_LAS_ACCIONES = {**IBEX35, **CONTINUO, **EUROPA, **EEUU, **ETFS}
 
+# --------------------------------------------------------------------------- catálogo ampliado
+# Todo lo que se puede consultar y practicar en la app (Analizar, Mercados, cartera virtual). No entra en el
+# informe diario ni en las carteras modelo, que siguen con el universo de arriba (validado en el laboratorio).
+# Todos los códigos están comprobados con datos reales de Yahoo Finance.
+REINO_UNIDO_SUIZA = {
+    "HSBA.L": ("HSBC", "Banca", ["hsbc"]), "SHEL.L": ("Shell", "Petróleo", ["shell"]),
+    "AZN.L": ("AstraZeneca", "Salud", ["astrazeneca"]), "ULVR.L": ("Unilever", "Consumo", ["unilever"]),
+    "BP.L": ("BP", "Petróleo", ["bp"]), "RIO.L": ("Rio Tinto", "Materiales", ["rio tinto"]),
+    "GSK.L": ("GSK", "Salud", ["gsk", "glaxo"]), "BARC.L": ("Barclays", "Banca", ["barclays"]),
+    "LSEG.L": ("London Stock Exchange Group", "Financiero", ["london stock exchange"]),
+    "NESN.SW": ("Nestlé", "Consumo", ["nestlé", "nestle"]), "NOVN.SW": ("Novartis", "Salud", ["novartis"]),
+    "RO.SW": ("Roche", "Salud", ["roche"]), "UBSG.SW": ("UBS", "Banca", ["ubs"]),
+    "ZURN.SW": ("Zurich Insurance", "Seguros", ["zurich insurance"]),
+    "NOVO-B.CO": ("Novo Nordisk", "Salud", ["novo nordisk", "ozempic", "wegovy"]),
+}
+ASIA = {
+    "7203.T": ("Toyota", "Automoción", ["toyota"]), "6758.T": ("Sony", "Tecnología", ["sony"]),
+    "9984.T": ("SoftBank Group", "Tecnología", ["softbank"]), "7974.T": ("Nintendo", "Consumo", ["nintendo"]),
+    "8306.T": ("Mitsubishi UFJ", "Banca", ["mitsubishi ufj", "mufg"]),
+    "0700.HK": ("Tencent", "Tecnología", ["tencent"]), "9988.HK": ("Alibaba (Hong Kong)", "Consumo", ["alibaba"]),
+    "1299.HK": ("AIA Group", "Seguros", ["aia group"]), "1810.HK": ("Xiaomi", "Tecnología", ["xiaomi"]),
+    "005930.KS": ("Samsung Electronics", "Tecnología", ["samsung"]),
+    "2330.TW": ("TSMC (Taiwán)", "Tecnología", ["tsmc"]), "RELIANCE.NS": ("Reliance Industries", "Energía", ["reliance"]),
+}
+OTROS_MERCADOS = {
+    "TSM": ("TSMC (ADR en EEUU)", "Tecnología", []), "BABA": ("Alibaba (ADR en EEUU)", "Consumo", []),
+    "INFY": ("Infosys (ADR en EEUU)", "Tecnología", ["infosys"]), "VALE": ("Vale (ADR en EEUU)", "Materiales", ["vale"]),
+    "SHOP.TO": ("Shopify", "Tecnología", ["shopify"]), "RY.TO": ("Royal Bank of Canada", "Banca", ["royal bank of canada"]),
+    "PLTR": ("Palantir", "Tecnología", ["palantir"]), "UBER": ("Uber", "Transporte", ["uber"]),
+    "PYPL": ("PayPal", "Financiero", ["paypal"]), "SPOT": ("Spotify", "Medios", ["spotify"]),
+}
+FONDOS_INDEXADOS = {
+    "0P00000WLG.F": ("Vanguard Global Stock Index (MSCI World) € Acc", "Fondo mundial", []),
+    "0P0001CLDK.F": ("Fidelity MSCI World Index EUR P Acc", "Fondo mundial", []),
+    "0P00012PP6.F": ("Amundi Index MSCI World AE-C", "Fondo mundial", []),
+    "0P0001AINF.F": ("iShares Developed World Index (IE) D Acc EUR", "Fondo mundial", []),
+    "0P00000SUJ.F": ("Vanguard U.S. 500 Stock Index € Acc", "Fondo EEUU", []),
+    "0P00012SJB.F": ("Amundi S&P 500 Screened Index AE Acc", "Fondo EEUU", []),
+    "0P00000RQ8.F": ("Vanguard European Stock Index € Acc", "Fondo Europa", []),
+    "0P00012I6A.F": ("Vanguard Emerging Markets Stock Index € Acc", "Fondo emergentes", []),
+    "0P0000XR9M.F": ("Vanguard Global Small-Cap Index € Acc", "Fondo pequeñas empresas", []),
+    "0P00012I69.F": ("Vanguard Global Bond Index € Hedged Acc", "Renta fija", []),
+}
+MAS_ETFS = {
+    "EUNL.DE": ("iShares Core MSCI World (Xetra, €)", "ETF Mundial", []),
+    "XDWD.DE": ("Xtrackers MSCI World (€)", "ETF Mundial", []),
+    "VGWL.DE": ("Vanguard FTSE All-World (distribución, €)", "ETF Mundial", []),
+    "IS3N.DE": ("iShares Core MSCI Emerging Markets IMI (€)", "ETF Emergentes", []),
+    "EMIM.AS": ("iShares Core MSCI EM IMI (Ámsterdam, €)", "ETF Emergentes", []),
+    "VUSA.AS": ("Vanguard S&P 500 (distribución, €)", "ETF EEUU", []),
+    "SXRV.DE": ("iShares Nasdaq 100 (€)", "ETF EEUU", []),
+    "EXS1.DE": ("iShares Core DAX (€)", "ETF Alemania", []),
+    "EUNA.DE": ("iShares Core Global Aggregate Bond (€)", "Renta fija", []),
+    "4GLD.DE": ("Xetra-Gold (oro físico, €)", "Oro", []),
+    "SGLD.L": ("Invesco Physical Gold", "Oro", []),
+}
+CRIPTOMONEDAS = {f"{c}-EUR": (n, "Criptomoneda", [n.lower()]) for c, n in
+                 [("BTC", "Bitcoin"), ("ETH", "Ethereum"), ("SOL", "Solana"), ("XRP", "XRP"), ("ADA", "Cardano"),
+                  ("BNB", "BNB"), ("DOGE", "Dogecoin"), ("DOT", "Polkadot"), ("LTC", "Litecoin")]}
+DIVISAS = {
+    "USDEUR=X": ("Dólar estadounidense (USD/EUR)", "Divisa", []), "GBPEUR=X": ("Libra esterlina (GBP/EUR)", "Divisa", []),
+    "CHFEUR=X": ("Franco suizo (CHF/EUR)", "Divisa", []), "JPYEUR=X": ("Yen japonés (JPY/EUR)", "Divisa", []),
+    "CADEUR=X": ("Dólar canadiense (CAD/EUR)", "Divisa", []), "AUDEUR=X": ("Dólar australiano (AUD/EUR)", "Divisa", []),
+    "CNYEUR=X": ("Yuan chino (CNY/EUR)", "Divisa", []), "MXNEUR=X": ("Peso mexicano (MXN/EUR)", "Divisa", []),
+}
+MATERIAS_PRIMAS = {
+    "GC=F": ("Oro (futuro, $/onza)", "Metales", ["oro"]), "SI=F": ("Plata (futuro, $/onza)", "Metales", ["plata"]),
+    "PL=F": ("Platino (futuro, $/onza)", "Metales", ["platino"]), "HG=F": ("Cobre (futuro, $/libra)", "Metales", ["cobre"]),
+    "BZ=F": ("Petróleo Brent (futuro, $/barril)", "Energía", ["brent"]),
+    "CL=F": ("Petróleo WTI (futuro, $/barril)", "Energía", ["wti"]),
+    "NG=F": ("Gas natural (futuro, $)", "Energía", ["gas natural"]),
+    "ZW=F": ("Trigo (futuro, $)", "Agrícolas", ["trigo"]), "ZC=F": ("Maíz (futuro, $)", "Agrícolas", ["maíz"]),
+    "KC=F": ("Café (futuro, $)", "Agrícolas", ["café"]), "CC=F": ("Cacao (futuro, $)", "Agrícolas", ["cacao"]),
+    "SB=F": ("Azúcar (futuro, $)", "Agrícolas", ["azúcar"]),
+}
+INDICES_TODOS = {
+    "^IBEX": ("IBEX 35 (España)", "Índice", []), "^STOXX50E": ("Euro Stoxx 50 (zona euro)", "Índice", []),
+    "^GDAXI": ("DAX (Alemania)", "Índice", []), "^FCHI": ("CAC 40 (Francia)", "Índice", []),
+    "FTSEMIB.MI": ("FTSE MIB (Italia)", "Índice", []), "^AEX": ("AEX (Países Bajos)", "Índice", []),
+    "^FTSE": ("FTSE 100 (Reino Unido)", "Índice", []), "^SSMI": ("SMI (Suiza)", "Índice", []),
+    "^GSPC": ("S&P 500 (EEUU)", "Índice", []), "^NDX": ("Nasdaq 100 (EEUU)", "Índice", []),
+    "^IXIC": ("Nasdaq Composite (EEUU)", "Índice", []), "^DJI": ("Dow Jones (EEUU)", "Índice", []),
+    "^RUT": ("Russell 2000 (pequeñas EEUU)", "Índice", []), "^GSPTSE": ("S&P/TSX (Canadá)", "Índice", []),
+    "^BVSP": ("Bovespa (Brasil)", "Índice", []), "^N225": ("Nikkei 225 (Japón)", "Índice", []),
+    "^HSI": ("Hang Seng (Hong Kong)", "Índice", []), "000001.SS": ("Shanghái Composite (China)", "Índice", []),
+    "^KS11": ("KOSPI (Corea del Sur)", "Índice", []), "^NSEI": ("Nifty 50 (India)", "Índice", []),
+    "^AXJO": ("ASX 200 (Australia)", "Índice", []),
+}
+INDICADORES_MACRO = {
+    "^IRX": ("Letra del Tesoro EEUU 13 semanas (rentabilidad %)", "Tipos de interés", []),
+    "^FVX": ("Bono EEUU 5 años (rentabilidad %)", "Tipos de interés", []),
+    "^TNX": ("Bono EEUU 10 años (rentabilidad %)", "Tipos de interés", []),
+    "^TYX": ("Bono EEUU 30 años (rentabilidad %)", "Tipos de interés", []),
+    "^VIX": ("VIX (índice del miedo)", "Volatilidad", []),
+    "DX-Y.NYB": ("Índice dólar (DXY)", "Divisas", []),
+    "EURUSD=X": ("Euro / dólar (EUR/USD)", "Divisas", []),
+}
+
+CATALOGO = {
+    "España (IBEX 35)": IBEX35, "España (Mercado Continuo)": CONTINUO, "Europa": EUROPA, "EEUU": EEUU,
+    "Reino Unido, Suiza y Nórdicos": REINO_UNIDO_SUIZA, "Asia": ASIA, "Otros mercados": OTROS_MERCADOS,
+    "Fondos indexados": FONDOS_INDEXADOS, "ETF y oro": {**ETFS, **MAS_ETFS}, "Criptomonedas": CRIPTOMONEDAS,
+    "Divisas": DIVISAS, "Materias primas": MATERIAS_PRIMAS, "Índices": INDICES_TODOS,
+    "Tipos de interés y macro": INDICADORES_MACRO,
+}
+TODOS_LOS_VALORES = {t: v for grupo in CATALOGO.values() for t, v in grupo.items()}
+# Lo que no se puede comprar directamente (son referencias): índices y tipos/indicadores.
+NO_INVERTIBLES = set(INDICES_TODOS) | set(INDICADORES_MACRO)
+
 
 def nombre_de(ticker: str) -> str:
     if ticker in INDICES:
@@ -206,6 +315,8 @@ def nombre_de(ticker: str) -> str:
         return INDICES_MUNDIALES[ticker]
     if ticker in TODAS_LAS_ACCIONES:
         return TODAS_LAS_ACCIONES[ticker][0]
+    if ticker in TODOS_LOS_VALORES:
+        return TODOS_LOS_VALORES[ticker][0]
     from .activos import ACTIVOS, CRIPTO, ORO, es_cripto
 
     if ticker in ORO:
@@ -218,7 +329,16 @@ def nombre_de(ticker: str) -> str:
 
 
 def sector_de(ticker: str) -> str:
-    return TODAS_LAS_ACCIONES.get(ticker, ("", "—", []))[1]
+    return TODOS_LOS_VALORES.get(ticker, ("", "—", []))[1]
+
+
+def grupo_de(ticker: str) -> str | None:
+    """Grupo del catálogo (p. ej. 'Asia', 'Divisas')."""
+    return next((g for g, d in CATALOGO.items() if ticker in d), None)
+
+
+def es_invertible(ticker: str) -> bool:
+    return ticker not in NO_INVERTIBLES and not ticker.startswith("^")
 
 
 def mercado_de(ticker: str) -> str:

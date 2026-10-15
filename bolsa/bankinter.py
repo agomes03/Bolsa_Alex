@@ -122,10 +122,23 @@ def leer_archivo(archivo, nombre_archivo: str) -> pd.DataFrame:
 
 MERCADOS_BANKINTER = {".MC": "Mercado Continuo (España)", ".DE": "Xetra (Alemania)", ".PA": "Euronext París",
                       ".AS": "Euronext Ámsterdam", ".MI": "Borsa Italiana (Milán)", ".BR": "Euronext Bruselas",
-                      ".HE": "Nasdaq Helsinki", ".L": "Bolsa de Londres"}
+                      ".HE": "Nasdaq Helsinki", ".L": "Bolsa de Londres", ".SW": "SIX (Suiza)",
+                      ".CO": "Nasdaq Copenhague", ".T": "Bolsa de Tokio", ".HK": "Bolsa de Hong Kong",
+                      ".KS": "Bolsa de Corea", ".TW": "Bolsa de Taiwán", ".NS": "Bolsa de India (NSE)",
+                      ".TO": "Bolsa de Toronto", ".LS": "Euronext Lisboa"}
 
 
 def mercado_de(ticker: str) -> str:
+    if ticker.startswith("^") or ticker in ("DX-Y.NYB", "000001.SS"):
+        return "Índice o indicador (no se compra directamente)"
+    if ticker.startswith("0P"):
+        return "Fondo de inversión (sección Fondos de tu banco)"
+    if ticker.endswith("=X"):
+        return "Mercado de divisas"
+    if ticker.endswith("=F"):
+        return "Futuros de materias primas"
+    if ticker.endswith("-EUR"):
+        return "Criptomonedas"
     for sufijo, nombre in MERCADOS_BANKINTER.items():
         if ticker.endswith(sufijo):
             return nombre

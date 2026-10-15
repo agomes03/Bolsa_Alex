@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 CLASES = ["Acciones", "Fondos y ETF", "Renta fija", "Monetario y liquidez", "Oro y materias primas",
-          "Criptomonedas"]
+          "Criptomonedas", "Divisas", "Índices y macro"]
 
 CRIPTO = {"BTC": "Bitcoin", "ETH": "Ethereum", "SOL": "Solana", "XRP": "XRP", "ADA": "Cardano", "BNB": "BNB",
           "DOGE": "Dogecoin", "DOT": "Polkadot", "LTC": "Litecoin", "USDT": "Tether", "USDC": "USD Coin"}
@@ -54,8 +54,21 @@ def clase_de(ticker: str, tipo: str | None = None, nombre: str = "") -> str:
 
     tipo = (tipo or "").upper()
     n = "" if tipo == "EQUITY" else f" {(nombre or '').lower()} "   # el nombre solo cuenta si no es una acción
+    from .tickers import FONDOS_INDEXADOS, MAS_ETFS, NO_INVERTIBLES
+
     if es_cripto(ticker) or tipo == "CRYPTOCURRENCY":
         return "Criptomonedas"
+    if ticker in NO_INVERTIBLES or ticker.startswith("^"):
+        return "Índices y macro"
+    if ticker.endswith("=X") or tipo == "CURRENCY":
+        return "Divisas"
+    if ticker.endswith("=F"):
+        return "Oro y materias primas"
+    catalogo = {**FONDOS_INDEXADOS, **MAS_ETFS}
+    if ticker in catalogo:
+        categoria = catalogo[ticker][1]
+        return "Renta fija" if categoria == "Renta fija" else "Oro y materias primas" if categoria == "Oro" \
+            else "Fondos y ETF"
     if ticker in ORO or ticker in ("SI=F", "BZ=F", "CL=F") or any(p in n for p in (" gold", " oro ", "silver",
                                                                                    " plata ")):
         return "Oro y materias primas"

@@ -15,14 +15,21 @@ SESIONES = {
     "EEUU": (ZoneInfo("America/New_York"), time(9, 30), time(16, 0)),
     ".L": (ZoneInfo("Europe/London"), time(8, 0), time(16, 30)),
     "EUROPA": (MADRID, time(9, 0), time(17, 30)),
+    ".T": (ZoneInfo("Asia/Tokyo"), time(9, 0), time(15, 30)),
+    ".HK": (ZoneInfo("Asia/Hong_Kong"), time(9, 30), time(16, 0)),
+    ".KS": (ZoneInfo("Asia/Seoul"), time(9, 0), time(15, 30)),
+    ".TW": (ZoneInfo("Asia/Taipei"), time(9, 0), time(13, 30)),
+    ".NS": (ZoneInfo("Asia/Kolkata"), time(9, 15), time(15, 30)),
+    ".SS": (ZoneInfo("Asia/Shanghai"), time(9, 30), time(15, 0)),
 }
 SUFIJOS_EUROPA = (".MC", ".DE", ".PA", ".AS", ".MI", ".BR", ".HE", ".LS", ".SW", ".CO", ".ST", ".OL")
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
 
 def sesion(ticker: str):
-    if ticker.endswith(".L"):
-        return SESIONES[".L"]
+    for sufijo in (".L", ".T", ".HK", ".KS", ".TW", ".NS", ".SS"):
+        if ticker.endswith(sufijo):
+            return SESIONES[sufijo]
     if ticker.endswith(SUFIJOS_EUROPA) or ticker.startswith("^"):
         return SESIONES["EUROPA"]
     return SESIONES["EEUU"]
@@ -37,6 +44,18 @@ def estado_mercado(ticker: str, ahora: datetime | None = None) -> dict:
 
     if es_cripto(ticker):
         return {"abierto": True, "texto": "Las criptomonedas cotizan las 24 horas, todos los días",
+                "apertura": ahora.astimezone(MADRID)}
+    if ticker.endswith(("=X", "=F")) or ticker == "DX-Y.NYB":
+        madrid = ahora.astimezone(MADRID)
+        # De domingo 23:00 a viernes 23:00 (hora peninsular), aproximadamente.
+        abierto = (madrid.weekday() < 4 or (madrid.weekday() == 4 and madrid.hour < 23)
+                   or (madrid.weekday() == 6 and madrid.hour >= 23))
+        que = "Las divisas" if ticker.endswith("=X") else "Los futuros de materias primas"
+        return {"abierto": abierto, "texto": f"{que} cotizan casi 24 horas de lunes a viernes"
+                + ("" if abierto else ": ahora está cerrado (abre el domingo a las 23:00)"), "apertura": madrid}
+    if ticker.startswith("0P"):
+        return {"abierto": ahora.astimezone(MADRID).weekday() < 5,
+                "texto": "Los fondos se compran y venden al valor liquidativo, que se calcula una vez al día",
                 "apertura": ahora.astimezone(MADRID)}
     zona, abre, cierra = sesion(ticker)
     local = ahora.astimezone(zona)

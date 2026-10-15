@@ -12,7 +12,7 @@ from bolsa import asesor, bankinter, costes, estrategias, patrones
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import asesor_hoy
-from ui_comun import (conclusion_noticia, cargar_informe, cargar_varios, datos_usuario, dias_informe, eur, fecha, guardar_datos,
+from ui_comun import (reducir, conclusion_noticia, cargar_informe, cargar_varios, datos_usuario, dias_informe, eur, fecha, guardar_datos,
                       hora_espana, ir_a, moneda_de, num, pct, perfil)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
@@ -443,7 +443,7 @@ def bloque_entrenamiento_diario():
         curvas = pd.DataFrame({k: pd.Series(v["valores"], index=pd.to_datetime(v["fechas"]))
                                for k, v in e.get("curvas", {}).items()})
         if not curvas.empty:
-            st.line_chart(curvas, height=300 if pf.movil else 380)
+            st.line_chart(reducir(curvas), height=300 if pf.movil else 380)
         veredicto_simulacion(e["fuera_de_muestra"], e["comprar_y_mantener"])
         from bolsa.simulador import Parametros
         with st.expander("Reglas vigentes"):
@@ -510,7 +510,7 @@ def mostrar_cartera(k: str, c: dict, por_ticker: dict, sugerida: bool):
     curvas = pd.DataFrame({"Esta cartera": pd.Series(c["curva"]["valores"], index=pd.to_datetime(c["curva"]["fechas"])),
                            "Todas a partes iguales": pd.Series(c["curva_referencia"]["valores"],
                                                                index=pd.to_datetime(c["curva_referencia"]["fechas"]))})
-    st.line_chart(curvas, height=240 if pf.movil else 320)
+    st.line_chart(reducir(curvas), height=240 if pf.movil else 320)
     st.caption(f"Qué habría pasado con {eur(c.get('capital_simulado', 10_000), '€').replace(',00', '')} invertidos desde "
                f"el {fecha(m['desde'])} siguiendo la regla, en euros y con las comisiones reales de Bankinter "
                "(gráfico escalado a 10.000 €; sin IRPF). «Todas a partes iguales» es la referencia: comprar todas las "

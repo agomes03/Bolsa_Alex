@@ -155,10 +155,12 @@ def moneda_de(ticker: str, info: dict | None = None) -> str:
 @st.cache_data(ttl=3600, show_spinner=False)
 def tipos_cambio() -> dict[str, float]:
     """Unidades de cada divisa por 1 euro (último cierre)."""
+    pares = {div: t for div, t in costes.TICKER_CAMBIO.items() if div != "GBp"}
+    hist = datos.varios(sorted(set(pares.values())), "1mo")   # una sola descarga para todas las divisas
     salida = {}
-    for div, t in (("USD", "EURUSD=X"), ("GBP", "EURGBP=X"), ("CHF", "EURCHF=X")):
-        df = datos.historico(t, "1mo")
-        if not df.empty:
+    for div, t in pares.items():
+        df = hist.get(t)
+        if df is not None and not df.empty:
             salida[div] = float(df["Close"].iloc[-1])
     return salida
 
@@ -255,6 +257,43 @@ def fila_informe(ticker: str) -> dict | None:
     if not inf:
         return None
     return next((r for r in inf.get("ranking", []) if r["ticker"] == ticker), None)
+
+
+def mostrar_plotly(fig, alto: int | None = None):
+    """Gráfico fluido: sin barra de herramientas y, en el móvil, sin capturar el deslizamiento ni el zoom (así la
+    página se desplaza bien con el dedo)."""
+    fig.update_layout(dragmode=False, margin=dict(l=0, r=0, t=30, b=0), **({"height": alto} if alto else {}))
+    if st.session_state.get("_perfil") and st.session_state["_perfil"].movil:
+        fig.update_xaxes(fixedrange=True)
+        fig.update_yaxes(fixedrange=True)
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False, "scrollZoom": False, "responsive": True})
+
+
+def reducir(datos, max_puntos: int = 400):
+    """Menos puntos en curvas largas (a la vista es igual y el móvil dibuja mucho más rápido)."""
+    if datos is None or len(datos) <= max_puntos:
+        return datos
+    paso = -(-len(datos) // max_puntos)
+    salida = datos.iloc[::paso]
+    return salida if salida.index[-1] == datos.index[-1] else pd.concat([salida, datos.iloc[[-1]]])
+
+
+def selector_valor(clave: str, solo_invertibles: bool = False, defecto: str | None = None,
+                   etiqueta: str = "Valor") -> str:
+    """Elige grupo (España, EEUU, Asia, Fondos, Cripto, Divisas...) y valor. Devuelve el ticker."""
+    from bolsa.tickers import CATALOGO, NO_INVERTIBLES, grupo_de
+
+    grupos = [g for g, d in CATALOGO.items() if not solo_invertibles or any(t not in NO_INVERTIBLES for t in d)]
+    if defecto and grupo_de(defecto) in grupos and st.session_state.get(f"{clave}_def") != defecto:
+        st.session_state[f"{clave}_grupo"] = grupo_de(defecto)
+        st.session_state[f"{clave}_valor"] = defecto
+        st.session_state[f"{clave}_def"] = defecto
+    c = st.columns([1, 2])
+    grupo = c[0].selectbox("Mercado o tipo", grupos, key=f"{clave}_grupo")
+    opciones = [t for t in CATALOGO[grupo] if not solo_invertibles or t not in NO_INVERTIBLES]
+    if st.session_state.get(f"{clave}_valor") not in opciones:
+        st.session_state.pop(f"{clave}_valor", None)
+    return c[1].selectbox(etiqueta, opciones, key=f"{clave}_valor", format_func=nombre_de)
 
 
 def enlace(pagina: str, texto: str, icono: str | None = None):

@@ -10,8 +10,9 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from bolsa import asesor, bankinter, cartera, costes, datos, ejercicios, horario, senales
-from bolsa.tickers import TODAS_LAS_ACCIONES, nombre_de, sector_de
-from ui_comun import (cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, datos_usuario,
+from bolsa.activos import clase_de
+from bolsa.tickers import nombre_de, sector_de
+from ui_comun import (mostrar_plotly, selector_valor, cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, datos_usuario,
                       estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de, num, pct,
                       perfil)
 
@@ -128,7 +129,7 @@ def bloque_evolucion(cv: dict):
                            "(sin dividendos).")
         fig.update_layout(height=280, margin=dict(l=0, r=0, t=10, b=0), legend=dict(orientation="h", y=-0.2),
                           yaxis_title="€")
-        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+        mostrar_plotly(fig)
 
 
 # --------------------------------------------------------------------------- posiciones
@@ -236,7 +237,7 @@ def ficha_cotizacion(ticker: str, diario: pd.DataFrame, q: dict):
         if rango == "Hoy" and q.get("anterior"):
             fig.add_hline(y=q["anterior"], line_dash="dot", annotation_text="cierre anterior")
         fig.update_layout(height=220, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+        mostrar_plotly(fig)
 
     fila = next((r for r in (cargar_informe() or {}).get("ranking", []) if r["ticker"] == ticker), None)
     if fila:
@@ -246,6 +247,7 @@ def ficha_cotizacion(ticker: str, diario: pd.DataFrame, q: dict):
         st.caption(f"📋 Veredicto de la app: **{etiqueta}**{nota}{riesgo}. {explicacion}")
 
 
+@st.fragment
 def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
     pf = perfil()
     st.subheader("🛒 Operar")
@@ -257,8 +259,13 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
     if sentido == "venta" and not con_posicion:
         st.info("Aún no tienes acciones que vender. Compra alguna primero.")
         return
-    opciones = con_posicion if sentido == "venta" else list(TODAS_LAS_ACCIONES)
-    ticker = c[1].selectbox("Valor", opciones, format_func=nombre_de, key=f"v_ticker_{sentido}")
+    if sentido == "venta":
+        defecto = st.session_state.pop("v_defecto", None)
+        if defecto in con_posicion:
+            st.session_state["v_ticker_venta"] = defecto
+        ticker = c[1].selectbox("Valor", con_posicion, format_func=nombre_de, key="v_ticker_venta")
+    else:
+        ticker = selector_valor("v_compra", solo_invertibles=True, defecto=st.session_state.pop("v_defecto", None))
     diario, intra, q = _datos_valor(ticker)
     f_eur = fx(ticker)
     if not q or f_eur is None:
@@ -270,7 +277,7 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
 
     # Propuesta de la app (stop-loss, objetivo y tamaño) para rellenar la orden.
     plan = None
-    if sentido == "compra":
+    if sentido == "compra" and clase_de(ticker) not in ("Fondos y ETF", "Renta fija", "Monetario y liquidez"):
         hist = cargar_historico(ticker, "2y")
         if not hist.empty:
             p = estrategia_actual()

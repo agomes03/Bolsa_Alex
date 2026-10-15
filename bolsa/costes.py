@@ -28,16 +28,23 @@ TASA_TOBIN = {".MC": (0.2, 1e9), ".PA": (0.4, 1e9), ".MI": (0.1, 5e8)}
 
 SUFIJOS_EURO = (".MC", ".AS", ".PA", ".DE", ".MI", ".BR", ".HE", ".LS", ".VI", ".IR", ".F")
 SUFIJOS_DIVISA = {".L": "GBp", ".SW": "CHF", ".T": "JPY", ".TO": "CAD", ".HK": "HKD", ".ST": "SEK", ".CO": "DKK",
-                  ".OL": "NOK"}
-SIMBOLOS = {"EUR": "€", "USD": "$", "GBp": "p", "GBP": "£", "CHF": "CHF", "JPY": "¥", "CAD": "C$"}
+                  ".OL": "NOK", ".KS": "KRW", ".TW": "TWD", ".NS": "INR", ".SS": "CNY"}
+# Excepciones comprobadas: cotizan en otra divisa que la habitual de su bolsa (p. ej. ETF de Londres en dólares).
+DIVISA_CONOCIDA = {"SGLD.L": "USD", "IGLN.L": "USD"}
+SIMBOLOS = {"EUR": "€", "USD": "$", "GBp": "p", "GBP": "£", "CHF": "CHF", "JPY": "¥", "CAD": "C$", "HKD": "HK$",
+            "KRW": "₩", "TWD": "NT$", "INR": "₹", "DKK": "DKK", "CNY": "¥"}
 
 
 def divisa(ticker: str, info: dict | None = None) -> str:
     """Divisa en la que cotiza un valor ('EUR', 'USD', 'GBp'...). Si se conoce, manda la de los datos."""
     if info and info.get("currency"):
         return info["currency"]
-    if ticker.endswith("-EUR"):          # criptomonedas cotizadas en euros (BTC-EUR...)
+    if ticker in DIVISA_CONOCIDA:
+        return DIVISA_CONOCIDA[ticker]
+    if ticker.endswith("-EUR") or ticker.endswith("EUR=X"):   # cripto en euros y divisas «XXX/EUR»
         return "EUR"
+    if ticker.endswith("=F"):            # futuros de materias primas: en dólares
+        return "USD"
     if ticker.endswith(SUFIJOS_EURO):
         return "EUR"
     for sufijo, d in SUFIJOS_DIVISA.items():
@@ -51,6 +58,12 @@ def divisa(ticker: str, info: dict | None = None) -> str:
 def simbolo(ticker: str, info: dict | None = None) -> str:
     d = divisa(ticker, info)
     return SIMBOLOS.get(d, d)
+
+
+def sin_comision(ticker: str) -> bool:
+    """Fondos de inversión (se suscriben sin comisión de compra en los bancos españoles) y divisas (el coste es el
+    margen del cambio, no una comisión fija)."""
+    return ticker.startswith("0P") or ticker.endswith("=X")
 
 
 def es_nacional(ticker: str) -> bool:
@@ -87,7 +100,7 @@ class Tarifa:
     custodia_int_minimo: float = 6.0
 
     def comision(self, importe: float, ticker: str) -> float:
-        if importe <= 0:
+        if importe <= 0 or sin_comision(ticker):
             return 0.0
         if es_nacional(ticker):
             if self.broker_cero:
@@ -104,6 +117,8 @@ class Tarifa:
         return importe * self.internacional_pct / 100
 
     def cambio_divisa(self, importe: float, ticker: str) -> float:
+        if ticker.endswith("=X"):        # comprar o vender divisa: el coste es el margen del cambio
+            return importe * self.divisa_pct / 100
         return importe * self.divisa_pct / 100 if divisa(ticker) not in ("EUR", "—") else 0.0
 
     def coste(self, importe: float, ticker: str) -> float:
@@ -177,13 +192,15 @@ class TarifaPersonal:
     broker_cero: bool = False             # compatibilidad con `Tarifa`
 
     def comision(self, importe: float, ticker: str) -> float:
-        if importe <= 0:
+        if importe <= 0 or sin_comision(ticker):
             return 0.0
         if es_nacional(ticker):
             return self.nacional_fija + importe * self.nacional_pct / 100 + self.canon_nacional
         return self.internacional_fija + importe * self.internacional_pct / 100
 
     def cambio_divisa(self, importe: float, ticker: str) -> float:
+        if ticker.endswith("=X"):
+            return importe * self.divisa_pct / 100
         return importe * self.divisa_pct / 100 if divisa(ticker) not in ("EUR", "—") else 0.0
 
     def coste(self, importe: float, ticker: str) -> float:
@@ -249,7 +266,8 @@ def simular_aportaciones(mensual: float, anos: int, rent_anual_pct: float, inici
 
 # --------------------------------------------------------------------------- divisas
 TICKER_CAMBIO = {"USD": "EURUSD=X", "GBp": "EURGBP=X", "GBP": "EURGBP=X", "CHF": "EURCHF=X", "JPY": "EURJPY=X",
-                 "CAD": "EURCAD=X", "HKD": "EURHKD=X", "SEK": "EURSEK=X", "DKK": "EURDKK=X", "NOK": "EURNOK=X"}
+                 "CAD": "EURCAD=X", "HKD": "EURHKD=X", "SEK": "EURSEK=X", "DKK": "EURDKK=X", "NOK": "EURNOK=X",
+                 "KRW": "EURKRW=X", "TWD": "EURTWD=X", "INR": "EURINR=X", "CNY": "EURCNY=X"}
 
 
 def euros_por_unidad(div: str, tipos: dict[str, float]) -> float | None:

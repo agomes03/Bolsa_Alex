@@ -15,7 +15,7 @@ from bolsa import (asesor, asesor_diario, bankinter, cartera, costes, diagnostic
 from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
-from ui_comun import (almacen_actual, cargar_activos, enlace, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
+from ui_comun import (mostrar_plotly, reducir, selector_valor, almacen_actual, cargar_activos, enlace, cargar_fundamentales_varios, cargar_informe, cargar_historico, cargar_varios,
                       datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, num,
                       pct, perfil)
 
@@ -161,7 +161,7 @@ def pagina_simulador():
         cols = st.columns(1 if pf.movil else 2)
         tarjetas_metricas(r.metricas, "🤖 Estrategia de la app", capital, cols[0])
         tarjetas_metricas(m_mant, "🧺 Comprar y mantener (referencia)", capital, cols[-1])
-        st.line_chart(pd.DataFrame({"Estrategia": r.curva, "Comprar y mantener": mant}),
+        st.line_chart(reducir(pd.DataFrame({"Estrategia": r.curva, "Comprar y mantener": mant})),
                       height=300 if pf.movil else 380)
         if cual.startswith("Reglas entrenadas"):
             st.caption("⚠️ Estas reglas se eligieron mirando estos mismos años, así que este resultado es "
@@ -227,8 +227,8 @@ def mostrar_entrenamiento(wf: dict, capital: float):
     tarjetas_metricas(wf["metricas_entrenada"], "🏋️ Estrategia entrenada", capital, cols[0])
     tarjetas_metricas(wf["metricas_defecto"], "📏 Reglas por defecto", capital, cols[1 % len(cols)])
     tarjetas_metricas(wf["metricas_mantener"], "🧺 Comprar y mantener", capital, cols[2 % len(cols)])
-    st.line_chart(pd.DataFrame({"Entrenada": wf["curva_entrenada"], "Por defecto": wf["curva_defecto"],
-                                "Comprar y mantener": wf["curva_mantener"]}), height=300 if pf.movil else 400)
+    st.line_chart(reducir(pd.DataFrame({"Entrenada": wf["curva_entrenada"], "Por defecto": wf["curva_defecto"],
+                                        "Comprar y mantener": wf["curva_mantener"]})), height=300 if pf.movil else 400)
     veredicto_simulacion(wf["metricas_entrenada"], wf["metricas_mantener"])
 
     st.subheader("Año a año")
@@ -334,7 +334,7 @@ def robot():
                     pct((float(mant.iloc[-1]) / rb["capital"] - 1) * 100, 2))
         c[2 % len(c)].metric("Operaciones cerradas", len(r.operaciones))
         if len(r.curva) > 1:
-            st.line_chart(pd.DataFrame({"Robot": r.curva, "Comprar y mantener": mant}), height=280)
+            st.line_chart(reducir(pd.DataFrame({"Robot": r.curva, "Comprar y mantener": mant})), height=280)
         if not r.abiertas.empty:
             st.markdown("**Posiciones abiertas del robot**")
             a = r.abiertas.copy()
@@ -402,7 +402,7 @@ def robot_cartera(rb: dict):
                    pct((float(ref.iloc[-1]) / rb["capital"] - 1) * 100, 2))
     cols[2 % len(cols)].metric("Comisiones pagadas", eur(met.get("gastos", 0.0)))
     if len(curva) > 1:
-        st.line_chart(pd.DataFrame({"Robot": curva, "Todas a partes iguales": ref}), height=280)
+        st.line_chart(reducir(pd.DataFrame({"Robot": curva, "Todas a partes iguales": ref})), height=280)
     filas = [{"Empresa": nombre_de(t), "Acciones": n, "Valor": eur(n * float(cierres[t].iloc[-1]))}
              for t, n in met["cartera_final"].items()]
     st.markdown("**Lo que tiene ahora el robot**")
@@ -617,8 +617,8 @@ def pagina_bankinter():
         if texto.strip():
             revisar_e_importar(importador.leer_texto(texto, resolver=buscar_simbolo), "pegado")
     with t1:
+        ticker = selector_valor("alta", solo_invertibles=True)
         with st.form("alta_real"):
-            ticker = st.selectbox("Acción o ETF de la lista", list(TODAS_LAS_ACCIONES), format_func=nombre_de)
             otro = st.text_input("¿Otro activo? Escribe su ISIN, su código (BTC-EUR, 4GLD.DE...) o su nombre",
                                  "").strip()
             c = st.columns(2 if pf.movil else 4)
@@ -662,6 +662,7 @@ def _perfil_guardado() -> str | None:
         return None
 
 
+@st.fragment
 def bloque_diagnostico(filas: list[dict]) -> bool:
     """Revisión de la cartera como la haría un asesor, con una propuesta concreta y sus costes.
     Devuelve True si ya ha mostrado la comparación con crisis reales."""
@@ -710,7 +711,7 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
                      annotation_text=f"máximo prudente {diagnostico.MAX_EMPRESA * 100:.0f} %")
     figura.update_layout(height=80 + 45 * len(dg["empresas"]), margin=dict(l=0, r=0, t=30, b=0),
                          xaxis_title="% de tu dinero", yaxis=dict(autorange="reversed"))
-    st.plotly_chart(figura, width="stretch", config={"displayModeBar": False})
+    mostrar_plotly(figura)
 
     for x in dg["hallazgos"]:
         with st.expander(f"{ICONO_GRAVEDAD[x['gravedad']]} {x['titulo']}", expanded=x["gravedad"] == "alta"):
