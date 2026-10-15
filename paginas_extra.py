@@ -8,13 +8,13 @@ from datetime import date, datetime
 import pandas as pd
 import streamlit as st
 
-from bolsa import bankinter, cartera, estrategias, experimentos, senales, simulador
-from bolsa.costes import tamano_por_riesgo
+from bolsa import bankinter, cartera, costes, estrategias, experimentos, senales, simulador
+from bolsa.costes import acciones_asequibles, tamano_por_riesgo
 from bolsa.simulador import Parametros
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de, sector_de
 from ui_comun import (almacen_actual, cargar_fundamentales_varios, cargar_historico, cargar_varios,
-                      datos_usuario, estrategia_actual, eur, guardar_datos, mercado_alcista_para, moneda_de, pct,
-                      perfil, ultimo_precio)
+                      datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de,
+                      num, pct, perfil, ultimo_precio)
 
 UNIVERSOS = {
     "IBEX 35": (tuple(IBEX35), "^IBEX"),
@@ -113,7 +113,8 @@ def pagina_simulador():
         st.markdown(
             "- ✅ Tendencia, medias, RSI, MACD, ambiente del mercado y el **modelo de predicción** (recalculado "
             "cada semana solo con datos pasados).\n"
-            "- ✅ Comisiones de tu perfil, impuesto de transacciones (0,2%), stop-loss y objetivos.\n"
+            "- ✅ Comisiones reales de Bankinter (según tu perfil), tasa Tobin, cambio de divisa, stop-loss y "
+            "objetivos. Todo en euros.\n"
             "- ❌ Noticias y analistas: no existe un histórico gratuito de 10 años, así que no se pueden simular.\n"
             "- ⚠️ Se usan las empresas que están HOY en el índice (las que salieron por ir mal no aparecen), "
             "lo que hace los resultados algo optimistas.\n"
@@ -274,53 +275,54 @@ def cartera_manual():
     cv = d.setdefault("cartera_virtual", cartera.nueva(10_000.0))
     posiciones = tuple(sorted(cv["posiciones"]))
     hist = cargar_varios(posiciones, "1y") if posiciones else {}
-    eventos = cartera.revisar_ordenes(cv, hist, pf.tarifa)
+    fx_pos = {t: fx(t) or 1.0 for t in cv["posiciones"]}
+    eventos = cartera.revisar_ordenes(cv, hist, pf.tarifa, fx_pos)
     if eventos:
         guardar_datos()
         for e in eventos:
             st.info("🔔 " + e)
     precios = {t: ultimo_precio(hist.get(t)) for t in cv["posiciones"]}
-    tabla, res = cartera.valorar(cv, precios)
+    tabla, res = cartera.valorar(cv, precios, fx_pos)
     c = st.columns(2 if pf.movil else 4)
     c[0].metric("Valor total", eur(res["total"]), pct(res["ganancia_pct"], 1))
     c[1].metric("Ganancia / pérdida", eur(res["ganancia"]))
     c[2 % len(c)].metric("Dinero disponible", eur(res["efectivo"]))
     c[3 % len(c)].metric("Operaciones cerradas", f"{res['ganadoras']}/{res['operaciones_cerradas']} ganadoras")
-    st.caption(f"Empezaste con {eur(cv['capital_inicial'])} el {cv['creada']}.")
+    st.caption(f"Empezaste con {eur(cv['capital_inicial'])} el {fecha(cv['creada'])}. Los importes están en euros; "
+               "los precios, en la divisa de cada acción (como en Bankinter).")
 
     if len(tabla):
         st.subheader("Posiciones abiertas")
         vista = pd.DataFrame({
             "Empresa": tabla["ticker"].map(nombre_de), "Acciones": tabla["acciones"],
             "Precio compra": tabla["precio_medio"].round(2), "Precio actual": tabla["precio"].round(2),
-            "Resultado €": tabla["resultado"].round(2), "Resultado %": tabla["resultado_pct"].round(1),
+            "Resultado (€)": tabla["resultado"].round(2), "Resultado (%)": tabla["resultado_pct"].round(1),
             "Stop-loss": tabla["stop"], "Objetivo": tabla["objetivo"]})
         st.dataframe(vista, hide_index=True, width="stretch")
         c1, c2 = st.columns([2, 1])
         vender_t = c1.selectbox("Vender", list(cv["posiciones"]), format_func=nombre_de, key="v_vender")
         if c2.button("Vender todo a precio actual", width="stretch") and precios.get(vender_t):
             cartera.vender(cv, vender_t, cv["posiciones"][vender_t]["acciones"], precios[vender_t], pf.tarifa,
-                           motivo="Venta manual")
+                           motivo="Venta manual", fx=fx_pos.get(vender_t, 1.0))
             guardar_datos()
             st.rerun()
 
     st.subheader("Comprar con dinero virtual")
-    ticker = st.selectbox("Empresa", list(TODAS_LAS_ACCIONES), format_func=lambda t: f"{nombre_de(t)} ({t})",
-                          key="v_ticker")
+    ticker = st.selectbox("Empresa", list(TODAS_LAS_ACCIONES), format_func=nombre_de, key="v_ticker")
     df = cargar_historico(ticker, "2y")
-    if df.empty:
-        st.error("No hay cotización disponible.")
+    f_eur = fx(ticker)
+    if df.empty or f_eur is None:
+        st.error("No hay cotización o tipo de cambio disponible.")
     else:
         p = estrategia_actual()
         ev = senales.evaluar(ticker, df, mercado_alcista=mercado_alcista_para(ticker),
                              stop_atr=p.stop_atr, ratio_objetivo=p.ratio_objetivo)
-        st.caption(f"Precio: **{eur(ev.precio, moneda_de(ticker))}** · Puntuación técnica: **{ev.puntuacion}** "
-                   f"({ev.veredicto}). Para el análisis completo, usa 🔍 Analizar.")
+        st.caption(f"Precio: **{eur(ev.precio, moneda_de(ticker))}**. Para el análisis completo, usa 🔍 Analizar.")
         patrimonio = res["total"]
         sugeridas = 0
         if ev.plan:
-            sugeridas = min(tamano_por_riesgo(patrimonio, pf.riesgo, ev.precio, ev.plan.stop),
-                            int(res["efectivo"] // ev.precio))
+            sugeridas = min(tamano_por_riesgo(patrimonio, pf.riesgo, ev.precio * f_eur, ev.plan.stop * f_eur),
+                            acciones_asequibles(res["efectivo"], ev.precio * f_eur, ticker, pf.tarifa))
         with st.form("compra_virtual"):
             c = st.columns(3)
             n = c[0].number_input("Acciones", 1, 1_000_000, max(sugeridas, 1))
@@ -328,7 +330,7 @@ def cartera_manual():
             obj = c[2].number_input("Objetivo", 0.0, value=round(ev.plan.objetivo, 2) if ev.plan else 0.0)
             if st.form_submit_button("🎮 Comprar", type="primary", width="stretch"):
                 err = cartera.comprar(cv, ticker, int(n), ev.precio, pf.tarifa, stop=stop or None,
-                                      objetivo=obj or None, nota=f"Puntuación {ev.puntuacion}")
+                                      objetivo=obj or None, nota=f"Puntuación {ev.puntuacion}", fx=f_eur)
                 if err:
                     st.error(err)
                 else:
@@ -447,12 +449,12 @@ def robot_cartera(rb: dict):
     """Robot que replica una cartera modelo con rotación mensual desde el día en que se creó."""
     pf = perfil()
     c = estrategias.CARTERAS[rb["cartera"]]
-    st.caption(f"{c.nombre} · creado el {rb['creado']} con {eur(rb['capital'])}")
+    st.caption(f"{c.nombre} · creado el {fecha(rb['creado'])} con {eur(rb['capital'])}")
     with st.spinner("Calculando la cartera del robot con datos de todas las empresas..."):
-        acciones = tuple(t for t in TODAS_LAS_ACCIONES if t not in ETFS)
-        hist = cargar_varios(acciones, "2y")
+        acciones = tuple(t for t in TODAS_LAS_ACCIONES if t not in ETFS and (c.universo == "global" or t.endswith(".MC")))
+        hist = costes.historicos_en_euros(cargar_varios(acciones, "2y"), {"USD": cargar_historico("EURUSD=X", "2y")})
         refs = {k: cargar_historico(k, "2y") for k in ("^IBEX", "^STOXX50E", "^GSPC")}
-        cierres = estrategias.cierres_acciones(hist)
+        cierres = estrategias.cierres_acciones(hist, c.universo)
         perm = estrategias.permitido(cierres, {k: v for k, v in refs.items() if not v.empty})
     if cierres.empty:
         st.error("No se han podido descargar cotizaciones.")
@@ -461,8 +463,8 @@ def robot_cartera(rb: dict):
     if inicio.empty:
         st.info("Todavía no ha habido ninguna sesión desde que creaste el robot. En la próxima comprará esto:")
         comp = estrategias.composicion_hoy(cierres, perm, c)
-        st.dataframe(pd.DataFrame([{"Empresa": nombre_de(x["ticker"]), "Precio": round(x["precio"], 2)} for x in comp]),
-                     hide_index=True, width="stretch")
+        st.dataframe(pd.DataFrame([{"Empresa": nombre_de(x["ticker"]), "Precio (€)": round(x["precio_eur"], 2)}
+                                   for x in comp]), hide_index=True, width="stretch")
         return
     sig = estrategias.senal(cierres, c.senal)
     curva, met = experimentos.simular_rotacion(cierres, sig, c.n, pf.tarifa, rb["capital"],
@@ -478,8 +480,8 @@ def robot_cartera(rb: dict):
     cols[2 % len(cols)].metric("Comisiones pagadas", eur(met.get("gastos", 0.0)))
     if len(curva) > 1:
         st.line_chart(pd.DataFrame({"Robot": curva, "Todas a partes iguales": ref}), height=280)
-    filas = [{"Empresa": nombre_de(t), "Acciones": n, "Precio": round(float(cierres[t].iloc[-1]), 2),
-              "Valor": eur(n * float(cierres[t].iloc[-1]), moneda_de(t))} for t, n in met["cartera_final"].items()]
+    filas = [{"Empresa": nombre_de(t), "Acciones": n, "Valor": eur(n * float(cierres[t].iloc[-1]))}
+             for t, n in met["cartera_final"].items()]
     st.markdown("**Lo que tiene ahora el robot**")
     if filas:
         st.dataframe(pd.DataFrame(filas), hide_index=True, width="stretch")
@@ -512,7 +514,7 @@ def revisar_cartera_real() -> list[dict]:
             ev.precio, pos["precio_medio"], pos.get("stop"), stop_sug, ev.puntuacion, p.umbral_venta,
             any("resultados" in a for a in ev.avisos))
         filas.append({"ticker": t, "pos": pos, "precio": ev.precio, "nivel": nivel, "consejo": texto,
-                      "ev": ev, "stop_sugerido": stop_sug})
+                      "ev": ev, "stop_sugerido": stop_sug, "fx": fx(t, funds.get(t)) or 1.0})
     return filas
 
 
@@ -549,26 +551,27 @@ def pagina_bankinter():
         avisos = [f for f in filas if f["nivel"] not in ("mantener",)]
         if avisos:
             st.warning(f"🔔 {len(avisos)} posición(es) necesitan tu atención.")
-        vista, total = [], 0.0
+        vista, total, ganancia = [], 0.0, 0.0
         for f in filas:
             pos, precio = f["pos"], f["precio"]
-            valor = pos["acciones"] * precio if precio else None
+            valor = pos["acciones"] * precio * f["fx"] if precio else None
+            invertido = pos["acciones"] * pos["precio_medio"] * pos.get("fx_medio", 1.0)
             total += valor or 0
-            invertido = pos["acciones"] * pos["precio_medio"]
-            vista.append({"": ICONO_NIVEL[f["nivel"]], "Empresa": nombre_de(f["ticker"]), "Acciones": pos["acciones"],
+            ganancia += (valor - invertido) if valor else 0
+            vista.append({"": ICONO_NIVEL[f["nivel"]], "Empresa": nombre_de(f["ticker"]), "Títulos": pos["acciones"],
                           "Precio medio": round(pos["precio_medio"], 2),
                           "Precio actual": round(precio, 2) if precio else None,
-                          "Ganancia €": round(valor - invertido, 2) if valor else None,
-                          "Ganancia %": round((valor / invertido - 1) * 100, 1) if valor and invertido else None,
-                          "Puntuación": f["ev"].puntuacion if f["ev"] else None,
+                          "Valor (€)": round(valor, 2) if valor else None,
+                          "Ganancia (%)": round((precio / pos["precio_medio"] - 1) * 100, 1) if precio else None,
                           "Stop-loss": pos.get("stop")})
         tabla = pd.DataFrame(vista)
-        ganancia = tabla["Ganancia €"].fillna(0).sum()
         c = st.columns(2)
         c[0].metric("Valor de tu cartera", eur(total))
-        c[1].metric("Ganancia / pérdida latente", eur(ganancia))
+        c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia))
+        st.caption("Precios en la divisa de cada valor, como en Bankinter; valores y ganancias en euros. La ganancia "
+                   "en % es la del precio (sin comisiones ni efecto divisa).")
         if pf.movil:
-            tabla = tabla[["", "Empresa", "Ganancia %", "Puntuación"]]
+            tabla = tabla[["", "Empresa", "Ganancia (%)", "Valor (€)"]]
         st.dataframe(tabla, hide_index=True, width="stretch")
         concentracion(filas, total)
 
@@ -578,26 +581,26 @@ def pagina_bankinter():
 
         st.subheader("🌦️ Qué le puede pasar a tu cartera")
         from paginas_hoy import bloque_que_puede_pasar
-        pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] for f in filas if f["precio"]}
+        pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
         bloque_que_puede_pasar(pesos, total, 0.0, 0)
     else:
-        st.caption("Aún no has registrado posiciones. Añádelas a mano o importa el Excel de Bankinter.")
+        st.caption("Aún no has registrado posiciones. Añádelas a mano o impórtalas desde un Excel.")
 
     st.subheader("➕ Añadir posiciones")
     t1, t2 = st.tabs(["✍️ A mano", "📥 Importar de Bankinter (Excel/CSV)"])
     with t1:
         with st.form("alta_real"):
-            ticker = st.selectbox("Empresa", list(TODAS_LAS_ACCIONES), format_func=lambda t: f"{nombre_de(t)} ({t})")
-            otro = st.text_input("…u otro ticker de Yahoo Finance", "").strip().upper()
+            ticker = st.selectbox("Empresa", list(TODAS_LAS_ACCIONES), format_func=nombre_de)
+            otro = st.text_input("¿No está en la lista? Su código de Yahoo Finance", "").strip().upper()
             c = st.columns(2 if pf.movil else 4)
             n = c[0].number_input("Títulos", 1, 10_000_000, 10)
-            precio = c[1].number_input("Precio medio de compra", 0.0, value=0.0, format="%.4f")
-            fecha = c[2 % len(c)].date_input("Fecha de compra", date.today())
-            stop = c[3 % len(c)].number_input("Stop-loss puesto (0 si no)", 0.0, value=0.0)
+            precio = c[1].number_input("Precio medio (el que muestra Bankinter)", 0.0, value=0.0, format="%.4f")
+            f_compra = c[2 % len(c)].date_input("Fecha de compra", date.today())
+            stop = c[3 % len(c)].number_input("Stop-loss puesto (0 si no tienes)", 0.0, value=0.0)
             if st.form_submit_button("Guardar posición", type="primary"):
                 t = otro or ticker
-                err = cartera.comprar(cr, t, int(n), precio, pf.tarifa, fecha.isoformat(), stop or None,
-                                      nota="Registrada a mano")
+                err = cartera.comprar(cr, t, int(n), precio, pf.tarifa, f_compra.isoformat(), stop or None,
+                                      nota="Registrada a mano", fx=fx(t) or 1.0)
                 if err:
                     st.error(err)
                 else:
@@ -605,10 +608,11 @@ def pagina_bankinter():
                     st.rerun()
     with t2:
         st.markdown(
-            "1. En **bankinter.com** (ordenador) entra en **Broker → Cartera / Posición**.\n"
-            "2. Descarga la posición en **Excel** si tu pantalla tiene esa opción; si no, selecciona la tabla, "
-            "cópiala y pégala en un Excel o Google Sheets y guárdalo.\n"
-            "3. Súbelo aquí. La app busca columnas como *Valor*, *Títulos* y *Precio medio*.")
+            "1. En **bankinter.com** (ordenador), entra en **Bróker → Posición**.\n"
+            "2. Si tu pantalla permite descargarla en Excel, hazlo; si no, selecciona la tabla, cópiala y pégala en "
+            "una hoja de cálculo (Excel o Google Sheets) y guárdala.\n"
+            "3. Súbela aquí. La app busca columnas como *Valor*, *Títulos* y *Precio medio* y te deja corregir "
+            "cualquier fila antes de guardar.")
         archivo = st.file_uploader("Archivo de posiciones", type=["xlsx", "xls", "csv"])
         if archivo:
             try:
@@ -631,8 +635,9 @@ def pagina_bankinter():
                         if not r["ticker"] or not r["precio_medio"]:
                             malas.append(str(r["nombre"]))
                             continue
-                        cartera.comprar(cr, str(r["ticker"]).upper(), int(r["acciones"]), float(r["precio_medio"]),
-                                        pf.tarifa, nota="Importada de Bankinter")
+                        tk = str(r["ticker"]).upper()
+                        cartera.comprar(cr, tk, int(r["acciones"]), float(r["precio_medio"]), pf.tarifa,
+                                        nota="Importada de Bankinter", fx=fx(tk) or 1.0)
                     guardar_datos()
                     if malas:
                         st.warning("No se importaron (falta ticker o precio): " + ", ".join(malas))
@@ -647,7 +652,7 @@ def concentracion(filas: list[dict], total: float):
     for f in filas:
         if not f["precio"]:
             continue
-        v = f["pos"]["acciones"] * f["precio"]
+        v = f["pos"]["acciones"] * f["precio"] * f["fx"]
         por_valor[f["ticker"]] = v
         s = sector_de(f["ticker"])
         por_sector[s] = por_sector.get(s, 0) + v
@@ -666,14 +671,12 @@ def posicion_detalle(f: dict, cr: dict):
     with st.expander(f"{ICONO_NIVEL[f['nivel']]} {nombre_de(t)} — {f['consejo'][:70]}"):
         st.write(f["consejo"])
         if f["ev"]:
-            st.caption(f"Puntuación {f['ev'].puntuacion}/100 · {f['ev'].veredicto}")
             for a in f["ev"].avisos:
                 st.caption("⚠️ " + a)
         if f["nivel"] in ("poner_stop", "subir_stop") and f.get("stop_sugerido"):
-            st.code(bankinter.ticket(t, "Venta stop", pos["acciones"], f["stop_sugerido"], dias_validez=90),
-                    language=None)
+            st.code(bankinter.ticket_stop(t, pos["acciones"], f["stop_sugerido"]), language=None)
         elif f["nivel"] in ("vender", "vigilar") and f["precio"]:
-            st.code(bankinter.ticket(t, "Venta", pos["acciones"], round(f["precio"] * 0.995, 2)), language=None)
+            st.code(bankinter.ticket_venta(t, pos["acciones"], f["precio"]), language=None)
         c = st.columns(3)
         nuevo_stop = c[0].number_input("Stop-loss que tienes puesto", 0.0, value=float(pos.get("stop") or 0.0),
                                        key=f"stop_{t}")
@@ -683,7 +686,7 @@ def posicion_detalle(f: dict, cr: dict):
             st.rerun()
         precio_v = c[1].number_input("Vendida a (precio)", 0.0, value=float(f["precio"] or 0.0), key=f"pv_{t}")
         if c[1].button("Registrar venta", key=f"vend_{t}"):
-            cartera.vender(cr, t, pos["acciones"], precio_v, pf.tarifa, motivo="Venta en Bankinter")
+            cartera.vender(cr, t, pos["acciones"], precio_v, pf.tarifa, motivo="Venta en Bankinter", fx=f["fx"])
             guardar_datos()
             st.rerun()
         if c[2].button("🗑️ Quitar sin vender", key=f"del_{t}"):
@@ -692,37 +695,48 @@ def posicion_detalle(f: dict, cr: dict):
             st.rerun()
 
 
-# --------------------------------------------------------------------------- acciones desde "Analizar"
-def acciones_rapidas(ticker: str, ev: senales.Evaluacion, n_acciones: int):
-    """Orden lista para copiar en Bankinter + botones para registrarla (virtual o real)."""
+# --------------------------------------------------------------------------- operar en Bankinter (desde Analizar)
+def bloque_operar(ticker: str, n: int, plan: senales.Plan, f_eur: float):
+    """Pasos y órdenes exactas para Bankinter, y botones para registrar la operación (virtual o real)."""
     pf = perfil()
-    if not ev.plan:
-        return
-    st.markdown("**📋 Orden lista para copiar en Bankinter**")
-    st.code(bankinter.ticket(ticker, "Compra", max(n_acciones, 1), round(ev.precio, 2), ev.plan.stop,
-                             ev.plan.objetivo), language=None)
+    n = max(n, 1)
+    st.markdown("**📱 Cómo hacerlo en Bankinter**")
+    st.markdown(
+        f"1. Abre la app de Bankinter → **Bróker** → busca **{nombre_de(ticker).split(' (')[0]}** "
+        f"({bankinter.mercado_de(ticker)}).\n"
+        "2. **Compra** con orden **Limitada** (no «a mercado»): así nunca pagas más del precio que fijes.\n"
+        "3. Cuando se ejecute, crea la **protección**: órdenes «stop relacionadas» (stop-loss + objetivo a la vez) o, "
+        "si prefieres, solo una orden **Stop** de venta.")
+    st.code(bankinter.ticket_compra(ticker, n, plan.entrada, tarifa=pf.tarifa, importe_eur=n * plan.entrada * f_eur),
+            language=None)
+    st.code(bankinter.ticket_stop_relacionadas(ticker, n, plan.stop, plan.objetivo), language=None)
+    with st.expander("Otras formas de protegerte"):
+        st.code(bankinter.ticket_stop(ticker, n, plan.stop), language=None)
+        distancia = (1 - plan.stop / plan.entrada) * 100
+        st.caption(f"También puedes usar una orden **Stop dinámica** con una distancia del {num(distancia, 1)} %: "
+                   "sube sola cuando la acción sube y no baja nunca. Se ejecuta a mercado al activarse.")
     d = datos_usuario()
     c1, c2 = st.columns(2)
     if c1.button("🎮 Probarla con dinero virtual", width="stretch"):
         cv = d.setdefault("cartera_virtual", cartera.nueva(10_000.0))
-        err = cartera.comprar(cv, ticker, max(n_acciones, 1), ev.precio, pf.tarifa, stop=ev.plan.stop,
-                              objetivo=ev.plan.objetivo, nota=f"Desde Analizar (puntuación {ev.puntuacion})")
+        err = cartera.comprar(cv, ticker, n, plan.entrada, pf.tarifa, stop=plan.stop, objetivo=plan.objetivo,
+                              nota="Desde Analizar", fx=f_eur)
         if err:
             st.error(err)
         else:
             guardar_datos()
-            st.success("Añadida a tu 🎮 Cartera virtual. Los stop-loss y objetivos se ejecutarán solos.")
+            st.success("Añadida a tu 🎮 Cartera virtual. El stop-loss y el objetivo se ejecutarán solos.")
     with c2.popover("🏦 Ya la compré en Bankinter", width="stretch"):
         with st.form(f"real_{ticker}"):
-            n = st.number_input("Títulos comprados", 1, 10_000_000, max(n_acciones, 1))
-            precio = st.number_input("Precio al que se ejecutó", 0.0, value=round(ev.precio, 2))
-            stop = st.number_input("Stop-loss que has puesto", 0.0, value=round(ev.plan.stop, 2))
+            n_real = st.number_input("Títulos comprados", 1, 10_000_000, n)
+            precio = st.number_input("Precio al que se ejecutó", 0.0, value=round(plan.entrada, 2))
+            stop = st.number_input("Stop-loss que has puesto", 0.0, value=round(plan.stop, 2))
             if st.form_submit_button("Registrar en mi cartera", type="primary"):
                 cr = d.setdefault("cartera_real", cartera.nueva(None))
-                cartera.comprar(cr, ticker, int(n), precio, pf.tarifa, stop=stop or None,
-                                nota=f"Comprada tras análisis (puntuación {ev.puntuacion})")
+                cartera.comprar(cr, ticker, int(n_real), precio, pf.tarifa, stop=stop or None,
+                                nota="Comprada tras analizarla", fx=f_eur)
                 guardar_datos()
-                st.success("Registrada. La verás en 🏦 Mi Bankinter, que la vigilará por ti.")
+                st.success("Registrada. La verás en 🏦 Mi Bankinter, que la vigilará cada día.")
 
 
 # --------------------------------------------------------------------------- copia de seguridad

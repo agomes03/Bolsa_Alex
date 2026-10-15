@@ -35,10 +35,11 @@ class CarteraModelo:
     senal: str           # "momentum" o "baja_vol"
     n: int
     filtro_mercado: bool
-    perfil: str
+    perfil: str          # texto para mostrar
     descripcion: str
     universo: str = "espana"      # "espana" (acciones españolas) o "global"
     capital: float = 10_000.0     # capital con el que se simula (realista para sus comisiones)
+    perfiles: tuple = ()          # perfiles de 🎯 Mi plan a los que se recomienda
 
 
 _DESC = {
@@ -46,32 +47,31 @@ _DESC = {
     "baja_vol": "Cada mes, las {n} acciones más estables (las que menos se mueven). ",
 }
 
+# Elegidas con el laboratorio (datos reales 2020-2026, comisiones de Bankinter, en euros). En España el filtro
+# de mercado empeoró la cartera de momentum sin reducir sus caídas, así que no se usa en ella.
 CARTERAS = {
     "es_dinamica": CarteraModelo(
-        "es_dinamica", "Dinámica España", "momentum", 8, False, "Dinámico",
-        _DESC["momentum"].format(n=8) + "La que más puede ganar y también la que más puede caer."),
-    "es_equilibrada": CarteraModelo(
-        "es_equilibrada", "Equilibrada España", "momentum", 8, True, "Moderado",
-        _DESC["momentum"].format(n=8) + "Si el IBEX está en tendencia bajista, esa parte queda en liquidez. "
-        "Un punto medio entre ganancia y sustos."),
+        "es_dinamica", "Dinámica España", "momentum", 8, False, "dinámico y moderado",
+        _DESC["momentum"].format(n=8) + "Es la que más ha ganado en las pruebas, pero puede caer tanto como la "
+        "bolsa (más de un 30 % en una crisis). El perfil moderado le dedica menos dinero que el dinámico.",
+        perfiles=("Dinámico", "Moderado")),
     "es_tranquila": CarteraModelo(
-        "es_tranquila", "Tranquila España", "baja_vol", 8, True, "Conservador",
-        _DESC["baja_vol"].format(n=8) + "Solo si el IBEX va al alza. En años muy alcistas gana menos que la media, "
-        "pero sus caídas han sido más pequeñas."),
+        "es_tranquila", "Tranquila España", "baja_vol", 8, True, "conservador",
+        _DESC["baja_vol"].format(n=8) + "Solo invierte si el IBEX va al alza; si no, queda en liquidez. Gana menos "
+        "que la bolsa, pero sus caídas han sido mucho más pequeñas.", perfiles=("Conservador",)),
     "dinamica": CarteraModelo(
-        "dinamica", "Dinámica internacional", "momentum", 10, False, "Dinámico",
+        "dinamica", "Dinámica internacional", "momentum", 10, False, "dinámico (importes grandes)",
         _DESC["momentum"].format(n=10) + "Con acciones de España, Europa y EEUU. Solo tiene sentido con mucho "
         "dinero (≈5.000 € por empresa) por las comisiones internacionales.", "global", 50_000.0),
     "equilibrada": CarteraModelo(
-        "equilibrada", "Equilibrada internacional", "momentum", 20, True, "Moderado",
-        _DESC["momentum"].format(n=20) + "Solo de mercados en tendencia alcista. Para importes grandes.",
-        "global", 100_000.0),
+        "equilibrada", "Equilibrada internacional", "momentum", 20, True, "moderado (importes grandes)",
+        _DESC["momentum"].format(n=20) + "Solo de mercados en tendencia alcista: ganó parecido a la media con "
+        "caídas menores.", "global", 100_000.0),
     "tranquila": CarteraModelo(
-        "tranquila", "Tranquila internacional", "baja_vol", 20, True, "Conservador",
-        _DESC["baja_vol"].format(n=20) + "Solo de mercados en tendencia alcista. Para importes grandes.",
-        "global", 100_000.0),
+        "tranquila", "Tranquila internacional", "baja_vol", 20, True, "conservador (importes grandes)",
+        _DESC["baja_vol"].format(n=20) + "Solo de mercados en tendencia alcista.", "global", 100_000.0),
 }
-CARTERA_POR_PERFIL = {c.perfil: c for c in CARTERAS.values() if c.universo == "espana"}
+CARTERA_POR_PERFIL = {p: c for c in CARTERAS.values() if c.universo == "espana" for p in c.perfiles}
 
 
 def cierres_acciones(acciones: dict[str, pd.DataFrame], universo: str = "global") -> pd.DataFrame:

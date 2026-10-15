@@ -43,19 +43,19 @@ def mensaje_diario(informe: dict, avisos_propios: list[str] | None = None) -> st
     por_ticker = {r["ticker"]: r for r in informe.get("ranking", [])}
     lineas = [f"📈 Bolsa · {informe['fecha']}", ""]
     lineas += [f"• {f}" for f in informe.get("resumen", [])]
-    if informe.get("ideas"):
-        lineas += ["", "💡 Ideas del día:"]
-        for t in informe["ideas"]:
+    ideas = informe.get("ideas_es") or informe.get("ideas") or []
+    if ideas:
+        lineas += ["", "💡 Ideas del día en España:"]
+        for t in ideas:
             r = por_ticker.get(t, {})
             nota = f"nota {r['nota']}/100" if r.get("nota") is not None else f"{r.get('puntuacion')} pts"
             riesgo = f" · riesgo de caída {r['riesgo_nivel']}" if r.get("riesgo_nivel") else ""
             stop = f" · stop {r['stop']:.2f}" if r.get("stop") else ""
             lineas.append(f"  - {r.get('nombre', t)}: {nota}{riesgo}{stop}")
-    for clave, c in informe.get("carteras", {}).items():
-        if c.get("composicion"):
-            lineas += ["", f"📦 {c['nombre']} este mes: " + ", ".join(por_ticker.get(x["ticker"], {}).get("nombre", x["ticker"])
-                                                                for x in c["composicion"][:10])]
-            break
+    for c in informe.get("carteras", {}).values():
+        if c.get("universo") == "espana":
+            nombres = ", ".join(por_ticker.get(x["ticker"], {}).get("nombre", x["ticker"]) for x in c["composicion"])
+            lineas += ["", f"📦 {c['nombre']} este mes: {nombres or 'en liquidez'}"]
     if avisos_propios:
         lineas += ["", "🏦 Tu cartera:"] + avisos_propios
     lineas += ["", "Herramienta educativa, no es asesoramiento financiero."]

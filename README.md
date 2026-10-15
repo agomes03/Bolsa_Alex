@@ -5,9 +5,9 @@ Una app sencilla (en español) que te ayuda a invertir en bolsa con el **broker 
 | Sección | Qué hace |
 |---|---|
 | 🧭 **Hoy** | Pantalla de inicio: semáforo del mercado, resumen en pocas palabras, **ideas del día** (diversificadas por sector), **qué puede pasar** según la historia de los índices, noticias clave y avisos de tu cartera. Abre al instante porque usa el informe diario. |
-| 🎯 **Mi plan** | Asesor: 6 preguntas → tu perfil (conservador, moderado o dinámico) y un **reparto concreto en euros** (monetario/Letras, bonos, ETF mundial y unas pocas acciones), con órdenes para Bankinter, escenarios a 1 año y pruebas de estrés en crisis reales. |
-| 🔍 **Analizar** | Puntuación de 0 a 100 explicada, modelo conjunto, predicción por situaciones parecidas, plan con stop-loss y tamaño de posición, qué le puede pasar a tu dinero, datos de la empresa, analistas y noticias. |
-| 📡 **Radar** | Todas las empresas (IBEX, Continuo, Europa, EEUU, ETF) ordenadas por puntuación, con filtros. Toca una fila para analizarla. |
+| 🎯 **Mi plan** | Asesor: 6 preguntas → tu perfil (conservador, moderado o dinámico) y un **reparto concreto en euros** (Letras/monetario, renta fija, **fondo indexado mundial** y unas pocas acciones españolas), con órdenes para Bankinter, escenarios a 1 año y pruebas de estrés en crisis reales. |
+| 🔍 **Analizar** | **Veredicto** claro (Candidata a comprar, Neutral, Esperar…), nota global, riesgo de caída, por qué, plan en euros con stop-loss, costes reales de Bankinter y las **órdenes exactas** (limitada + stop relacionadas), qué le puede pasar a tu dinero, datos de la empresa y noticias. |
+| 📡 **Radar** | Acciones españolas (o todas) ordenadas por nota global con su veredicto. Toca una fila para analizarla. |
 | 📰 **Noticias** | 19 fuentes en español e inglés, ordenadas por impacto y explicadas. |
 | 🌍 **Mercados** | Índices, termómetros (VIX, euro/dólar, petróleo), fase de cada mercado con estadísticas desde los años 90 y peores caídas de la historia. |
 | 🏦 **Mi Bankinter** | Copiloto de tu broker: importa o registra tus posiciones, la app las vigila, te avisa y te prepara las órdenes; además, qué le puede pasar a tu cartera. |
@@ -77,8 +77,8 @@ ver durante unas semanas cómo se comporta la estrategia antes de arriesgar dine
 2. 🔍 **Analizar** → antes de comprar algo, lee los motivos, el riesgo de caída y el plan con stop-loss.
 3. **Bankinter** → copia la orden que te prepara la app (orden limitada + stop-loss) y regístrala en 🏦 Mi Bankinter.
 
-**Una vez al mes:** revisa 📦 **Carteras modelo** (qué entra y qué sale) y haz tu aportación periódica al fondo
-indexado.
+**Una vez al mes:** revisa 📦 **Carteras modelo** (qué entra y qué sale). La aportación al fondo indexado,
+mejor programarla en Bankinter como aportación periódica.
 
 ## Cómo decide (sin cajas negras)
 La **nota global** (0-100) es el puesto de cada acción frente a las demás, combinando lo que ha funcionado con
@@ -101,33 +101,34 @@ Todo el código de las reglas está en `bolsa/senales.py` y `bolsa/noticias.py`.
 
 ## Lo que hemos aprendido con datos reales (laboratorio, octubre 2026)
 Probado con ~130 empresas (2016-2026) e índices con toda su historia, siempre en años que los modelos no
-habían visto y con comisiones incluidas:
+habían visto, **en euros y con las comisiones reales de Bankinter**:
 
 | Pregunta | ¿Se puede predecir? |
 |---|---|
 | ¿Subirá una acción en 1 o 3 meses? | No (AUC 0,50-0,52: igual que lanzar una moneda) |
 | ¿Lo hará mejor que las demás? | Prácticamente no (AUC 0,51) |
-| **¿Sufrirá una caída de más del 10% el próximo mes?** | **Sí (AUC 0,61)**: con riesgo "muy bajo" ocurrió el 7% de las veces; con "muy alto", el 21% |
+| **¿Sufrirá una caída de más del 10 % el próximo mes?** | **Sí (AUC 0,61)**: con riesgo "muy bajo" ocurrió el 7 % de las veces; con "muy alto", el 21 % |
 
-| Estrategia (2020-2026, años no vistos, comisiones incluidas) | Rentabilidad/año | Peor caída |
+| Cartera mensual (2020-2026, comisiones de Bankinter) | Rentabilidad/año | Peor caída |
 |---|---|---|
-| Momentum 12-1, 10 acciones, rotación mensual | 27,9% | -37% |
-| Momentum 12-1, 20 acciones | 21,9% | -33% |
-| Todas las acciones a partes iguales (referencia) | 15,5% | -34% |
-| Momentum 12-1, 20 acciones, con filtro de mercado | 14,4% | -28% |
-| Baja volatilidad, 20 acciones, con filtro de mercado | 7,9% | **-14%** |
-| Reglas de compra/venta diarias con stop-loss (entrenadas) | 4,2% | -19% |
+| **España**: 8 acciones con más momentum (cartera *Dinámica España*) | 20,7 % | -35 % |
+| España: las mismas con filtro de mercado | 11,3 % | -35 % |
+| **España**: 8 más estables con filtro (cartera *Tranquila España*) | 5,1 % | **-16 %** |
+| España: todas a partes iguales (referencia) | 13,1 % | -35 % |
+| Internacional: 10 con más momentum (≈5.000 € por empresa) | 28,2 % | -35 % |
+| Internacional: 20 con más momentum y filtro | 14,7 % | -25 % |
+| Internacional: todas a partes iguales (referencia) | 15,3 % | -34 % |
 
-| Regla de protección (media 200 ± 2%) | Sin regla | Con regla |
+| Regla de protección (media 200 ± 2 %) | Sin regla | Con regla |
 |---|---|---|
-| IBEX 35 (1994-2026) | 5,3%/año, peor caída -63% | 6,7%/año, peor caída -37% |
-| S&P 500 (1928-2026) | 6,2%/año, peor caída -86% | 7,0%/año, peor caída -53% |
+| IBEX 35 (1994-2026) | 5,3 %/año, peor caída -63 % | 6,7 %/año, peor caída -37 % |
+| S&P 500 (1928-2026) | 6,2 %/año, peor caída -86 % | 7,0 %/año, peor caída -53 % |
 
-Por eso la app se apoya en el **riesgo de caída** (para evitar sustos), en **carteras modelo de rotación mensual**
-y en la **regla de protección** para los fondos indexados, y no presume de adivinar si una acción subirá.
-Ojo con la lectura: los filtros de seguridad reducen los sustos, pero en un periodo muy alcista como 2020-2026
-también reducen la ganancia. Ninguna opción gana a la vez más y con menos riesgo en todos los periodos.
-Cuidado: el universo son las grandes empresas de hoy (sesgo de supervivencia), lo que favorece al momentum.
+Conclusiones que aplica la app: no presume de adivinar subidas; usa el **riesgo de caída** para evitar sustos;
+propone **carteras modelo españolas** (en Bankinter, las extranjeras pagan 20 € por operación, un 1 % de divisa y
+custodia) y un **fondo indexado** para el grueso del dinero. Cuidado: el universo son las grandes empresas de hoy
+(sesgo de supervivencia) y 2020-2026 es un único periodo; ninguna opción gana a la vez más y con menos riesgo
+siempre.
 
 ## Cómo predice (y por qué no promete milagros)
 `bolsa/prediccion.py` usa el método de **situaciones parecidas** (k vecinos más cercanos): describe el
@@ -188,8 +189,18 @@ en la app (🧪 Simulador y modelos).
 ## Cómo trabaja con Bankinter
 Bankinter no ofrece una API pública para que apps de terceros lean la cuenta de un particular o envíen
 órdenes, así que la app **no se conecta** a tu cuenta ni toca tu dinero. Funciona como copiloto:
-prepara cada orden con los campos del formulario de Bankinter (valor, mercado, tipo limitada, precio,
-títulos, validez y stop-loss), importa tus posiciones desde un Excel/CSV y vigila lo que tienes.
+
+- **Órdenes listas para copiar**, con los tipos de orden de Bankinter: compra **limitada**; protección con orden
+  **Stop** (condición «menor o igual que» + **precio límite**, que Bankinter exige), **stop relacionadas**
+  (stop-loss y objetivo a la vez; al ejecutarse una se cancela la otra) o **stop dinámica**. Recuerda que en
+  Bankinter las órdenes stop no se modifican: para cambiarlas, cancela y crea otra.
+- **Costes reales** (tarifa pública, oct. 2026; ajustable en la barra lateral): España 3,95 € (≤2.000 €) u 8 €
+  (≤60.000 €) por operación, 0 € con Bróker Cero, más cánones de bolsa (~1 €, aproximado) y tasa Tobin del 0,2 %;
+  extranjeras 20 € por operación, ±1 % de cambio de divisa y custodia de 0,05 % trimestral (mínimo 6 € por valor).
+- **Importes en euros**: los precios se muestran en la divisa del valor (como en Bankinter) y los importes, en euros
+  con el tipo de cambio del día.
+- **Tu cartera**: la registras a mano o la importas de una hoja de cálculo; la app la vigila cada día y te avisa
+  (también por Telegram si lo activas).
 
 ## Datos
 - Cotizaciones: Yahoo Finance (gratis, ~15 minutos de retraso). En Yahoo las acciones españolas

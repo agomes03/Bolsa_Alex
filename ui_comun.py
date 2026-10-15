@@ -80,18 +80,72 @@ def mercado_alcista_para(ticker: str) -> bool | None:
     return senales.estado_indice(h)["alcista"] if not h.empty else None
 
 
-def pct(x: float | None, dec: int = 2) -> str:
+def num(x: float | None, dec: int = 2) -> str:
+    """Número en formato español: 1.234,56."""
     if x is None or pd.isna(x):
         return "—"
-    return f"{x:+.{dec}f}%"
+    return f"{x:,.{dec}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def eur(x: float, moneda: str = "€") -> str:
-    return f"{x:,.2f} {moneda}".replace(",", "X").replace(".", ",").replace("X", ".")
+def pct(x: float | None, dec: int = 1, signo: bool = True) -> str:
+    """Porcentaje (x ya en %) en formato español: +3,2 %."""
+    if x is None or pd.isna(x):
+        return "—"
+    texto = num(abs(x), dec)
+    if signo:
+        texto = ("+" if x > 0 else "−" if x < 0 else "") + texto
+    elif x < 0:
+        texto = "−" + texto
+    return f"{texto} %"
 
 
-def moneda_de(ticker: str) -> str:
-    return "€" if ticker.endswith((".MC", ".AS")) else "$"
+def eur(x: float | None, moneda: str = "€") -> str:
+    return "—" if x is None or pd.isna(x) else f"{num(x, 2)} {moneda}"
+
+
+def fecha(iso: str | None) -> str:
+    """'2026-10-15' -> '15/10/2026'."""
+    if not iso:
+        return "—"
+    try:
+        return date.fromisoformat(str(iso)[:10]).strftime("%d/%m/%Y")
+    except ValueError:
+        return str(iso)
+
+
+def hora_espana(iso_utc: str | None) -> str:
+    """Fecha y hora UTC (ISO) en hora peninsular española."""
+    if not iso_utc:
+        return "—"
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    try:
+        d = datetime.fromisoformat(iso_utc.replace("Z", "+00:00"))
+        return d.astimezone(ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y a las %H:%M")
+    except ValueError:
+        return iso_utc
+
+
+def moneda_de(ticker: str, info: dict | None = None) -> str:
+    """Símbolo de la divisa en la que cotiza (la que verás en Bankinter)."""
+    return costes.simbolo(ticker, info)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def tipos_cambio() -> dict[str, float]:
+    """Unidades de cada divisa por 1 euro (último cierre)."""
+    salida = {}
+    for div, t in (("USD", "EURUSD=X"), ("GBP", "EURGBP=X"), ("CHF", "EURCHF=X")):
+        df = datos.historico(t, "1mo")
+        if not df.empty:
+            salida[div] = float(df["Close"].iloc[-1])
+    return salida
+
+
+def fx(ticker: str, info: dict | None = None) -> float | None:
+    """Euros que vale 1 unidad de la divisa del valor (1 para valores en euros; None si no se sabe)."""
+    return costes.euros_por_unidad(costes.divisa(ticker, info), tipos_cambio())
 
 
 def es_movil() -> bool:

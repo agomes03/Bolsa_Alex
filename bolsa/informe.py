@@ -468,6 +468,7 @@ def actualizar(carpeta: str | Path = "informe", entrenar: bool | None = None, it
         ev_c = estrategias.evaluar_cartera(cierres, perm, c, tarifa)
         carteras[clave] = {"nombre": c.nombre, "perfil": c.perfil, "descripcion": c.descripcion, "n": c.n,
                            "filtro_mercado": c.filtro_mercado, "universo": c.universo,
+                           "perfiles": list(c.perfiles),
                            "composicion": estrategias.composicion_hoy(cierres, perm, c), **ev_c}
         m = ev_c["metricas"]
         log(f"  {c.nombre}: {m['cagr_pct']:.1f}%/año, peor caída {m['max_caida_pct']:.1f}% "
