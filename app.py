@@ -19,7 +19,7 @@ from paginas_extra import bloque_operar, pagina_bankinter, pagina_cartera_virtua
 from paginas_hoy import (bloque_fases, bloque_que_puede_pasar_accion, pagina_carteras, pagina_hoy, pagina_plan,
                          pagina_radar_global)
 from ui_comun import (Perfil, cargar_fundamentales, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
-                      es_movil, estrategia_actual, eur, fila_informe, fx, mercado_alcista_para, moneda_de,
+                      datos_usuario, es_movil, eur, fila_informe, fx, mercado_alcista_para, moneda_de,
                       noticias_empresa, num, pct)
 
 st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide",
@@ -35,8 +35,16 @@ with st.sidebar:
     st.title("⚙️ Tu perfil")
     movil = st.toggle("📱 Vista para móvil", value=es_movil(),
                       help="Gráficos más bajos y tablas con menos columnas. Se activa sola en el móvil.")
-    capital = st.number_input("Dinero que tienes para invertir (€)", min_value=100.0, value=3000.0, step=100.0)
-    riesgo = st.slider("Máximo que aceptas perder por operación (% de tu dinero)", 0.5, 5.0, 1.0, 0.5,
+    _plan = datos_usuario().get("perfil_inversor") or {}
+    _defecto = 3000.0
+    if _plan:
+        from bolsa import asesor as _asesor
+        _perfil = _asesor.perfil_inversor(_plan["horizonte"], _plan["reaccion"], _plan["experiencia"], _plan["colchon"])
+        _defecto = max(100.0, _plan["importe"] * _asesor.REPARTOS[_perfil.nombre]["Acciones individuales"] / 100)
+    capital = st.number_input("Dinero para acciones sueltas (€)", min_value=100.0, value=float(round(_defecto, -1)),
+                              step=100.0, help="La parte de tu dinero para comprar acciones concretas (en 🎯 Mi plan "
+                                               "se calcula según tu perfil). Se usa para decirte cuántas comprar.")
+    riesgo = st.slider("Máximo que aceptas perder por operación (% de ese dinero)", 0.5, 5.0, 1.0, 0.5,
                        help="Regla de oro de los profesionales: no arriesgar más de un 1-2% del capital "
                             "en una sola operación. Así, aunque falles varias veces seguidas, sigues en el juego.")
     with st.expander("Tus comisiones en Bankinter"):
@@ -319,8 +327,9 @@ def pagina_analizar():
             st.warning("No se ha podido obtener el tipo de cambio de su divisa: no se pueden calcular importes en "
                        "euros para esta acción.")
         else:
+            # Como mucho el 20 % del dinero en una sola empresa (diversificación), aunque el stop esté muy cerca.
             n = min(costes.tamano_por_riesgo(capital, riesgo, p.entrada * f_eur, p.stop * f_eur),
-                    costes.acciones_asequibles(capital, p.entrada * f_eur, ticker, tarifa))
+                    costes.acciones_asequibles(capital * 0.20, p.entrada * f_eur, ticker, tarifa))
             importe = n * p.entrada * f_eur
             importe_ref = importe or importe_ref
             cap_empresa = fund.get("marketCap")
@@ -334,11 +343,11 @@ def pagina_analizar():
                                      delta_color="off", help="Comprar + vender + 1 año de custodia (si es extranjera).")
             st.markdown(
                 f"Si sale mal y salta el stop, perderías unos **{eur(n * (p.entrada - p.stop) * f_eur)}** "
-                f"(el {num(riesgo, 1)} % de tus {eur(capital)}, como has fijado en tu perfil). Si llega al objetivo, "
-                f"ganarías unos **{eur(n * (p.objetivo - p.entrada) * f_eur)}** antes de impuestos.")
-            st.caption(f"El stop-loss está a {num(estrategia_actual().stop_atr, 1)} veces lo que se mueve en un día normal "
-                       "(para que el ruido diario no lo active) y el objetivo al doble de esa distancia: así ganas 2 € "
-                       "por cada 1 € que arriesgas.")
+                f"(como máximo el {num(riesgo, 1)} % de tus {eur(capital)}). Si llega al objetivo, "
+                f"ganarías unos **{eur(n * (p.objetivo - p.entrada) * f_eur)}** antes de impuestos. Nunca más del "
+                "20 % de tu dinero en una sola empresa.")
+            st.caption("El stop-loss está a 2 veces lo que se mueve en un día normal (para que el ruido diario no lo "
+                       "active) y el objetivo al doble de esa distancia: así ganas 2 € por cada 1 € que arriesgas.")
             if n == 0:
                 st.info("Con tu dinero y tu riesgo máximo no llega para comprar ni una acción con este stop-loss.")
             elif iv and iv["pct"] > 2:

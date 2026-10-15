@@ -207,7 +207,19 @@ def pagina_plan():
     else:
         candidatas = [ranking[t] for t in inf.get("ideas_es", []) if t in ranking]
     candidatas = [r for r in candidatas if precio_eur(r)]
+    aviso_cartera = None
+    if perfil_inv.invertir_en_bolsa and propia and candidatas:
+        euros_acciones = p["importe"] * asesor.REPARTOS[perfil_inv.nombre]["Acciones individuales"] / 100
+        necesario = len(candidatas) * minimo
+        if euros_acciones < necesario:
+            aviso_cartera = (f"Para seguir bien la {propia[1]['nombre']} hacen falta unos {eur(necesario)} "
+                             f"({len(candidatas)} empresas × {eur(minimo)}), y tu parte para acciones es de "
+                             f"{eur(euros_acciones)}. Comprar solo algunas no es la misma estrategia, así que de momento "
+                             "esa parte va también al fondo indexado.")
+            candidatas = []
     plan = asesor.plan_inversion(p["importe"], p["mensual"], perfil_inv, candidatas, minimo)
+    if aviso_cartera:
+        plan["avisos"] = [aviso_cartera]
     fase = inf.get("mercado", {}).get("fases", {}).get("^IBEX", {}).get("fase")
     st.info("⏱️ " + asesor.ritmo_de_entrada(fase))
 
