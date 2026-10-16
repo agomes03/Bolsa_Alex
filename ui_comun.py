@@ -868,6 +868,26 @@ def ir_a(pagina: str, **estado):
 # --------------------------------------------------------------------------- estilo
 ESTILOS = """
 <style>
+/* Orden de compra/venta de la cartera virtual, con el aspecto de la de Bankinter. */
+.st-key-orden_ticket, .st-key-orden_confirmar { background: #f6f8fb; }
+.orden-titulo { letter-spacing: .04em; color: #4b5563; font-size: .95rem; border-bottom: 3px solid #4b5563;
+  display: inline-block; padding-bottom: .2rem; margin-bottom: .6rem; }
+.orden-valor { font-size: 1.25rem; font-weight: 600; }
+.orden-precio { font-size: 1.35rem; font-weight: 700; }
+.orden-hora { color: #6b7280; font-size: .9rem; }
+.orden-caja { background: #e8edf3; border-radius: 6px; padding: .4rem .7rem; font-size: .85rem; }
+.orden-caja-cab, .orden-caja-val { display: flex; justify-content: space-between; }
+.orden-caja-cab { color: #374151; letter-spacing: .03em; }
+.orden-caja-val { font-weight: 600; font-size: 1rem; }
+.orden-caja-pie { color: #6b7280; font-size: .8rem; }
+.st-key-orden_ticket [data-testid="stWidgetLabel"] p, .st-key-orden_confirmar [data-testid="stWidgetLabel"] p {
+  font-size: .8rem; letter-spacing: .03em; color: #4b5563; }
+.st-key-orden_ticket button[kind="primary"], .st-key-orden_confirmar button[kind="primary"] {
+  background: #f7941d; border-color: #f7941d; border-radius: 999px; letter-spacing: .06em; }
+@media (prefers-color-scheme: dark) {
+  .st-key-orden_ticket, .st-key-orden_confirmar { background: transparent; }
+  .orden-caja { background: rgba(255,255,255,.06); }
+}
 /* Cifras un poco más pequeñas: caben más sin hacer scroll. */
 [data-testid="stMetricValue"] { font-size: clamp(1.3rem, 2.4vw, 1.9rem); }
 @media (max-width: 640px) {

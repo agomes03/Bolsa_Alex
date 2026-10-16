@@ -282,8 +282,57 @@ def ficha_cotizacion(ticker: str, diario: pd.DataFrame, q: dict):
         st.caption(f"📋 Veredicto de la app: **{etiqueta}**{nota}{riesgo}. {explicacion}")
 
 
+VALIDEZ = ["Hasta fin de día", "Hasta fin de semana", "Hasta fin de mes", "Fecha concreta"]
+
+
+def _fecha_validez(opcion: str, concreta: date | None) -> date:
+    hoy = date.today()
+    if opcion == "Hasta fin de día":
+        return hoy
+    if opcion == "Hasta fin de semana":
+        return hoy + timedelta(days=max(4 - hoy.weekday(), 0))
+    if opcion == "Hasta fin de mes":
+        siguiente = (hoy.replace(day=28) + timedelta(days=4)).replace(day=1)
+        return siguiente - timedelta(days=1)
+    return concreta or hoy
+
+
+def _cabecera_orden(ticker: str, q: dict, sentido: str) -> None:
+    """Cabecera como la de la orden de Bankinter: valor, precio, variación, hora y mercado, y la sesión."""
+    m = moneda_de(ticker)
+    corto = ticker.split(".")[0].replace("^", "")
+    nombre = nombre_de(ticker).split(" (")[0].upper()
+    var = q.get("variacion_pct")
+    flecha = "↗" if (var or 0) >= 0 else "↘"
+    color = "#15803d" if (var or 0) >= 0 else "#b91c1c"
+    hora = pd.Timestamp(q["hora"])
+    st.markdown(f"<div class='orden-titulo'>ORDEN DE {'COMPRA' if sentido == 'compra' else 'VENTA'}</div>",
+                unsafe_allow_html=True)
+    c = st.columns([3, 2])
+    c[0].markdown(
+        f"<div class='orden-valor'>{corto} · {nombre}</div>"
+        f"<div class='orden-precio'>{txt_precio(q['precio'], m)} <span style='color:{color}'>{flecha} "
+        + (f"{pct(var, 2)}" if var is not None else "") + "</span></div>"
+        f"<div class='orden-hora'>{hora:%H:%M} · {bankinter.mercado_de(ticker).upper()}</div>",
+        unsafe_allow_html=True)
+    c[1].markdown(
+        "<div class='orden-caja'><div class='orden-caja-cab'><span>MÁXIMO</span><span>MÍNIMO</span></div>"
+        f"<div class='orden-caja-val'><span>{num(q['maximo'], 3)}</span><span>{num(q['minimo'], 3)}</span></div>"
+        f"<div class='orden-caja-pie'>Cierre anterior {num(q['anterior'], 3) if q.get('anterior') else '—'}</div>"
+        "</div>", unsafe_allow_html=True)
+
+
+def _cancelar_orden(ticker: str) -> None:
+    """«Cancelar»: deja la orden como al principio (los valores propuestos por la app)."""
+    for x in [x for x in st.session_state if isinstance(x, str) and x.startswith("v_") and ticker in x]:
+        del st.session_state[x]
+    st.session_state.pop("v_confirmar", None)
+
+
 @st.fragment
 def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
+    """Orden de compra o venta con el mismo formulario que el bróker (Bankinter): cuenta, tipo de orden, precio,
+    títulos, importe y validez; «Continuar» enseña el resumen con los costes y «Confirmar» la envía."""
     pf = perfil()
     st.subheader("🛒 Operar")
     c = st.columns(2)
@@ -314,9 +363,15 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
         st.error("Yahoo no da ahora mismo la cotización de este valor (a veces limita las consultas). Prueba de nuevo "
                  "en un minuto con «🔄 Actualizar todo ahora» en el menú lateral.")
         return
-    ficha_cotizacion(ticker, diario, q)
+    with st.expander(f"📈 Gráfico y datos de {nombre_de(ticker).split(' (')[0]}"):
+        ficha_cotizacion(ticker, diario, q)
     m = moneda_de(ticker)
     precio = q["precio"]
+    clave = f"{ticker}_{sentido}"
+    confirmar = st.session_state.get("v_confirmar")
+    if confirmar and confirmar.get("clave") != clave:
+        st.session_state.pop("v_confirmar", None)
+        confirmar = None
 
     # Propuesta de la app (stop-loss, objetivo y tamaño) para rellenar la orden.
     plan = None
@@ -327,102 +382,169 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
             plan = senales.evaluar(ticker, hist, mercado_alcista=mercado_alcista_para(ticker),
                                    stop_atr=p.stop_atr, ratio_objetivo=p.ratio_objetivo).plan
 
-    tipos = ["Limitada", "A mercado"] + (["Stop (con límite)"] if sentido == "venta" else [])
-    tipo_txt = st.radio("Tipo de orden", tipos, horizontal=True, key=f"v_tipo_{sentido}")
-    tipo = TIPOS[tipo_txt]
-    st.caption(EXPLICA_TIPO[tipo])
+    with st.container(border=True, key="orden_ticket"):
+        _cabecera_orden(ticker, q, sentido)
+        k = st.columns(2)
+        k[0].selectbox("CUENTA VALORES", ["🎮 Cartera virtual"], key=f"v_cuenta_{clave}", disabled=True)
+        k[1].selectbox("LIQUIDACIÓN", ["Efectivo virtual"], key=f"v_liq_{clave}", disabled=True)
+        k[1].caption(f"Saldo disponible: {eur(libre)}")
 
-    k = st.columns(2 if pf.movil else 4)
-    limite = activacion = stop = objetivo = None
-    if sentido == "compra":
-        ref = precio * f_eur
-        sugeridas = 0
-        if plan and plan.stop < precio:
-            sugeridas = min(costes.tamano_por_riesgo(patrimonio, pf.riesgo, ref, plan.stop * f_eur),
-                            costes.acciones_asequibles(min(libre, patrimonio * 0.20), ref, ticker, pf.tarifa))
-        maximo = max(costes.acciones_asequibles(libre, ref, ticker, pf.tarifa), 1)
-        n = k[0].number_input("Títulos", 1, 10_000_000, max(min(sugeridas, maximo), 1), key=f"v_n_{ticker}_c",
-                              help=f"La app propone {sugeridas} para que, si salta el stop, pierdas como mucho el "
-                                   f"{num(pf.riesgo, 1)} % de tu cartera y ninguna empresa pase del 20 %.")
-    else:
-        libres = cartera.acciones_libres(cv, ticker)
-        if libres == 0:
-            st.info("Todas tus acciones de este valor ya están en otras órdenes de venta.")
+        k = st.columns(2)
+        tipos = ["Estándar"] + (["Stop (stop-loss)"] if sentido == "venta" else [])
+        tipo_orden = k[0].selectbox("TIPO DE ORDEN", tipos, key=f"v_tipo_{clave}",
+                                    help="Estándar: compra o venta normal. Stop: se queda dormida y vende si el "
+                                         "precio baja a la activación (para limitar pérdidas).")
+        limite = activacion = None
+        if tipo_orden == "Estándar":
+            precio_txt = k[0].selectbox("PRECIO", ["A mercado", "Limitado"], index=1, key=f"v_precio_{clave}",
+                                        help="Limitado: solo se ejecuta a tu precio o mejor (lo recomendable). A "
+                                             "mercado: al precio que haya, sin control del precio.")
+            tipo = "mercado" if precio_txt == "A mercado" else "limitada"
+            if tipo == "limitada":
+                limite = k[1].number_input(f"PRECIO LÍMITE ({m})", 0.001, value=round(precio, 3), format="%.3f",
+                                           key=f"v_lim_{ticker}_{sentido}")
+        else:
+            tipo = "stop"
+            pos = cv["posiciones"][ticker]
+            defecto = pos.get("stop") or round(precio * 0.93, 3)
+            activacion = k[1].number_input(f"PRECIO DE ACTIVACIÓN ({m})", 0.001,
+                                           value=float(min(defecto, precio * 0.999)), format="%.3f",
+                                           key=f"v_act_{ticker}")
+            limite = k[1].number_input(f"PRECIO LÍMITE ({m})", 0.001, value=round(activacion * 0.98, 3),
+                                       format="%.3f", key=f"v_limst_{ticker}",
+                                       help="Un 2 % por debajo de la activación, para que se ejecute aunque caiga "
+                                            "deprisa (Bankinter lo exige en los stop).")
+        st.caption(EXPLICA_TIPO[tipo])
+
+        k = st.columns(2)
+        if sentido == "compra":
+            ref = precio * f_eur
+            sugeridas = 0
+            if plan and plan.stop < precio:
+                sugeridas = min(costes.tamano_por_riesgo(patrimonio, pf.riesgo, ref, plan.stop * f_eur),
+                                costes.acciones_asequibles(min(libre, patrimonio * 0.20), ref, ticker, pf.tarifa))
+            maximo = max(costes.acciones_asequibles(libre, ref, ticker, pf.tarifa), 1)
+            n = k[0].number_input("TÍTULOS", 1, 10_000_000, max(min(sugeridas, maximo), 1), key=f"v_n_{ticker}_c",
+                                  help=f"La app propone {sugeridas} para que, si salta el stop, pierdas como mucho el "
+                                       f"{num(pf.riesgo, 1)} % de tu cartera y ninguna empresa pase del 20 %. Con tu "
+                                       f"saldo puedes comprar hasta {maximo}.")
+        else:
+            libres = cartera.acciones_libres(cv, ticker)
+            n = k[0].number_input("TÍTULOS EN VENTA", 0, max(libres, 0), libres, key=f"v_n_{ticker}_v")
+            k[0].caption(f"Disponibles {libres}")
+            if libres == 0:
+                k[0].markdown("<span style='color:#dc2626'>No tienes títulos disponibles (están en otras órdenes "
+                              "de venta).</span>", unsafe_allow_html=True)
+        precio_estimado = limite if tipo == "limitada" else (activacion if tipo == "stop" else precio)
+        importe = n * precio_estimado * f_eur
+        k[1].text_input("IMPORTE APROXIMADO SIN COMISIONES", eur(importe), disabled=True,
+                        key=f"v_importe_{clave}_{round(importe, 2)}")
+
+        k = st.columns(2)
+        opcion = k[0].selectbox("VALIDEZ", VALIDEZ, index=0 if tipo == "mercado" else 2, key=f"v_validez_{clave}")
+        concreta = None
+        if opcion == "Fecha concreta":
+            concreta = k[1].date_input("Fecha", date.today() + timedelta(days=7), min_value=date.today(),
+                                       max_value=date.today() + timedelta(days=90), key=f"v_val_{clave}",
+                                       format="DD/MM/YYYY")
+        validez = _fecha_validez(opcion, concreta)
+        estado = horario.estado_mercado(ticker)
+        if validez == date.today() and not estado["abierto"] and estado["apertura"].date() > date.today():
+            st.warning("El mercado ya ha cerrado por hoy: una orden «hasta fin de día» caducará sin ejecutarse. "
+                       "Elige «Hasta fin de semana» o «Hasta fin de mes».")
+
+        stop = objetivo = None
+        if sentido == "compra":
+            with st.expander("🛡️ Protección tras la compra (stop-loss y objetivo)", expanded=False):
+                j = st.columns(2)
+                stop = j[0].number_input(f"Stop-loss ({m}, 0 = sin stop)", 0.0,
+                                         value=round(plan.stop, 3) if plan else 0.0, format="%.3f",
+                                         key=f"v_slc_{ticker}")
+                objetivo = j[1].number_input(f"Objetivo ({m}, 0 = sin objetivo)", 0.0,
+                                             value=round(plan.objetivo, 3) if plan else 0.0, format="%.3f",
+                                             key=f"v_objc_{ticker}")
+                st.caption("Propuestos por la app según la volatilidad del valor. En Bankinter serían órdenes "
+                           "«stop relacionadas», que se crean después de la compra.")
+            stop, objetivo = stop or None, objetivo or None
+            compra_a = limite if tipo == "limitada" else precio
+            if stop and stop >= compra_a:
+                # Pasa al poner un límite por debajo del stop propuesto: se recoloca a la misma distancia (en %)
+                # bajo tu precio, en vez de no dejarte enviar la orden.
+                distancia = (precio - plan.stop) / precio if plan and plan.stop < precio else 0.07
+                stop = round(compra_a * (1 - distancia), 3)
+                st.info(f"🛡️ Has puesto la compra por debajo del stop-loss propuesto: lo bajo a "
+                        f"**{num(stop, 3)}** ({pct(-distancia * 100, 1)} bajo tu precio).")
+            if tipo == "limitada" and limite > precio * 1.02:
+                st.warning("Tu límite está muy por encima del precio actual: se ejecutará enseguida al precio de "
+                           "mercado.")
+
+        orden = dict(clave=clave, ticker=ticker, sentido=sentido, tipo=tipo, n=int(n), limite=limite,
+                     activacion=activacion, validez=validez.isoformat(), stop=stop, objetivo=objetivo,
+                     precio=precio, f_eur=f_eur, importe=importe)
+        if not confirmar:
+            b = st.columns(2)
+            b[0].button("✕ CANCELAR", key=f"v_cancelar_{clave}", width="stretch", type="tertiary",
+                        on_click=_cancelar_orden, args=(ticker,))
+            b[1].button("CONTINUAR", key=f"v_continuar_{sentido}", type="primary", width="stretch",
+                        disabled=n <= 0, on_click=st.session_state.__setitem__, args=("v_confirmar", orden))
             return
-        n = k[0].number_input("Títulos", 1, libres, libres, key=f"v_n_{ticker}_v")
-    if tipo == "limitada":
-        limite = k[1].number_input(f"Precio límite ({m})", 0.001, value=round(precio, 3), format="%.3f",
-                                   key=f"v_lim_{ticker}_{sentido}")
-    elif tipo == "stop":
-        pos = cv["posiciones"][ticker]
-        defecto = pos.get("stop") or round(precio * 0.93, 3)
-        activacion = k[1].number_input(f"Activación ({m})", 0.001, value=float(min(defecto, precio * 0.999)),
-                                       format="%.3f", key=f"v_act_{ticker}")
-        limite = k[2 % len(k)].number_input(f"Límite ({m})", 0.001, value=round(activacion * 0.98, 3), format="%.3f",
-                                            key=f"v_limst_{ticker}", help="Muchos brókers (Bankinter, por ejemplo) lo exigen. Un 2 % por debajo de la "
-                                                                        "activación para que se ejecute aunque caiga deprisa.")
-    validez = k[-1].date_input("Válida hasta", date.today() + timedelta(days=0 if tipo == "mercado" else 7),
-                               min_value=date.today(), max_value=date.today() + timedelta(days=90),
-                               key=f"v_val_{ticker}_{sentido}_{tipo}", format="DD/MM/YYYY")
-    estado = horario.estado_mercado(ticker)
-    if validez == date.today() and not estado["abierto"] and estado["apertura"].date() > date.today():
-        st.warning("El mercado ya ha cerrado por hoy: una orden válida solo hasta hoy caducará sin ejecutarse. "
-                   "Pon como validez el próximo día de mercado o más.")
-    if sentido == "compra":
-        j = st.columns(2)
-        stop = j[0].number_input(f"Stop-loss tras la compra ({m}, 0 = sin stop)", 0.0,
-                                 value=round(plan.stop, 3) if plan else 0.0, format="%.3f", key=f"v_slc_{ticker}")
-        objetivo = j[1].number_input(f"Objetivo ({m}, 0 = sin objetivo)", 0.0,
-                                     value=round(plan.objetivo, 3) if plan else 0.0, format="%.3f", key=f"v_objc_{ticker}")
-        stop, objetivo = stop or None, objetivo or None
-        compra_a = limite if tipo == "limitada" else precio
-        if stop and stop >= compra_a:
-            # Pasa al poner un límite por debajo del stop propuesto: se recoloca a la misma distancia (en %)
-            # bajo tu precio, en vez de no dejarte enviar la orden.
-            distancia = (precio - plan.stop) / precio if plan and plan.stop < precio else 0.07
-            stop = round(compra_a * (1 - distancia), 3)
-            st.info(f"🛡️ Has puesto la compra por debajo del stop-loss propuesto: lo bajo a **{num(stop, 3)}** "
-                    f"({pct(-distancia * 100, 1)} bajo tu precio). Puedes cambiarlo arriba.")
 
-    # Estimación de costes, como la pantalla de confirmación del bróker.
-    precio_estimado = limite if tipo == "limitada" else (activacion if tipo == "stop" else precio)
-    importe = n * precio_estimado * f_eur
-    if sentido == "compra":
-        cc = costes.coste_compra(importe, ticker, pf.tarifa)
-        partes = [f"comisión {eur(cc['comision'])}"] + ([f"cambio de divisa {eur(cc['cambio'])}"] if cc["cambio"] else []) \
-            + ([f"tasa Tobin {eur(cc['itf'])}"] if cc["itf"] else [])
-        texto = (f"**Importe estimado: {eur(importe)}** + gastos {eur(cc['total'])} ({', '.join(partes)}) = "
-                 f"**{eur(importe + cc['total'])}**")
-    else:
-        gastos = pf.tarifa.coste(importe, ticker)
-        pos = cv["posiciones"][ticker]
-        resultado = importe - gastos - n * pos["precio_medio"] * pos.get("fx_medio", 1.0) \
-            - pos.get("gastos", 0.0) * n / pos["acciones"]
-        texto = (f"**Recibirías unos {eur(importe - gastos)}** (importe {eur(importe)} − comisión {eur(gastos)}). "
-                 f"Resultado estimado de la operación: **{eur(resultado)}**"
-                 + (f", unos {eur(costes.impuesto_ganancia(resultado))} de IRPF." if resultado > 0 else "."))
-    st.markdown("🧮 " + texto)
-    if tipo == "limitada" and sentido == "compra" and limite > precio * 1.02:
-        st.warning("Tu límite está muy por encima del precio actual: se ejecutará enseguida al precio de mercado.")
-
-    if st.button("📨 Enviar orden", type="primary", width="stretch", key=f"v_enviar_{sentido}"):
-        ahora_iso = f"{horario.ahora_madrid():%Y-%m-%dT%H:%M}"
-        err = cartera.nueva_orden(cv, ticker, sentido, tipo, int(n), pf.tarifa, precio_ref=precio, ahora=ahora_iso,
-                                  validez=validez.isoformat(), limite=limite, activacion=activacion, fx=f_eur,
-                                  stop=stop, objetivo=objetivo)
-        if err:
-            st.error(err)
-            return
-        abierto = horario.estado_mercado(ticker)["abierto"]
-        eventos = cartera.ejecutar_ordenes(cv, {}, pf.tarifa, ahora_iso, {ticker: (precio, abierto)})
-        guardar_datos()
-        if not eventos:
-            eventos = ["📨 Orden enviada. Queda pendiente: "
-                       + ("se ejecutará en la apertura." if tipo == "mercado" else
-                          "se ejecutará si el precio llega a tu límite." if tipo == "limitada" else
-                          "se activará si el precio baja a la activación.")]
-        st.session_state["_avisos_virtual"] = eventos
-        st.rerun()
+    # Paso 2: resumen con los costes, como la pantalla de confirmación del bróker.
+    o = confirmar
+    with st.container(border=True, key="orden_confirmar"):
+        que = "COMPRA" if o["sentido"] == "compra" else "VENTA"
+        st.markdown(f"<div class='orden-titulo'>CONFIRMA TU ORDEN DE {que}</div>", unsafe_allow_html=True)
+        como = {"mercado": "a mercado", "limitada": f"limitada a {num(o['limite'], 3)} {m}",
+                "stop": f"stop: activación {num(o['activacion'], 3)} · límite {num(o['limite'], 3)} {m}"}[o["tipo"]]
+        st.markdown(f"**{o['n']} títulos de {nombre_de(o['ticker'])}** · orden {como} · válida hasta "
+                    f"**{fecha(o['validez'])}**")
+        if o["sentido"] == "compra":
+            cc = costes.coste_compra(o["importe"], o["ticker"], pf.tarifa)
+            filas = [("Importe aproximado", eur(o["importe"])), ("Comisión", eur(cc["comision"]))]
+            if cc["cambio"]:
+                filas.append(("Cambio de divisa", eur(cc["cambio"])))
+            if cc["itf"]:
+                filas.append((costes.nombre_tasa_tobin(o["ticker"]), eur(cc["itf"])))
+            filas.append(("**Total aproximado**", f"**{eur(o['importe'] + cc['total'])}**"))
+            if o.get("stop"):
+                filas.append(("Stop-loss tras la compra", f"{num(o['stop'], 3)} {m}"))
+        else:
+            gastos = pf.tarifa.coste(o["importe"], o["ticker"])
+            pos = cv["posiciones"][o["ticker"]]
+            resultado = o["importe"] - gastos - o["n"] * pos["precio_medio"] * pos.get("fx_medio", 1.0) \
+                - pos.get("gastos", 0.0) * o["n"] / pos["acciones"]
+            filas = [("Importe aproximado", eur(o["importe"])), ("Comisión", eur(gastos)),
+                     ("**Recibirías unos**", f"**{eur(o['importe'] - gastos)}**"),
+                     ("Resultado de la operación", eur(resultado))]
+            if resultado > 0:
+                filas.append(("IRPF aproximado", eur(costes.impuesto_ganancia(resultado))))
+        for etiqueta, valor in filas:
+            c = st.columns([3, 2])
+            c[0].markdown(etiqueta)
+            c[1].markdown(valor)
+        b = st.columns(2)
+        b[0].button("← MODIFICAR", key="v_modificar", width="stretch", type="tertiary",
+                    on_click=lambda: st.session_state.pop("v_confirmar", None))
+        if b[1].button("CONFIRMAR ORDEN", key=f"v_enviar_{o['sentido']}", type="primary", width="stretch"):
+            ahora_iso = f"{horario.ahora_madrid():%Y-%m-%dT%H:%M}"
+            err = cartera.nueva_orden(cv, o["ticker"], o["sentido"], o["tipo"], o["n"], pf.tarifa,
+                                      precio_ref=o["precio"], ahora=ahora_iso, validez=o["validez"],
+                                      limite=o["limite"], activacion=o["activacion"], fx=o["f_eur"], stop=o["stop"],
+                                      objetivo=o["objetivo"])
+            if err:
+                st.error(err)
+                return
+            abierto = horario.estado_mercado(o["ticker"])["abierto"]
+            eventos = cartera.ejecutar_ordenes(cv, {}, pf.tarifa, ahora_iso, {o["ticker"]: (o["precio"], abierto)})
+            guardar_datos()
+            if not eventos:
+                eventos = ["📨 Orden enviada. Queda pendiente: "
+                           + ("se ejecutará en la apertura." if o["tipo"] == "mercado" else
+                              "se ejecutará si el precio llega a tu límite." if o["tipo"] == "limitada" else
+                              "se activará si el precio baja a la activación.")]
+            st.session_state["_avisos_virtual"] = eventos
+            st.session_state.pop("v_confirmar", None)
+            st.rerun()
 
 
 # --------------------------------------------------------------------------- ejercicios

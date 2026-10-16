@@ -87,6 +87,13 @@ def tasa_tobin_pct(ticker: str, capitalizacion: float | None = None) -> float:
 itf_pct = tasa_tobin_pct  # nombre antiguo
 
 
+def nombre_tasa_tobin(ticker: str) -> str:
+    """«Tasa Tobin España (ITF, 0,2 %)»: el impuesto sobre transacciones financieras de cada país."""
+    pais = {".MC": "España", ".PA": "Francia", ".MI": "Italia"}.get("." + ticker.rsplit(".", 1)[-1], "")
+    pct = tasa_tobin_pct(ticker)
+    return f"Tasa Tobin {pais} ({pct:.1f} %)".replace(".", ",").replace("  ", " ")
+
+
 @dataclass
 class Tarifa:
     """Tarifa de Bankinter. Todos los importes en euros."""

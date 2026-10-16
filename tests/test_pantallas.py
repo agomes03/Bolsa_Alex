@@ -612,8 +612,19 @@ def test_modo_privado_oculta_tus_importes():
     assert "Valor (€)" not in tabla.columns and "Precio actual" in tabla.columns
 
 
+class _Enviar:
+    """Como en el bróker: «Continuar» enseña el resumen con los costes y «Confirmar orden» la envía."""
+
+    def __init__(self, at):
+        self.at = at
+
+    def click(self):
+        [b for b in self.at.button if b.label == "CONTINUAR"][0].click().run()
+        return [b for b in self.at.button if b.label == "CONFIRMAR ORDEN"][0].click()
+
+
 def _boton_enviar(at):
-    return [b for b in at.button if "Enviar" in b.label][0]
+    return _Enviar(at)
 
 
 def test_virtual_compra_totalenergies_con_limite_por_debajo_del_stop_propuesto():
@@ -689,3 +700,30 @@ def test_ver_solo_un_activo_en_la_cartera_virtual():
     assert any(k.startswith("Valor de Indra") for k in etiquetas)
     assert etiquetas["Precio de compra"].startswith("60,00") and etiquetas["Títulos"] == "20"
     assert any("Cómo ha ido el precio" in m.value for m in at.markdown)
+
+
+def test_orden_virtual_como_en_el_broker_continuar_modificar_y_vender():
+    cv = cartera.nueva(10_000.0)
+    cartera.comprar(cv, "SAN.MC", 300, 12.0, costes.Tarifa(), "2026-09-01", None, nota="prueba", fx=1.0)
+    at = abrir("pagina_cartera_virtual", datos_usuario={"cartera_virtual": cv}, estado={"v_defecto": "SAN.MC"})
+    sin_fallos(at)
+    assert any("ORDEN DE COMPRA" in m.value for m in at.markdown)
+    assert {"TIPO DE ORDEN", "PRECIO", "VALIDEZ"} <= {s.label for s in at.selectbox}
+    [b for b in at.button if b.label == "CONTINUAR"][0].click().run()
+    assert any("CONFIRMA TU ORDEN DE COMPRA" in m.value for m in at.markdown)
+    assert any("Total aproximado" in m.value for m in at.markdown)
+    [b for b in at.button if b.label == "← MODIFICAR"][0].click().run()            # vuelve al formulario
+    assert any(b.label == "CONTINUAR" for b in at.button)
+    # Venta de 100 a mercado.
+    at.segmented_control(key="v_sentido").set_value("Vender").run()
+    sin_fallos(at)
+    assert any("ORDEN DE VENTA" in m.value for m in at.markdown)
+    at.selectbox(key="v_precio_SAN.MC_venta").set_value("A mercado").run()
+    at.number_input(key="v_n_SAN.MC_v").set_value(100).run()
+    [b for b in at.button if b.label == "CONTINUAR"][0].click().run()
+    assert any("Recibirías unos" in m.value for m in at.markdown)
+    [b for b in at.button if b.label == "CONFIRMAR ORDEN"][0].click().run()
+    sin_fallos(at)
+    cv = at.session_state["_datos"]["cartera_virtual"]
+    vendido = sum(h["acciones"] for h in cv["historial"] if h["tipo"] == "Venta")
+    assert vendido == 100 or any(o["sentido"] == "venta" for o in cv.get("ordenes", []))
