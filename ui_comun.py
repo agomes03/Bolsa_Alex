@@ -300,19 +300,22 @@ def datos_usuario() -> dict:
             st.warning(f"No se pudieron cargar tus datos guardados ({e}). Empiezas con datos vacíos.")
             st.session_state["_datos"] = {}
     d = st.session_state["_datos"]
-    if d.get("cartera_real") or d.get("cuentas"):
-        cuentas.asegurar(d)          # datos de antes de las cuentas: todo pasa a la «Cuenta principal»
+    cuentas.asegurar(d)              # `cartera_real` apunta siempre a la cuenta activa
     return d
+
+
+def cuenta_activa() -> dict:
+    """La cuenta que estás mirando (la tuya, la de tu madre...): sus posiciones y sus ajustes (perfil, ahorros,
+    avisos, diario, aportación, bróker). Nunca se suman cuentas."""
+    return cuentas.activa(datos_usuario())
 
 
 def guardar_datos() -> None:
     from datetime import datetime
 
     d = datos_usuario()
-    if d.get("cuentas"):
-        cuentas.consolidar(d)        # la cartera «Todas» siempre al día con lo que hay en cada cuenta
     try:
-        _almacen().guardar(d)
+        _almacen().guardar(cuentas.para_guardar(d))
         st.session_state["_guardado"] = (True, datetime.now(MADRID_TZ).strftime("%H:%M"), "")
     except Exception as e:  # noqa: BLE001
         st.session_state["_guardado"] = (False, datetime.now(MADRID_TZ).strftime("%H:%M"), str(e))

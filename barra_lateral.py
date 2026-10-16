@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import streamlit as st
 
-from bolsa import asesor, bankinter, costes, noticias
-from ui_comun import (Perfil, datos_usuario, es_movil, estado_finnhub, estado_guardado, guardar_datos,
+from bolsa import asesor, bankinter, costes, cuentas, noticias
+from ui_comun import (Perfil, cuenta_activa, datos_usuario, es_movil, estado_finnhub, estado_guardado, guardar_datos,
                       hay_contrasena)
 
 
 def _capital_por_defecto() -> float:
     """La parte para acciones sueltas según el plan guardado en 🎯 Mi plan (3.000 € si no hay plan)."""
-    plan = datos_usuario().get("perfil_inversor") or {}
+    plan = cuenta_activa().get("perfil_inversor") or {}
     if not plan:
         return 3000.0
     p = asesor.perfil_inversor(plan["horizonte"], plan["reaccion"], plan["experiencia"], plan["colchon"])
@@ -71,9 +71,25 @@ def _pie():
         st.rerun()
 
 
+def selector_de_cuenta() -> None:
+    """Qué cuenta asesora la app (la tuya, la de tu madre...). Solo aparece si hay más de una."""
+    d = datos_usuario()
+    nombres = list(cuentas.asegurar(d))
+    if len(nombres) < 2:
+        return
+    elegida = st.selectbox("👤 Cuenta", nombres, index=nombres.index(d["cuenta_activa"]),
+                           help="Toda la app (Hoy, Mi cartera, Seguimiento, Mi plan) asesora solo a esta cuenta. "
+                                "Las cuentas no se suman. Créalas en 🏦 Mi cartera → 🗂️ Cuentas.")
+    if elegida != d["cuenta_activa"]:
+        cuentas.activar(d, elegida)
+        guardar_datos()
+    st.divider()
+
+
 def barra_lateral() -> Perfil:
     """Pinta la barra lateral y devuelve el perfil elegido."""
     with st.sidebar:
+        selector_de_cuenta()
         st.title("⚙️ Tu perfil")
         movil = st.toggle("📱 Vista para móvil", value=es_movil(),
                           help="Gráficos más bajos y tablas con menos columnas. Se activa sola en el móvil.")
@@ -84,7 +100,7 @@ def barra_lateral() -> Perfil:
         riesgo = st.slider("Máximo que aceptas perder por operación (% de ese dinero)", 0.5, 5.0, 1.0, 0.5,
                            help="Regla de oro de los profesionales: no arriesgar más de un 1-2% del capital "
                                 "en una sola operación. Así, aunque falles varias veces seguidas, sigues en el juego.")
-        d = datos_usuario()
+        d = cuenta_activa()
         broker = st.selectbox("Tu banco o bróker", costes.BROKERS,
                               index=costes.BROKERS.index(d["broker"]) if d.get("broker") in costes.BROKERS else 0,
                               help="Se usa para las comisiones y para escribir las órdenes con los pasos de tu bróker.")

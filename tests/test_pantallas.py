@@ -193,7 +193,7 @@ def test_seguimiento_con_datos_y_pendientes_en_hoy():
     textos = " ".join(m.value for m in at.markdown)
     assert "Tus pendientes" in textos and "Toca tu aportación mensual" in textos
     assert "ha bajado de" in textos               # el aviso a 1.000.000 € salta con cualquier precio
-    assert at.session_state["_datos"]["alertas"][0]["disparada"]
+    assert at.session_state["_datos"]["cartera_real"]["alertas"][0]["disparada"]
 
 
 def test_seguimiento_crear_aviso_aportacion_y_apunte():
@@ -206,14 +206,14 @@ def test_seguimiento_crear_aviso_aportacion_y_apunte():
     [n for n in at.number_input if n.label == "Precio"][0].set_value(99_999.0)
     [b for b in at.button if "Crear aviso" in b.label][0].click().run()
     sin_fallos(at)
-    assert len(at.session_state["_datos"]["alertas"]) == 2
+    assert len(at.session_state["_datos"]["cartera_real"]["alertas"]) == 2
     # Aportación del mes: reparto y marcarla como hecha.
     assert any("A dónde llevarla" in s.value for s in at.subheader)
     [b for b in at.button if "Ya he hecho la aportación" in b.label][0].click().run()
-    assert len(at.session_state["_datos"]["aportacion"]["hechas"]) == 1
+    assert len(at.session_state["_datos"]["cartera_real"]["aportacion"]["hechas"]) == 1
     # Diario: el apunte vencido se puede revisar.
     [b for b in at.button if b.label == "Marcar como revisado"][0].click().run()
-    assert at.session_state["_datos"]["diario"][0]["revisada"]
+    assert at.session_state["_datos"]["cartera_real"]["diario"][0]["revisada"]
     # Renta: la venta de Santander aparece con su resultado y se puede descargar.
     assert any("Ganancias y pérdidas patrimoniales" in s.value for s in at.subheader)
     sin_fallos(at)
@@ -258,14 +258,14 @@ def test_vigilar_sin_stop_desde_mi_cartera():
     acciones = [t for t in ("SAN.MC", "IDR.MC") if t in d["cartera_real"]["posiciones"]]
     assert all(d["cartera_real"]["posiciones"][t]["sin_stop"] for t in acciones)
     assert all(d["cartera_real"]["posiciones"][t]["alarma"] for t in acciones)
-    avisos = {a["ticker"] for a in d["alertas"]}
+    avisos = {a["ticker"] for a in d["cartera_real"]["alertas"]}
     assert set(acciones) <= avisos
     assert not [b for b in at.button if "Vigilarlas sin stop-loss" in b.label]   # ya no lo vuelve a pedir
     # Desmarcar una: deja de vigilarla y borra su aviso.
     at.toggle(key="ss_SAN.MC").set_value(False).run()
     d = at.session_state["_datos"]
     assert not d["cartera_real"]["posiciones"]["SAN.MC"].get("sin_stop")
-    assert "SAN.MC" not in {a["ticker"] for a in d["alertas"]}
+    assert "SAN.MC" not in {a["ticker"] for a in d["cartera_real"]["alertas"]}
 
 
 def test_cambiar_el_nivel_de_alarma_de_una_posicion():
@@ -277,64 +277,67 @@ def test_cambiar_el_nivel_de_alarma_de_una_posicion():
     sin_fallos(at)
     pos = at.session_state["_datos"]["cartera_real"]["posiciones"]["SAN.MC"]
     assert pos["sin_stop"] and pos["alarma"] == 1.0
-    assert [a["precio"] for a in at.session_state["_datos"]["alertas"] if a["ticker"] == "SAN.MC"] == [1.0]
+    assert [a["precio"] for a in at.session_state["_datos"]["cartera_real"]["alertas"] if a["ticker"] == "SAN.MC"] == [1.0]
 
 
-def _dos_cuentas() -> dict:
-    principal = cartera.nueva(None)
-    cartera.comprar(principal, "SAN.MC", 2500, 12.46, costes.Tarifa(), "2025-06-02")
-    segunda = cartera.nueva(None)
-    cartera.comprar(segunda, "SAN.MC", 1000, 14.20, costes.Tarifa(), "2026-02-10")
-    cartera.comprar(segunda, "ITX.MC", 100, 50.0, costes.Tarifa(), "2026-02-10")
-    return {"cuentas": {"Bankinter 1": principal, "Bankinter 2": segunda}}
+def _familia() -> dict:
+    """Mi cuenta y la de mi madre: el mismo Santander a precios distintos, y perfiles distintos."""
+    mia = cartera.nueva(None)
+    cartera.comprar(mia, "SAN.MC", 2500, 12.46, costes.Tarifa(), "2025-06-02")
+    mia["otros_ahorros"] = 1000.0
+    madre = cartera.nueva(None)
+    cartera.comprar(madre, "SAN.MC", 1000, 14.20, costes.Tarifa(), "2026-02-10")
+    cartera.comprar(madre, "ITX.MC", 100, 50.0, costes.Tarifa(), "2026-02-10")
+    madre["aportacion"] = {"importe": 200.0, "dia": 1, "hechas": []}
+    return {"cuentas": {"Yo": mia, "Mamá": madre}, "cuenta_activa": "Yo"}
 
 
-def test_varias_cuentas_todas_y_cada_una():
-    at = abrir("pagina_bankinter", datos_usuario=_dos_cuentas())
+def test_cada_cuenta_se_asesora_por_separado():
+    at = abrir("pagina_bankinter", datos_usuario=_familia())
     sin_fallos(at)
     tabla = at.dataframe[0].value
-    san = tabla[tabla["Activo"].str.contains("Santander")].iloc[0]
-    assert san["Títulos"] == 3500 and san["Cuentas"] == 2
-    assert any("Bankinter 1: 2.500 a 12,46" in m.value and "Bankinter 2: 1.000 a 14,20" in m.value
-               for m in at.markdown)
-    assert not [b for b in at.button if b.label == "Registrar venta"]      # en «Todas» no se edita
-    # Solo la segunda cuenta: su Santander con su propio precio medio, y se puede vender.
-    at.segmented_control(key="cuenta_vista").set_value("Bankinter 2").run()
+    assert tabla["Títulos"].tolist() == [2500]                 # solo la mía, sin sumar la de mi madre
+    assert any(m.label == "Valor de «Yo»" for m in at.metric)
+    [s for s in at.sidebar.selectbox if s.label == "👤 Cuenta"][0].set_value("Mamá").run()
     sin_fallos(at)
     tabla = at.dataframe[0].value
     san = tabla[tabla["Activo"].str.contains("Santander")].iloc[0]
     assert san["Títulos"] == 1000 and san["Precio medio"] == 14.2
-    assert [b for b in at.button if b.label == "Registrar venta"]
+    assert at.session_state["_datos"]["cuenta_activa"] == "Mamá"
+
+
+def test_hoy_y_seguimiento_son_de_la_cuenta_activa():
+    datos = _familia()
+    at = abrir("pagina_hoy", datos_usuario=datos)
+    sin_fallos(at)
+    assert not any("aportación mensual" in m.value for m in at.markdown)       # la aportación es de mi madre
+    [s for s in at.sidebar.selectbox if s.label == "👤 Cuenta"][0].set_value("Mamá").run()
+    sin_fallos(at)
+    assert any("Toca tu aportación mensual de 200" in m.value for m in at.markdown)
 
 
 def test_crear_una_cuenta_nueva():
     at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
     sin_fallos(at)
-    at.text_input(key="cta_nueva").set_value("Bankinter 2").run()
+    at.text_input(key="cta_nueva").set_value("Mamá").run()
     at.button(key="cta_anadir").click().run()
     sin_fallos(at)
     d = at.session_state["_datos"]
-    assert list(d["cuentas"]) == ["Cuenta principal", "Bankinter 2"]
-    assert d["cartera_real"]["posiciones"]["SAN.MC"]["acciones"] == 2500     # nada se pierde al migrar
-
-
-def test_valor_de_una_sola_cuenta_lleva_su_nombre():
-    at = abrir("pagina_bankinter", datos_usuario=_dos_cuentas())
-    at.segmented_control(key="cuenta_vista").set_value("Bankinter 2").run()
-    assert any(m.label == "Valor en «Bankinter 2»" for m in at.metric)
+    assert list(d["cuentas"]) == ["Mi cuenta", "Mamá"]
+    assert d["cuenta_activa"] == "Mamá" and d["cartera_real"]["posiciones"] == {}     # la nueva empieza vacía
+    assert d["cuentas"]["Mi cuenta"]["posiciones"]["SAN.MC"]["acciones"] == 2500   # la mía sigue igual
 
 
 def test_renombrar_y_borrar_cuenta_desde_la_pantalla():
-    at = abrir("pagina_bankinter", datos_usuario=_dos_cuentas())
-    at.segmented_control(key="cuenta_vista").set_value("Bankinter 2").run()
-    at.selectbox(key="cta_cual").set_value("Bankinter 2").run()
+    at = abrir("pagina_bankinter", datos_usuario=_familia())
+    at.selectbox(key="cta_cual").set_value("Mamá").run()
     at.text_input(key="cta_nombre").set_value("Cuenta ahorro").run()
     at.button(key="cta_renombrar").click().run()
     sin_fallos(at)
-    assert list(at.session_state["_datos"]["cuentas"]) == ["Bankinter 1", "Cuenta ahorro"]
+    assert list(at.session_state["_datos"]["cuentas"]) == ["Yo", "Cuenta ahorro"]
     at.selectbox(key="cta_cual").set_value("Cuenta ahorro").run()
     at.checkbox(key="cta_seguro").check().run()
     at.button(key="cta_borrar").click().run()
     sin_fallos(at)
     d = at.session_state["_datos"]
-    assert list(d["cuentas"]) == ["Bankinter 1"] and d["cartera_real"]["posiciones"]["SAN.MC"]["acciones"] == 2500
+    assert list(d["cuentas"]) == ["Yo"] and d["cartera_real"]["posiciones"]["SAN.MC"]["acciones"] == 2500

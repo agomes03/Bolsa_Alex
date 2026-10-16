@@ -22,7 +22,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
-from bolsa import agenda, almacen, avisos, informe  # noqa: E402
+from bolsa import agenda, almacen, avisos, cuentas, informe  # noqa: E402
 
 
 def main() -> int:
@@ -48,10 +48,23 @@ def main() -> int:
             try:
                 datos = almacen.Almacen(gist_token=os.environ["GIST_TOKEN"], gist_id=os.environ["GIST_ID"]).cargar()
                 umbral = inf["estrategia"]["parametros"].get("umbral_venta", 40)
-                propios = avisos.avisos_cartera(datos.get("cartera_real"), inf["ranking"], umbral)
-                pendientes = agenda.texto_telegram(datos)
-                if datetime.now(timezone.utc).weekday() == 4:      # viernes: resumen de la semana
-                    semana = avisos.mensaje_semanal(datos.get("cartera_real"), inf.get("noticias", {}).get("top"))
+                lista = cuentas.asegurar(datos)                  # cada cuenta (tuya, de tu madre...) por separado
+                varias = len(lista) > 1
+                viernes = datetime.now(timezone.utc).weekday() == 4       # viernes: resumen de la semana
+                bloques_pend, bloques_semana = [], []
+                for nombre, cuenta in lista.items():
+                    titulo = [f"👤 {nombre}:"] if varias else []
+                    av = avisos.avisos_cartera(cuenta, inf["ranking"], umbral)
+                    if av:
+                        propios += titulo + av
+                    pend = agenda.texto_telegram(cuenta)
+                    if pend:
+                        bloques_pend.append((f"👤 {nombre} · " if varias else "") + pend)
+                    if viernes:
+                        sem = avisos.mensaje_semanal(cuenta, inf.get("noticias", {}).get("top"))
+                        if sem:
+                            bloques_semana.append((f"👤 {nombre} · " if varias else "") + sem)
+                pendientes, semana = "\n\n".join(bloques_pend), "\n\n".join(bloques_semana)
             except Exception as e:  # noqa: BLE001
                 log(f"No se pudo leer la cartera del Gist: {e}")
         mensaje = avisos.mensaje_diario(inf, propios) + (f"\n\n{pendientes}" if pendientes else "") + (

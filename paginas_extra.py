@@ -18,9 +18,10 @@ from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
 from ui_comun import (almacen_actual, cargar_activos, cargar_dividendos_varios, cargar_fundamentales_varios,
-                      cargar_historico, cargar_informe, cargar_noticias, cargar_varios, datos_usuario, enlace,
-                      estrategia_actual, eur, fecha, fx, guardar_datos, historia_larga_eur, mercado_alcista_para,
-                      mostrar_plotly, num, palabras_de_la_pagina, pct, perfil, reducir, selector_valor)
+                      cargar_historico, cargar_informe, cargar_noticias, cargar_varios, cuenta_activa, datos_usuario,
+                      enlace, estrategia_actual, eur, fecha, fx, guardar_datos, historia_larga_eur,
+                      mercado_alcista_para, mostrar_plotly, num, palabras_de_la_pagina, pct, perfil, reducir,
+                      selector_valor)
 
 UNIVERSOS = {
     "IBEX 35": (tuple(IBEX35), "^IBEX"),
@@ -482,7 +483,7 @@ def pesos_cartera_real() -> dict[str, float]:
     except Exception:  # noqa: BLE001 - sin datos, sin pesos
         return {}
     valores = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
-    total = sum(valores.values()) + max(datos_usuario().get("otros_ahorros", 0.0), 0.0)
+    total = sum(valores.values()) + max(cuenta_activa().get("otros_ahorros", 0.0), 0.0)
     return {t: v / total for t, v in valores.items()} if total > 0 else {}
 
 
@@ -496,7 +497,8 @@ def asesor_hoy(inf: dict | None):
     d = datos_usuario()
     cr = d.get("cartera_real")
     with st.container(border=True):
-        st.markdown("#### 🧑‍💼 Tu asesor hoy")
+        nombre_cuenta = d.get("cuenta_activa") if len(d.get("cuentas", {})) > 1 else None
+        st.markdown("#### 🧑‍💼 Tu asesor hoy" + (f" · 👤 {nombre_cuenta}" if nombre_cuenta else ""))
         if not cr or not cr.get("posiciones"):
             st.markdown("Importa tu cartera desde **cualquier banco** (Bankinter, CaixaBank, BBVA, Trade Republic, "
                         "Kutxabank...) en 🏦 Mi cartera y aquí verás cada día cuánto vale tu dinero y qué hacer con él.")
@@ -514,7 +516,8 @@ def asesor_hoy(inf: dict | None):
                        "stop": f["pos"].get("stop"), "clase": f["clase"], "nombre": f["nombre"],
                    "sin_stop": f["pos"].get("sin_stop", False)}
                       for f in filas if f["precio"]]
-        dg = diagnostico.diagnosticar(posiciones, d.get("otros_ahorros", 0.0), _perfil_guardado(), pf.tarifa,
+        dg = diagnostico.diagnosticar(posiciones, cuenta_activa().get("otros_ahorros", 0.0), _perfil_guardado(),
+                                      pf.tarifa,
                                       filas_inf)
         valor = sum(p["acciones"] * p["precio"] * p["fx"] for p in posiciones)
         cambio = sum(p["acciones"] * p["precio"] * p["fx"] * (1 - 1 / (1 + f["var_1d"]))
@@ -621,16 +624,14 @@ def pagina_bankinter():
             "Tú das siempre la última orden. Tus datos se guardan solo en tu copia de la app.")
     d = datos_usuario()
     nombres = list(cuentas.asegurar(d))
-    elegida = nombres[0]
+    elegida = d["cuenta_activa"]
+    cr = d["cartera_real"]
     if len(nombres) > 1:
-        elegida = st.segmented_control("Cuenta", [cuentas.TODAS] + nombres, default=cuentas.TODAS,
-                                       key="cuenta_vista") or cuentas.TODAS
-    todas = elegida == cuentas.TODAS
-    cr = d["cartera_real"] if todas else d["cuentas"][elegida]
+        st.info(f"👤 Estás viendo la cuenta **{elegida}**. Cámbiala en el menú lateral (»): la app asesora a cada "
+                "cuenta por separado y no las suma.")
     bloque_cuentas(d)
 
-    filas = revisar_cartera_real(None if todas else cr)
-    filas_todas = filas if (todas or len(nombres) == 1) else revisar_cartera_real()
+    filas = revisar_cartera_real()
     if filas:
         avisos = [f for f in filas if f["nivel"] not in ("mantener",)]
         if avisos:
@@ -648,11 +649,10 @@ def pagina_bankinter():
                           "Precio actual": round(precio, 2) if precio else None,
                           "Valor (€)": round(valor, 2) if valor else None,
                           "Ganancia (%)": round((precio / pos["precio_medio"] - 1) * 100, 1) if precio else None,
-                          "Stop-loss": pos.get("stop"),
-                          **({"Cuentas": len(pos.get("cuentas", []))} if todas and len(nombres) > 1 else {})})
+                          "Stop-loss": pos.get("stop")})
         tabla = pd.DataFrame(vista)
         c = st.columns(2)
-        c[0].metric("Valor de tu cartera" if todas or len(nombres) == 1 else f"Valor en «{elegida}»", eur(total))
+        c[0].metric("Valor de tu cartera" if len(nombres) == 1 else f"Valor de «{elegida}»", eur(total))
         c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia))
         st.caption("Precios en la divisa de cada valor, como en tu bróker; valores y ganancias en euros. La "
                    "ganancia en % es la del precio (sin comisiones ni efecto divisa).")
@@ -664,12 +664,9 @@ def pagina_bankinter():
         with p_hacer:
             bloque_vigilar_todas(filas)
             for f in filas:
-                posicion_detalle(f, cr, editable=not todas or len(nombres) == 1)
+                posicion_detalle(f, cr)
             bloque_telegram()
         with p_diag:
-            if not todas and len(nombres) > 1:
-                st.caption("El diagnóstico es de **todas tus cuentas juntas**: el riesgo depende de todo tu dinero.")
-            filas = filas_todas
             comparado = bloque_diagnostico(filas)
             if not comparado:
                 st.subheader("🌦️ Qué le puede pasar a tu cartera")
@@ -677,15 +674,14 @@ def pagina_bankinter():
                 pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
                 bloque_que_puede_pasar(pesos, sum(pesos.values()), 0.0, 0)
         with p_div:
-            bloque_dividendos(filas_todas)
+            bloque_dividendos(filas)
         with p_comp:
-            bloque_comparativa(filas_todas)
+            bloque_comparativa(filas)
         with p_anadir:
-            bloque_anadir(None if todas else elegida)
+            bloque_anadir()
     else:
-        st.caption("Aún no has registrado posiciones en esta cuenta. Impórtalas de tu banco o añádelas a mano."
-                   if not todas else "Aún no has registrado posiciones. Impórtalas de tu banco o añádelas a mano.")
-        bloque_anadir(None if todas else elegida)
+        st.caption("Aún no has registrado posiciones en esta cuenta. Impórtalas de tu banco o añádelas a mano.")
+        bloque_anadir()
         bloque_telegram()
 
     palabras_de_la_pagina(["Concentración", "Diversificación", "Sector", "Volatilidad", "Caída máxima", "Stop-loss",
@@ -696,19 +692,21 @@ def pagina_bankinter():
 def bloque_cuentas(d: dict):
     """Crear, renombrar o borrar cuentas (por ejemplo, dos cuentas de valores en Bankinter)."""
     lista = d["cuentas"]
-    with st.expander(f"🗂️ Tus cuentas ({len(lista)})" if len(lista) > 1 else "🗂️ ¿Tienes más de una cuenta?"):
-        st.caption("Si tienes varias cuentas de valores (en el mismo banco o en otros), añade cada una por separado: "
-                   "así ves la misma empresa comprada a precios distintos en cada cuenta, y la app suma todo en "
-                   "«Todas» para el diagnóstico, los dividendos y la Renta.")
+    with st.expander(f"🗂️ Cuentas ({len(lista)})" if len(lista) > 1 else "🗂️ ¿Llevas más de una cuenta?"):
+        st.caption("Añade una cuenta por persona o por cuenta de valores (la tuya, la de tu madre, la de tu "
+                   "hermano...). Cada una tiene sus acciones, su perfil, sus ahorros, sus avisos y su bróker, y la app "
+                   "asesora a cada una por separado: nunca las suma. Cambias de cuenta en el menú lateral (»).")
         for n, c in lista.items():
-            st.markdown(f"- **{n}**: {len(c.get('posiciones', {}))} posiciones")
+            st.markdown(f"- {'👉 ' if n == d['cuenta_activa'] else ''}**{n}**: "
+                        f"{len(c.get('posiciones', {}))} posiciones")
         c = st.columns([3, 1])
-        nueva = c[0].text_input("Nombre de la nueva cuenta", placeholder="p. ej. Bankinter 2", key="cta_nueva")
+        nueva = c[0].text_input("Nombre de la nueva cuenta", placeholder="p. ej. Mamá", key="cta_nueva")
         if c[1].button("➕ Añadir", key="cta_anadir", width="stretch"):
             err = cuentas.nueva_cuenta(d, nueva)
             if err:
                 st.error(err)
             else:
+                cuentas.activar(d, nueva.strip())       # se abre la nueva para empezar a rellenarla
                 guardar_datos()
                 st.rerun()
         c = st.columns([2, 2, 1])
@@ -719,24 +717,22 @@ def bloque_cuentas(d: dict):
             if err:
                 st.error(err)
             else:
-                st.session_state.pop("cuenta_vista", None)
                 guardar_datos()
                 st.rerun()
         if len(lista) > 1:
             seguro = st.checkbox(f"Quiero borrar «{cual}» y lo que tiene apuntado", key="cta_seguro")
             if st.button(f"🗑️ Borrar «{cual}»", key="cta_borrar", disabled=not seguro):
                 cuentas.borrar(d, cual)
-                st.session_state.pop("cuenta_vista", None)
                 guardar_datos()
                 st.rerun()
 
 
-def bloque_anadir(cuenta: str | None):
-    """Añadir posiciones a una cuenta: archivo del banco, tabla pegada o a mano; y copia de seguridad."""
+def bloque_anadir():
+    """Añadir posiciones a la cuenta activa: archivo del banco, tabla pegada o a mano; y copia de seguridad."""
     pf = perfil()
     d = datos_usuario()
-    st.markdown("#### ➕ Añadir posiciones")
-    cuenta = elegir_cuenta(d, "anadir_cuenta", cuenta, "¿A qué cuenta?")
+    cuenta = d["cuenta_activa"]
+    st.markdown("#### ➕ Añadir posiciones" + (f" a «{cuenta}»" if len(d["cuentas"]) > 1 else ""))
     cr = d["cuentas"][cuenta]
     t2, t3, t1 = st.tabs(["📥 Archivo de tu banco", "📋 Pegar tabla", "✍️ A mano"])
     with t2:
@@ -807,7 +803,7 @@ TITULO_SEMAFORO = {"rojo": "🔴 Necesita cambios", "ambar": "🟠 Mejorable", "
 
 
 def _perfil_guardado() -> str | None:
-    p = datos_usuario().get("perfil_inversor")
+    p = cuenta_activa().get("perfil_inversor")
     if not p:
         return None
     try:
@@ -897,7 +893,7 @@ def bloque_comparativa(filas: list[dict]):
 
 def bloque_plan_fiscal(dg: dict, posiciones: list[dict]):
     """Plan por pasos con calendario fiscal (qué vender este año y qué en enero) y entrada al fondo en tramos."""
-    d = datos_usuario()
+    d = cuenta_activa()
     st.markdown("#### 📅 Plan por pasos (calendario fiscal)")
     otras = st.number_input("Ganancias (+) o pérdidas (−) que ya has realizado este año al vender (€)", -1e7, 1e7,
                             float(d.get("ganancias_ano", 0.0)), 500.0,
@@ -947,7 +943,6 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     """Revisión de la cartera como la haría un asesor, con una propuesta concreta y sus costes.
     Devuelve True si ya ha mostrado la comparación con crisis reales."""
     pf = perfil()
-    d = datos_usuario()
     st.subheader("🩺 Diagnóstico de tu cartera")
     guardado = _perfil_guardado()
     c = st.columns(2)
@@ -956,11 +951,11 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
                                 help="Calcúlalo en 🎯 Mi plan (5 preguntas). Decide cuánto conviene tener en "
                                      "acciones sueltas y cuánto en fondos.")
     otros = c[1].number_input("Dinero en cuentas y depósitos (€)", 0.0, 100_000_000.0,
-                              float(d.get("otros_ahorros", 0.0)), 1000.0,
+                              float(cuenta_activa().get("otros_ahorros", 0.0)), 1000.0,
                               help="Lo que tienes en liquidez fuera de estas inversiones. Los fondos, planes o "
                                    "acciones de otros bancos, mejor impórtalos como posiciones para analizarlos.")
-    if otros != d.get("otros_ahorros", 0.0):
-        d["otros_ahorros"] = otros
+    if otros != cuenta_activa().get("otros_ahorros", 0.0):
+        cuenta_activa()["otros_ahorros"] = otros
         guardar_datos()
     perfil_nombre = None if perfil_txt == "Aún no lo sé" else perfil_txt
     inf = cargar_informe() or {}
@@ -1078,9 +1073,9 @@ def revisar_e_importar(leidas: pd.DataFrame, origen: str, cuenta: str):
     if st.button("📥 Importar" + (f" a «{cuenta}»" if varias else ""), type="primary", key=f"imp_{origen}"):
         previas = d["cuentas"][cuenta].get("posiciones", {})
         conservar = {t: {k: p[k] for k in ("stop", "sin_stop", "alarma") if p.get(k)} for t, p in previas.items()}
-        if reemplazar:
-            d["cuentas"][cuenta] = cartera.nueva(None)
         cr = d["cuentas"][cuenta]
+        if reemplazar:      # se vacían las posiciones, pero se quedan el perfil, los avisos y demás de la cuenta
+            cr["posiciones"], cr["historial"] = {}, []
         malas = []
         for _, r in editada.iterrows():
             if not r["ticker"] or not r["precio_medio"] or pd.isna(r["precio_medio"]):
@@ -1102,19 +1097,9 @@ NOTA_ALARMA = "Nivel de alarma de tu posición sin stop-loss"
 
 
 def _posiciones_de(d: dict, ticker: str) -> list[dict]:
-    """La posición de ese valor en cada cuenta que lo tiene (y en la vista «Todas», para verlo al momento)."""
-    lista = [c["posiciones"][ticker] for c in cuentas.asegurar(d).values() if ticker in c.get("posiciones", {})]
-    if ticker in (d.get("cartera_real") or {}).get("posiciones", {}):
-        lista.append(d["cartera_real"]["posiciones"][ticker])
-    return lista
-
-
-def elegir_cuenta(d: dict, clave: str, defecto: str | None = None, etiqueta: str = "¿En qué cuenta?") -> str:
-    """Selector de cuenta (solo si tienes más de una). Devuelve el nombre de la cuenta."""
-    nombres = list(cuentas.asegurar(d))
-    if len(nombres) == 1:
-        return nombres[0]
-    return st.selectbox(etiqueta, nombres, index=nombres.index(defecto) if defecto in nombres else 0, key=clave)
+    """La posición de ese valor en la cuenta activa (lista vacía si no lo tiene)."""
+    pos = cuentas.activa(d).get("posiciones", {}).get(ticker)
+    return [pos] if pos else []
 
 
 def vigilar_sin_stop(ticker: str, nombre: str, nivel: float | None, precio_actual: float | None) -> str | None:
@@ -1123,7 +1108,7 @@ def vigilar_sin_stop(ticker: str, nombre: str, nivel: float | None, precio_actua
     d = datos_usuario()
     if nivel is None and precio_actual:
         nivel = round(precio_actual * (1 - CAIDA_ALARMA), 2)
-    lista = d.setdefault("alertas", [])
+    lista = cuenta_activa().setdefault("alertas", [])
     lista[:] = [a for a in lista if not (a.get("ticker") == ticker and a.get("nota") == NOTA_ALARMA)]
     if nivel:
         err = alertas.nueva(lista, ticker, nombre, "baja", nivel, precio_actual, NOTA_ALARMA)
@@ -1144,7 +1129,8 @@ def dejar_de_vigilar(ticker: str) -> None:
     for pos in _posiciones_de(d, ticker):
         pos.pop("sin_stop", None)
         pos.pop("alarma", None)
-    d["alertas"] = [a for a in d.get("alertas", []) if not (a.get("ticker") == ticker and a.get("nota") == NOTA_ALARMA)]
+    cta = cuenta_activa()
+    cta["alertas"] = [a for a in cta.get("alertas", []) if not (a.get("ticker") == ticker and a.get("nota") == NOTA_ALARMA)]
     st.session_state[f"ss_{ticker}"] = False
 
 
@@ -1192,7 +1178,7 @@ def _editar_posicion(f: dict, cr: dict):
                        fx=f["fx"])
         if por_que.strip():
             from bolsa import diario
-            diario.nueva(datos_usuario().setdefault("diario", []), t, f["nombre"], "Venta", precio_v, por_que)
+            diario.nueva(cuenta_activa().setdefault("diario", []), t, f["nombre"], "Venta", precio_v, por_que)
         guardar_datos()
         st.rerun()
     if c[2].button("🗑️ Quitar sin vender", key=f"del_{t}"):
@@ -1201,16 +1187,10 @@ def _editar_posicion(f: dict, cr: dict):
         st.rerun()
 
 
-def posicion_detalle(f: dict, cr: dict, editable: bool = True):
-    """`editable=False` en la vista «Todas»: el stop, las ventas y quitar se hacen en cada cuenta."""
+def posicion_detalle(f: dict, cr: dict):
     t, pos = f["ticker"], f["pos"]
     with st.expander(f"{ICONO_NIVEL[f['nivel']]} {f['nombre']} — {f['consejo'][:70]}"):
         st.write(f["consejo"])
-        if len(pos.get("cuentas", [])) > 1:
-            st.markdown("**En cada cuenta:** " + " · ".join(
-                f"{x['cuenta']}: {num(x['acciones'], 0)} a {num(x['precio_medio'], 2)}"
-                + (f" (stop {num(x['stop'], 2)})" if x.get("stop") else "")
-                for x in cuentas.desglose(datos_usuario(), t)))
         if f["ev"]:
             for a in f["ev"].avisos:
                 st.caption("⚠️ " + a)
@@ -1218,11 +1198,7 @@ def posicion_detalle(f: dict, cr: dict, editable: bool = True):
             st.code(bankinter.ticket_stop(t, pos["acciones"], f["stop_sugerido"]), language=None)
         elif f["nivel"] in ("vender", "vigilar") and f["precio"]:
             st.code(bankinter.ticket_venta(t, pos["acciones"], f["precio"]), language=None)
-        if editable:
-            _editar_posicion(f, cr)
-        else:
-            st.caption("Para apuntar un stop-loss, registrar una venta o quitarla, elige arriba la cuenta donde la "
-                       "tienes.")
+        _editar_posicion(f, cr)
         if f["clase"] == "Acciones" and f["precio"]:
             pendientes = st.session_state.get("_ss_resincronizar", set())
             if f"ss_{t}" not in st.session_state or t in pendientes:
@@ -1291,9 +1267,10 @@ def bloque_operar(ticker: str, n: int, plan: senales.Plan, f_eur: float):
             n_real = st.number_input("Títulos comprados", 1, 10_000_000, n)
             precio = st.number_input("Precio al que se ejecutó", 0.0, value=round(plan.entrada, 2))
             stop = st.number_input("Stop-loss que has puesto", 0.0, value=round(plan.stop, 2))
-            cuenta = elegir_cuenta(d, f"cuenta_real_{ticker}")
-            if st.form_submit_button("Registrar en mi cartera", type="primary"):
-                cr = d["cuentas"][cuenta]
+            if st.form_submit_button("Registrar en mi cartera" + (f" («{d['cuenta_activa']}»)"
+                                                                  if len(d.get("cuentas", {})) > 1 else ""),
+                                     type="primary"):
+                cr = d["cartera_real"]
                 cartera.comprar(cr, ticker, int(n_real), precio, pf.tarifa, stop=stop or None,
                                 nota="Comprada tras analizarla", fx=f_eur)
                 guardar_datos()

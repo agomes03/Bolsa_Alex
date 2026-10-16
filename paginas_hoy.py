@@ -13,8 +13,8 @@ from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import asesor_hoy, pesos_cartera_real
 from paginas_seguimiento import bloque_pendientes
-from ui_comun import (palabras_de_la_pagina, reducir, conclusion_noticia, cargar_informe, cargar_varios, datos_usuario, dias_informe, eur, fecha, guardar_datos,
-                      hora_espana, ir_a, moneda_de, num, pct, perfil)
+from ui_comun import (cargar_informe, cargar_varios, conclusion_noticia, cuenta_activa, dias_informe, eur, fecha,
+                      guardar_datos, hora_espana, ir_a, moneda_de, num, palabras_de_la_pagina, pct, perfil, reducir)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
                   "ambar": ("warning", "🟡 Mercado mixto"),
@@ -91,7 +91,7 @@ def tarjeta_idea(r: dict, clave: str, peso: float = 0.0):
 
 def cartera_del_perfil(inf: dict) -> tuple[str, dict] | None:
     """Cartera modelo (España) que encaja con el perfil guardado en 🎯 Mi plan."""
-    p = datos_usuario().get("perfil_inversor")
+    p = cuenta_activa().get("perfil_inversor")
     if not p or not inf.get("carteras"):
         return None
     nombre = asesor.perfil_inversor(p["horizonte"], p["reaccion"], p["experiencia"], p["colchon"]).nombre
@@ -197,7 +197,7 @@ def pagina_plan():
     st.title("🎯 Mi plan: dónde invertir")
     st.caption("Responde 6 preguntas y la app te propone un reparto concreto en euros, con productos que puedes "
                "contratar en Bankinter, y te enseña qué podría pasar con él.")
-    d = datos_usuario()
+    d = cuenta_activa()
     previo = d.get("perfil_inversor", {})
     with st.form("cuestionario"):
         c = st.columns(2)

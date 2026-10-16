@@ -10,8 +10,8 @@ import streamlit as st
 from bolsa import activos, bankinter, chat, diagnostico
 from bolsa.indicadores import rsi
 from bolsa.tickers import nombre_de
-from ui_comun import (cargar_activos, cargar_fundamentales, cargar_historico, cargar_informe, datos_usuario, num,
-                      perfil)
+from ui_comun import (cargar_activos, cargar_fundamentales, cargar_historico, cargar_informe, cuenta_activa,
+                      datos_usuario, num, perfil)
 
 EJEMPLOS = [
     "¿Qué es el RSI y cómo está ahora el de Indra?",
@@ -82,12 +82,11 @@ def buscar_valor(consulta: str) -> dict | None:
 
 def contexto() -> str:
     """Contexto del usuario (se calcula una vez por sesión y día)."""
-    clave = f"_contexto_chat_{date.today()}"
+    clave = f"_contexto_chat_{date.today()}_{datos_usuario().get('cuenta_activa', '')}"
     if clave in st.session_state:
         return st.session_state[clave]
     from paginas_extra import _perfil_guardado, revisar_cartera_real
 
-    d = datos_usuario()
     inf = cargar_informe() or {}
     cartera, dg = [], None
     try:
@@ -102,7 +101,7 @@ def contexto() -> str:
             [{"ticker": f["ticker"], "acciones": f["pos"]["acciones"], "precio_medio": f["pos"]["precio_medio"],
               "fx_medio": f["pos"].get("fx_medio", 1.0), "precio": f["precio"], "fx": f["fx"],
               "stop": f["pos"].get("stop"), "clase": f["clase"], "nombre": f["nombre"]} for f in filas],
-            d.get("otros_ahorros", 0.0), _perfil_guardado(), perfil().tarifa,
+            cuenta_activa().get("otros_ahorros", 0.0), _perfil_guardado(), perfil().tarifa,
             {r["ticker"]: r for r in inf.get("ranking", [])})
         lista_activos = cargar_activos()
     except Exception:  # noqa: BLE001 - sin datos de mercado el chat sigue funcionando

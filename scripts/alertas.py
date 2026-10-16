@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bolsa import alertas, almacen, avisos, datos  # noqa: E402
+from bolsa import alertas, almacen, avisos, cuentas, datos  # noqa: E402
 
 
 def ventana(ahora: datetime) -> tuple[datetime, datetime]:
@@ -32,16 +32,22 @@ def main() -> int:
         print("Faltan secretos:", ", ".join(faltan), "- no se comprueban avisos.")
         return 0
     d = almacen.Almacen(gist_token=os.environ["GIST_TOKEN"], gist_id=os.environ["GIST_ID"]).cargar()
-    activas = [a for a in d.get("alertas", []) if not a.get("disparada")]
-    if not activas:
+    lista = cuentas.asegurar(d)                 # los avisos son de cada cuenta (tuya, de tu madre...)
+    activas = {n: [a for a in c.get("alertas", []) if not a.get("disparada")] for n, c in lista.items()}
+    if not any(activas.values()):
         print("No hay avisos activos.")
         return 0
     desde, hasta = ventana(datetime.now(ZoneInfo("UTC")))
-    intradia = {t: datos.intradia(t, "5d", "5m") for t in sorted({a["ticker"] for a in activas})}
-    cruces = alertas.cruces_en_ventana(activas, intradia, desde, hasta)
-    print(f"Ventana {desde:%d/%m %H:%M}-{hasta:%H:%M}: {len(activas)} avisos, {len(cruces)} cruzados.")
-    if cruces:
-        texto = "🔔 Aviso de precio\n" + "\n".join(f"• {alertas.texto(a, a['precio_ahora'])}" for a in cruces)
+    tickers = sorted({a["ticker"] for lst in activas.values() for a in lst})
+    intradia = {t: datos.intradia(t, "5d", "5m") for t in tickers}
+    lineas = []
+    for nombre, lst in activas.items():
+        for a in alertas.cruces_en_ventana(lst, intradia, desde, hasta):
+            lineas.append(f"• {(nombre + ': ') if len(lista) > 1 else ''}{alertas.texto(a, a['precio_ahora'])}")
+    print(f"Ventana {desde:%d/%m %H:%M}-{hasta:%H:%M}: {sum(map(len, activas.values()))} avisos, "
+          f"{len(lineas)} cruzados.")
+    if lineas:
+        texto = "🔔 Aviso de precio\n" + "\n".join(lineas)
         texto += "\n\nDecide con calma. Herramienta educativa, no es asesoramiento financiero."
         ok = avisos.enviar_telegram(os.environ["TELEGRAM_TOKEN"], os.environ["TELEGRAM_CHAT_ID"], texto)
         print("Telegram enviado" if ok else "Fallo al enviar a Telegram")

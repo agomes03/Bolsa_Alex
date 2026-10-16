@@ -12,7 +12,7 @@ from bolsa import agenda, alertas, aportaciones, asesor, diario, renta
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import _perfil_guardado, nombre_posicion, revisar_cartera_real
-from ui_comun import (cargar_dividendos_varios, cargar_varios, datos_usuario, enlace, eur, fx, guardar_datos,
+from ui_comun import (cargar_dividendos_varios, cargar_varios, cuenta_activa, datos_usuario, enlace, eur, fx, guardar_datos,
                       palabras_de_la_pagina, perfil, selector_valor)
 
 DESTINO_CORTO = {
@@ -49,7 +49,7 @@ def _elegir_valor(clave: str) -> tuple[str, str]:
 
 def actualizar_alertas() -> None:
     """Comprueba los avisos activos con las cotizaciones desde que se crearon y guarda los que han saltado."""
-    d = datos_usuario()
+    d = cuenta_activa()
     activas = [a for a in d.get("alertas", []) if not a.get("disparada")]
     if not activas:
         return
@@ -65,13 +65,15 @@ def bloque_pendientes() -> None:
     """«📌 Tus pendientes» (arriba en Hoy). No muestra nada si no hay pendientes."""
     try:
         actualizar_alertas()
-        items = agenda.pendientes(datos_usuario())
+        items = agenda.pendientes(cuenta_activa())
     except Exception:  # noqa: BLE001 - Hoy nunca debe romperse por esto
         return
     if not items:
         return
     with st.container(border=True):
-        st.markdown("#### 📌 Tus pendientes")
+        d = datos_usuario()
+        varias = len(d.get("cuentas", {})) > 1
+        st.markdown("#### 📌 Tus pendientes" + (f" · 👤 {d['cuenta_activa']}" if varias else ""))
         for x in items:
             st.markdown(f"{x['icono']} **{x['titulo']}** — {x['texto']}")
         enlace("seguimiento", "Ir a Seguimiento", "📒")
@@ -97,7 +99,7 @@ def pagina_seguimiento():
 
 
 def tab_alertas():
-    d = datos_usuario()
+    d = cuenta_activa()
     lista = d.setdefault("alertas", [])
     st.markdown("Pon el precio que te interesa y la app te avisa: **aquí y en 🧭 Hoy** cuando lo toque y, si tienes "
                 "Telegram activado (🏦 Mi cartera → Avisos al móvil), **al móvil en menos de una hora** en horario "
@@ -165,7 +167,7 @@ def _posiciones_valoradas() -> list[dict]:
 
 
 def tab_aportacion():
-    d = datos_usuario()
+    d = cuenta_activa()
     cfg = d.setdefault("aportacion", {"importe": 0.0, "dia": 1, "hechas": []})
     st.markdown("Meter una cantidad fija cada mes, pase lo que pase en la bolsa, es lo que mejor funciona a largo "
                 "plazo para la mayoría de la gente: no hay que adivinar cuándo entrar.")
@@ -220,7 +222,7 @@ def tab_aportacion():
 
 
 def tab_diario():
-    d = datos_usuario()
+    d = cuenta_activa()
     lista = d.setdefault("diario", [])
     st.markdown("Apunta **por qué** haces cada cosa (o por qué decides no hacer nada). Cuando pase el tiempo que "
                 "elijas, la app te enseña qué ocurrió después. Es la mejor forma de aprender de tus decisiones.")
@@ -287,8 +289,8 @@ def tab_diario():
 
 
 def tab_renta():
-    d = datos_usuario()
-    cr = d.get("cartera_real") or {}
+    d = cuenta_activa()
+    cr = d
     historial = cr.get("historial", [])
     hoy = date.today()
     anio = st.selectbox("Año", [hoy.year, hoy.year - 1], index=1 if hoy.month <= 6 else 0,
