@@ -20,10 +20,10 @@ from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
 from ui_comun import (SEGUNDOS_REFRESCO, almacen_actual, cargar_activos, cargar_analistas, cargar_composiciones,
                       cargar_diario_real, cargar_dividendos_varios, cargar_fundamentales, cargar_fundamentales_varios,
                       cargar_historico, cargar_informe, cargar_noticias, cargar_varios, cotizaciones_ahora,
-                      cuenta_activa, datos_usuario, descargas_en_paralelo, enlace, estrategia_actual, eur, fecha, fx,
-                      guardar_datos, historia_larga_eur, linea_actualizado, mercado_alcista_para, moneda_de,
-                      mostrar_plotly, num, olvidar_campos_de_cuenta, palabras_de_la_pagina, pct, perfil, pestanas,
-                      precio, privado, reducir, selector_valor, texto_estado_precio)
+                      cuenta_activa, datos_usuario, descargas_en_paralelo, enlace, entrada_importe, estrategia_actual,
+                      eur, fecha, fx, guardar_datos, historia_larga_eur, linea_actualizado, mercado_alcista_para,
+                      moneda_de, mostrar_plotly, num, ocultar, olvidar_campos_de_cuenta, palabras_de_la_pagina, pct,
+                      perfil, pestanas, precio, privado, reducir, selector_valor, texto_estado_precio)
 
 UNIVERSOS = {
     "IBEX 35": (tuple(IBEX35), "^IBEX"),
@@ -113,7 +113,7 @@ def pagina_simulador():
     st.title("🧪 Simulador con dinero virtual")
     st.caption("Comprueba con los últimos 10 años si las reglas de la app habrían ganado dinero: un operador "
                "virtual compra y vende **día a día usando solo lo que se sabía en cada momento**, paga "
-               "comisiones e impuestos y respeta los stop-loss. Después puedes **entrenar** las reglas para "
+               "comisiones, tasa Tobin y cambio de divisa (sin el IRPF de las ganancias) y respeta los stop-loss. Después puedes **entrenar** las reglas para "
                "reducir los errores de inversión.")
     c1, c2 = st.columns(2)
     universo = c1.selectbox("Acciones con las que opera", list(UNIVERSOS))
@@ -464,13 +464,14 @@ def revisar_cartera_real(cr: dict | None = None) -> list[dict]:
         base = {"ticker": t, "pos": pos, "clase": clase, "nombre": nombre_posicion(t, pos)}
         df = hist.get(t)
         if df is None or df.empty:
-            filas.append({**base, "precio": None, "nivel": "sin_datos", "ev": None, "fx": fx(t) or 1.0,
+            filas.append({**base, "precio": None, "nivel": "sin_datos", "ev": None,
+                          "fx": fx(t) or pos.get("fx_medio", 1.0),
                           "consejo": "No hay cotización para este valor (revisa su código)."})
             continue
         if clase != "Acciones":
             filas.append({**base, "precio": float(df["Close"].iloc[-1]), "nivel": "mantener", "ev": None,
                           "var_1d": _var_1d(df),
-                          "consejo": CONSEJO_CLASE[clase], "fx": fx(t, funds.get(t)) or 1.0})
+                          "consejo": CONSEJO_CLASE[clase], "fx": fx(t, funds.get(t)) or pos.get("fx_medio", 1.0)})
             continue
         ev = senales.evaluar(t, df, mercado_alcista=mercado_alcista_para(t), fundamentales=funds.get(t),
                              stop_atr=p.stop_atr, ratio_objetivo=p.ratio_objetivo)
@@ -482,7 +483,7 @@ def revisar_cartera_real(cr: dict | None = None) -> list[dict]:
             precio, pos["precio_medio"], pos.get("stop"), stop_sug, ev.puntuacion, p.umbral_venta,
             any("resultados" in a for a in ev.avisos), pos.get("sin_stop", False), pos.get("alarma"))
         filas.append({**base, "precio": ev.precio, "nivel": nivel, "consejo": texto, "var_1d": _var_1d(df),
-                      "ev": ev, "stop_sugerido": stop_sug, "fx": fx(t, funds.get(t)) or 1.0,
+                      "ev": ev, "stop_sugerido": stop_sug, "fx": fx(t, funds.get(t)) or pos.get("fx_medio", 1.0),
                       "resultados_pronto": any("resultados" in a for a in ev.avisos)})
     _precios_frescos(filas)
     return filas
@@ -588,7 +589,7 @@ def asesor_hoy(inf: dict | None):
         if resto:
             st.markdown("**Además, hoy:**")
             for a in resto:
-                st.markdown(f"{a['icono']} **{a['titulo']}** — {a['texto']}")
+                st.markdown(ocultar(f"{a['icono']} **{a['titulo']}** — {a['texto']}"))
         bloque_eventos_cerca(filas)
         bloque_semana(posiciones)
         enlace("bankinter", "Ver el diagnóstico completo de tu cartera", "🩺")
@@ -719,10 +720,10 @@ def bloque_semana(posiciones: list[dict]):
         return
     lineas = semanal.texto(r)
     if lineas:
-        with st.expander(f"📅 Tu semana: {lineas[0].split('(')[0].replace('Esta semana tu dinero ha cambiado ', '')}"
-                         .strip()):
+        titulo = lineas[0].split('(')[0].replace('Esta semana tu dinero ha cambiado ', '').strip()
+        with st.expander(f"📅 Tu semana: {ocultar(titulo)}"):
             for x in lineas:
-                st.markdown(f"- {x}")
+                st.markdown(f"- {ocultar(x)}")
 
 
 def avisos_resumen():
@@ -1156,7 +1157,7 @@ def bloque_dentro_de_fondos(filas: list[dict]):
     if not any(c.get("top") for c in comp.values()):
         return
     nombres = {f["ticker"]: f["nombre"] for f in filas}
-    r = fondos.exposicion(directas, fondos_tk, comp, nombres)
+    r = fondos.exposicion(directas, fondos_tk, comp, nombres, total=sum(valores.values()))
     with st.expander("🔍 Qué hay dentro de tus fondos y ETF", expanded=bool(r["solapes"])):
         for e in r["solapes"]:
             dentro = ", ".join(sorted(set(e["fondos"])))
@@ -1207,6 +1208,10 @@ def bloque_rentabilidad_periodos(filas: list[dict]):
     st.subheader("📈 Rentabilidad por periodos")
     st.dataframe(tabla, hide_index=True, width="stretch", column_config={
         n: st.column_config.NumberColumn(format="%+.2f %%") for n in columnas})
+    fuera = rentabilidad.sin_historia(acciones, cierres)
+    if fuera:
+        st.caption("Sin historia suficiente (no entran en los periodos largos): "
+                   + ", ".join(nombre_de(t) for t in fuera) + ".")
     st.caption("Cómo le ha ido a lo que tienes **hoy** en cada periodo (títulos de hoy × precio de cada día, en "
                "euros, con dividendos). No cuenta cuándo compraste ni lo que metiste o sacaste: es la «foto» de tu "
                "cartera actual, comparable con el IBEX (sin dividendos) y con un fondo indexado mundial.")
@@ -1249,15 +1254,15 @@ def bloque_plan_fiscal(dg: dict, posiciones: list[dict]):
     """Plan por pasos con calendario fiscal (qué vender este año y qué en enero) y entrada al fondo en tramos."""
     d = cuenta_activa()
     st.markdown("#### 📅 Plan por pasos (calendario fiscal)")
-    otras = st.number_input("Ganancias (+) o pérdidas (−) que ya has realizado este año al vender (€)", -1e7, 1e7,
-                            float(d.get("ganancias_ano", 0.0)), 500.0,
+    otras = entrada_importe(st, "Ganancias (+) o pérdidas (−) que ya has realizado este año al vender (€)", -1e7,
+                            1e7, float(d.get("ganancias_ano", 0.0)), 500.0,
                             help="Cuentan para el IRPF del año junto con estas ventas. Míralo en tus operaciones de "
                                  "este año o en el informe fiscal provisional de tu bróker.")
     if otras != d.get("ganancias_ano", 0.0):
         d["ganancias_ano"] = otras
         guardar_datos()
     plan = reequilibrio.planificar(dg["propuesta"], dg["liberado"], dg["destino"], otras_ganancias_ano=otras)
-    (st.success if plan["ahorro"] > 0 else st.info)(plan["motivo"])
+    (st.success if plan["ahorro"] > 0 else st.info)(ocultar(plan["motivo"]))
     if plan["ahorro"] > 0:
         k = st.columns(2)
         k[0].metric("IRPF vendiendo todo ahora", eur(plan["irpf_todo_ahora"]))
@@ -1306,8 +1311,8 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     perfil_txt = c[0].selectbox("Tu perfil", opciones, key="perfil_diag",
                                 help="Calcúlalo en 🎯 Mi plan (5 preguntas). Decide cuánto conviene tener en "
                                      "acciones sueltas y cuánto en fondos.")
-    otros = c[1].number_input("Dinero en cuentas y depósitos (€)", 0.0, 100_000_000.0,
-                              float(cuenta_activa().get("otros_ahorros", 0.0)), 1000.0,
+    otros = entrada_importe(c[1], "Dinero en cuentas y depósitos (€)", 0.0, 100_000_000.0,
+                            float(cuenta_activa().get("otros_ahorros", 0.0)), 1000.0,
                               help="Lo que tienes en liquidez fuera de estas inversiones. Los fondos, planes o "
                                    "acciones de otros bancos, mejor impórtalos como posiciones para analizarlos.")
     if otros != cuenta_activa().get("otros_ahorros", 0.0):
@@ -1358,8 +1363,9 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     mostrar_plotly(figura)
 
     for x in dg["hallazgos"]:
-        with st.expander(f"{ICONO_GRAVEDAD[x['gravedad']]} {x['titulo']}", expanded=x["gravedad"] == "alta"):
-            st.write(x["texto"])
+        with st.expander(f"{ICONO_GRAVEDAD[x['gravedad']]} {ocultar(x['titulo'])}",
+                         expanded=x["gravedad"] == "alta"):
+            st.write(ocultar(x["texto"]))
     bloque_dentro_de_fondos(filas)
 
     if not dg["propuesta"]:
@@ -1696,6 +1702,6 @@ def copia_seguridad():
         subida = st.file_uploader("⬆️ Restaurar una copia", type=["json"], key="restaurar")
         if subida and st.button("Restaurar (sustituye los datos actuales)"):
             st.session_state["_datos"] = json.loads(subida.getvalue().decode("utf-8"))
-            guardar_datos()
+            guardar_datos(forzar=True)      # la copia sustituye a lo de la nube (no se junta con ello)
             st.success("Datos restaurados.")
             st.rerun()

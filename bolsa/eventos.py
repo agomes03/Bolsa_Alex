@@ -18,6 +18,12 @@ CAMPOS = {"resultados": ("earningsTimestampStart", "earningsTimestamp"), "ex_div
           "pago_dividendo": ("dividendDate",)}
 
 
+def _hoy_madrid() -> date:
+    from zoneinfo import ZoneInfo
+
+    return datetime.now(ZoneInfo("Europe/Madrid")).date()
+
+
 def _a_fecha(x) -> date | None:
     if x is None:
         return None
@@ -38,7 +44,7 @@ def _a_fecha(x) -> date | None:
 def proximos(nombres: dict[str, str], fundamentales: dict[str, dict], hoy: date | None = None,
              dias: int = 30) -> list[dict]:
     """Eventos de los próximos `dias` días para esos valores, ordenados por fecha."""
-    hoy = hoy or date.today()
+    hoy = hoy or _hoy_madrid()
     hasta = hoy + timedelta(days=dias)
     salida = []
     for t, nombre in nombres.items():

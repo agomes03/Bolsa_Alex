@@ -14,7 +14,8 @@ from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import _perfil_guardado, eventos_de, nombre_posicion, revisar_cartera_real
 from ui_comun import (SEGUNDOS_REFRESCO, cargar_diario_real, cargar_dividendos_varios, cargar_varios,
-                      cotizaciones_ahora, cuenta_activa, datos_usuario, enlace, eur, fecha, fila_informe, fx,
+                      cotizaciones_ahora, cuenta_activa, datos_usuario, enlace, entrada_importe, eur, fecha,
+                      fila_informe, fx, tabla_privada,
                       guardar_datos, ir_a, palabras_de_la_pagina, perfil, pestanas, selector_valor,
                       texto_estado_precio)
 
@@ -118,8 +119,8 @@ def _anadir_a_lista(t: str) -> None:
 
 
 def _quitar_de_lista(t: str) -> None:
-    d = cuenta_activa()
-    d["lista_seguimiento"] = [x for x in d.get("lista_seguimiento", []) if x["ticker"] != t]
+    lista = cuenta_activa().setdefault("lista_seguimiento", [])
+    lista[:] = [x for x in lista if x["ticker"] != t]          # la misma lista: el refresco la ve ya cambiada
     st.session_state.pop("lista_elegido", None)
     guardar_datos()
 
@@ -132,7 +133,8 @@ def _accion_aviso(id_aviso: int, accion: str) -> None:
     if accion == "visto":
         a["vista"] = True
     elif accion == "reactivar":
-        a.update(disparada=None, precio_disparo=None, vista=False, creada=date.today().isoformat())
+        a.update(disparada=None, precio_disparo=None, vista=False, creada=date.today().isoformat(),
+                 creada_hora=alertas._ahora_madrid())
     elif accion == "borrar":
         lista.remove(a)
     guardar_datos()
@@ -293,7 +295,7 @@ def tab_aportacion():
     st.markdown("Meter una cantidad fija cada mes, pase lo que pase en la bolsa, es lo que mejor funciona a largo "
                 "plazo para la mayoría de la gente: no hay que adivinar cuándo entrar.")
     c = st.columns(2)
-    importe = c[0].number_input("¿Cuánto cada mes? (€, 0 = sin aportación)", 0.0, 100_000.0,
+    importe = entrada_importe(c[0], "¿Cuánto cada mes? (€, 0 = sin aportación)", 0.0, 100_000.0,
                                 float(cfg.get("importe", 0.0)), 50.0)
     dia = c[1].number_input("¿Qué día del mes?", 1, 31, int(cfg.get("dia", 1)),
                             help="Mejor unos días después de cobrar la nómina.")
@@ -338,8 +340,9 @@ def tab_aportacion():
             f"y tendrías unos **{eur(final['Valor'])}**.")
     if cfg.get("hechas"):
         with st.expander("Historial de aportaciones"):
-            st.dataframe(pd.DataFrame([{"Fecha": h["fecha"], "Importe (€)": h["importe"]}
-                                       for h in reversed(cfg["hechas"])]), hide_index=True, width="stretch")
+            st.dataframe(tabla_privada(pd.DataFrame([{"Fecha": h["fecha"], "Importe (€)": h["importe"]}
+                                                     for h in reversed(cfg["hechas"])])), hide_index=True,
+                         width="stretch")
 
 
 def tab_diario():
@@ -419,8 +422,8 @@ def tab_renta():
     st.markdown("Tus **ventas** y **dividendos** del año con lo que has registrado en 🏦 Mi cartera, ya colocados "
                 "como los pide Hacienda. Compáralo con el **borrador** de Renta Web (tu banco ya envía estos datos a "
                 "Hacienda): si algo no cuadra, manda el **certificado fiscal** de tu banco.")
-    anteriores = st.number_input("Pérdidas de años anteriores aún sin compensar (€, de tus últimas 4 declaraciones)",
-                                 0.0, 1e7, float(d.get("perdidas_anteriores", 0.0)), 100.0,
+    anteriores = entrada_importe(st, "Pérdidas de años anteriores aún sin compensar (€, de tus últimas 4 "
+                                 "declaraciones)", 0.0, 1e7, float(d.get("perdidas_anteriores", 0.0)), 100.0,
                                  help="Aparecen en tu declaración del año pasado como «saldos negativos pendientes de "
                                       "compensar».")
     if anteriores != d.get("perdidas_anteriores", 0.0):
@@ -470,20 +473,22 @@ def tab_renta():
 
     if ventas:
         st.subheader("Ventas → «Ganancias y pérdidas patrimoniales (acciones admitidas a negociación)»")
-        st.dataframe(pd.DataFrame([{"Fecha": v["fecha"], "Valor": v["nombre"], "Títulos": v["acciones"],
-                                    "Venta (€)": round(v["importe_venta"], 2), "Compra (€)": round(v["importe_compra"], 2),
-                                    "Resultado (€)": round(v["resultado"], 2)} for v in ventas]),
-                     hide_index=True, width="stretch")
+        st.dataframe(tabla_privada(pd.DataFrame([{
+            "Fecha": v["fecha"], "Valor": v["nombre"], "Títulos": v["acciones"],
+            "Venta (€)": round(v["importe_venta"], 2), "Compra (€)": round(v["importe_compra"], 2),
+            "Resultado (€)": round(v["resultado"], 2)} for v in ventas])), hide_index=True, width="stretch")
         st.caption("Importes con los gastos de compra y venta ya incluidos, como pide Hacienda. La app usa el precio "
                    "medio de compra; si compraste el mismo valor varias veces a precios distintos, Hacienda usa las "
                    "primeras compradas primero (FIFO) y la cifra puede variar algo: la buena es la de tu banco.")
     if dividendos:
         st.subheader("Dividendos → «Rendimientos del capital mobiliario»")
-        st.dataframe(pd.DataFrame([{"Fecha ex": x["fecha"], "Valor": x["nombre"], "Títulos": x["acciones"],
-                                    "Bruto (€)": round(x["bruto"], 2), "Retención 19 % (€)": round(x["retencion"], 2)}
-                                   for x in dividendos]), hide_index=True, width="stretch")
-        st.caption("Estimado con tus títulos en cada fecha ex-dividendo. Los gastos de custodia de tu banco también "
-                   "se pueden restar de los dividendos.")
+        st.dataframe(tabla_privada(pd.DataFrame([{
+            "Fecha ex": x["fecha"], "Valor": x["nombre"], "Títulos": x["acciones"], "Bruto (€)": round(x["bruto"], 2),
+            "Retención 19 % (€)": round(x["retencion"], 2)} for x in dividendos])), hide_index=True, width="stretch")
+        st.caption("Estimado con tus títulos en cada fecha ex-dividendo. Ojo: a Hacienda le cuenta el año en que se "
+                   "PAGA (un dividendo con fecha ex a finales de diciembre que se cobra en enero va al año siguiente). "
+                   "En los extranjeros, la retención española se calcula sobre lo que llega tras la del otro país "
+                   "(≈15 %). Los gastos de custodia de tu banco también se pueden restar de los dividendos.")
         if r["hay_extranjeros"]:
             st.caption("Dividendos extranjeros: el país de origen también retiene (EEUU, un 15 % con el formulario "
                        "W-8BEN). Esa retención se deduce en la casilla de «deducción por doble imposición "

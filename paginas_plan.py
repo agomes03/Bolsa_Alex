@@ -15,13 +15,17 @@ from bolsa.activos import LIMITES_ALTERNATIVOS
 from paginas_hoy import (COLOR_SEMAFORO, TEXTO_SEMAFORO, bloque_que_puede_pasar, cartera_del_perfil,
                          precio_eur)
 from ui_comun import (cargar_activos, cargar_informe, cargar_varios, cuenta_activa, datos_usuario, eur, fx,
-                      guardar_datos, ir_a, num, palabras_de_la_pagina, pct, perfil)
+                      guardar_datos, ir_a, num, palabras_de_la_pagina, pct, perfil, privado)
 
 PERDIDAS_MAX = [2, 3, 5, 8, 10]
 
 
 def _cuestionario(cta: dict) -> dict | None:
     previo = cta.get("perfil_inversor", {})
+    if privado() and previo:
+        st.caption("🙈 Modo privado: tus respuestas (con tu dinero) están ocultas. Quita «Ocultar importes» en el "
+                   "menú lateral para cambiarlas.")
+        return previo
     with st.form("cuestionario"):
         objetivo = st.radio("1️⃣ ¿Para qué es este dinero?", list(plan.OBJETIVOS), format_func=plan.OBJETIVOS.get,
                             index=list(plan.OBJETIVOS).index(previo.get("objetivo", "crecer")))

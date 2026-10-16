@@ -187,6 +187,14 @@ def _hora_ahora() -> str:
     return datetime.now(MADRID_TZ).strftime("%H:%M:%S")
 
 
+def _hacer_sitio() -> None:
+    """Muchos grupos distintos guardados: se olvidan los más viejos (nunca los que se están descargando)."""
+    if len(_VIVOS) > 300:
+        viejos = sorted((k for k in _VIVOS if not _VIVOS[k]["renovando"]), key=lambda k: _VIVOS[k]["t"])
+        for k in viejos[:100]:
+            _VIVOS.pop(k, None)
+
+
 def al_dia(clave: tuple, funcion, segundos: int, esperar: bool = True):
     """(valor, hora): lo último descargado al instante; si tiene más de `segundos`, se renueva en segundo plano.
     La primera vez (nada guardado) se espera a la descarga, salvo con `esperar=False`: entonces devuelve
@@ -194,6 +202,7 @@ def al_dia(clave: tuple, funcion, segundos: int, esperar: bool = True):
     with _CERROJO_VIVOS:
         e = _VIVOS.get(clave)
         if e is None and not esperar:
+            _hacer_sitio()
             _VIVOS[clave] = {"valor": None, "t": 0.0, "hora": None, "renovando": True}
             threading.Thread(target=_renovar, args=(clave, funcion), daemon=True).start()
             return None, None
@@ -203,9 +212,7 @@ def al_dia(clave: tuple, funcion, segundos: int, esperar: bool = True):
     if e is None:
         valor = funcion()
         with _CERROJO_VIVOS:
-            if len(_VIVOS) > 300:                     # muchos grupos distintos: se olvidan los más viejos
-                for k in sorted(_VIVOS, key=lambda k: _VIVOS[k]["t"])[:100]:
-                    _VIVOS.pop(k, None)
+            _hacer_sitio()
             e = _VIVOS[clave] = {"valor": valor, "t": time.time(), "hora": _hora_ahora(), "renovando": False}
     if e["hora"]:
         _ULTIMA_HORA[clave[0]] = e["hora"]
@@ -431,6 +438,29 @@ def eur(x: float | None, moneda: str = "€") -> str:
     return f"••• {moneda}" if privado() else f"{num(x, 2)} {moneda}"
 
 
+_IMPORTE = re.compile(r"[−+-]?\d[\d.]*(?:,\d+)?\s?€")
+
+
+def ocultar(texto: str) -> str:
+    """En modo privado, tapa los importes en euros de un texto ya escrito («perderías unos 1.234 €» → «••• €»)."""
+    return _IMPORTE.sub("••• €", texto) if privado() and texto else texto
+
+
+def tabla_privada(tabla: pd.DataFrame) -> pd.DataFrame:
+    """En modo privado, sin las columnas en euros ni la de títulos (precios y porcentajes sí)."""
+    if not privado():
+        return tabla
+    return tabla.drop(columns=[c for c in tabla.columns if "(€)" in str(c) or str(c) == "Títulos"])
+
+
+def entrada_importe(donde, etiqueta: str, minimo: float, maximo: float, valor: float, paso: float, **kw) -> float:
+    """Un campo con tu dinero (ahorros, aportación...): en modo privado no se enseña y se queda lo guardado."""
+    if privado():
+        donde.caption(f"{etiqueta}: ••• (oculto en modo privado)")
+        return valor
+    return donde.number_input(etiqueta, minimo, maximo, valor, paso, **kw)
+
+
 def precio(x: float | None, moneda: str = "€") -> str:
     """El precio de un valor, o un importe de ejemplo (calculadoras, lecciones): no es tu dinero, así que se ve
     también en modo privado."""
@@ -467,16 +497,25 @@ def moneda_de(ticker: str, info: dict | None = None) -> str:
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def tipos_cambio() -> dict[str, float]:
-    """Unidades de cada divisa por 1 euro (último cierre)."""
+def _tipos_cambio_completos() -> dict[str, float]:
     pares = {div: t for div, t in costes.TICKER_CAMBIO.items() if div != "GBp"}
     hist = datos.varios(sorted(set(pares.values())), "1mo")   # una sola descarga para todas las divisas
-    salida = {}
-    for div, t in pares.items():
-        df = hist.get(t)
-        if df is not None and not df.empty:
-            salida[div] = float(df["Close"].iloc[-1])
+    salida = {div: float(hist[t]["Close"].iloc[-1]) for div, t in pares.items()
+              if hist.get(t) is not None and not hist[t].empty}
+    if len(salida) < len(pares):     # incompleto: no se guarda una hora (se reintenta en la próxima pantalla)
+        raise ValueError("faltan tipos de cambio")
     return salida
+
+
+def tipos_cambio() -> dict[str, float]:
+    """Unidades de cada divisa por 1 euro (último cierre). Si falta alguna, se usan las que haya, sin guardarlas."""
+    try:
+        return _tipos_cambio_completos()
+    except Exception:  # noqa: BLE001
+        pares = {div: t for div, t in costes.TICKER_CAMBIO.items() if div != "GBp"}
+        hist = cargar_varios(tuple(sorted(set(pares.values()))), "1mo")
+        return {div: float(hist[t]["Close"].iloc[-1]) for div, t in pares.items()
+                if hist.get(t) is not None and not hist[t].empty}
 
 
 def fx(ticker: str, info: dict | None = None) -> float | None:
@@ -528,7 +567,10 @@ def datos_usuario() -> dict:
             except Exception:  # noqa: BLE001 - un fallo pasajero de GitHub: se reintenta una vez
                 d, version = _almacen().cargar_con_version()
             st.session_state["_datos"], st.session_state["_version_datos"] = d, version
+            st.session_state["_cuentas_conocidas"] = sorted((d or {}).get("cuentas", {}) or
+                                                            ([cuentas.PRINCIPAL] if d else []))
             st.session_state.pop("_carga_fallida", None)
+            _GUARDADOS.pop(_id_sesion(), None)       # datos recién cargados: versión y cuentas de ahora
         except Exception as e:  # noqa: BLE001
             # Sin tus datos NO se guarda nada: guardar ahora borraría lo que tienes en la nube.
             st.session_state["_datos"] = {}
@@ -594,45 +636,83 @@ def _trabajador_guardar(alm: almacen.Almacen, reg: dict) -> None:
             if item is None:
                 reg["hilo"] = None
                 return
+            cambiadas, reg["cambiadas"] = reg.get("cambiadas", set()), set()
+            forzar = reg.pop("forzar", False)
         a_guardar, activa = item
         try:
             # Si otro dispositivo ha guardado desde que abriste la app, se junta con lo suyo en vez de pisarlo.
             remotos, version = alm.cargar_con_version()
-            if version and version != reg.get("version"):
-                a_guardar = cuentas.combinar(a_guardar, remotos, activa)
-                reg["otras_cuentas"] = {n: c for n, c in a_guardar.get("cuentas", {}).items() if n != activa}
-            reg["version"] = alm.guardar(a_guardar)
-            reg["estado"] = (True, _hora(), "")
-        except Exception as e:  # noqa: BLE001 - se reintenta con el siguiente guardado
+            if version and version != reg.get("version") and not forzar:
+                a_guardar = cuentas.combinar(a_guardar, remotos, cambiadas | {activa}, reg.get("conocidas"))
+                otras = {n: c for n, c in a_guardar.get("cuentas", {}).items() if n not in cambiadas | {activa}}
+                with _CERROJO_GUARDAR:
+                    reg["otras_cuentas"] = otras
+            nueva = alm.guardar(a_guardar)
+            with _CERROJO_GUARDAR:
+                reg["version"] = nueva
+                reg["conocidas"] = set(a_guardar.get("cuentas", {}))
+                reg["estado"] = (True, _hora(), "")
+                reg.pop("fallos", None)
+        except Exception as e:  # noqa: BLE001 - se reintenta solo (ver _sincronizar_guardado)
             with _CERROJO_GUARDAR:
                 reg.setdefault("pendiente", item)
-            reg["estado"] = (False, _hora(), str(e))
-            with _CERROJO_GUARDAR:
+                reg["cambiadas"] = reg.get("cambiadas", set()) | cambiadas
+                if forzar:
+                    reg["forzar"] = True
+                reg["estado"] = (False, _hora(), str(e))
+                reg["fallos"] = reg.get("fallos", 0) + 1
+                reg["ultimo_fallo"] = time.time()
                 reg["hilo"] = None
             return
 
 
+def _lanzar_guardado(reg: dict) -> None:
+    """Arranca el trabajador si hay algo pendiente y no hay ninguno trabajando (llamar con el cerrojo cogido)."""
+    if reg.get("pendiente") and not reg.get("hilo"):
+        reg["hilo"] = threading.Thread(target=_trabajador_guardar, args=(_almacen(), reg), daemon=True)
+        reg["hilo"].start()
+
+
 def _sincronizar_guardado(d: dict) -> None:
-    """Trae a la sesión lo que ha hecho el guardado en segundo plano (estado, versión, cambios de otras cuentas)."""
+    """Trae a la sesión lo que ha hecho el guardado en segundo plano (estado, versión, cambios de otras cuentas) y,
+    si falló, lo reintenta solo (esperando cada vez un poco más)."""
     reg = _GUARDADOS.get(_id_sesion())
     if not reg:
         return
-    if "estado" in reg:
-        st.session_state["_guardado"] = reg["estado"]
-        if reg["estado"][0] is False and reg.get("avisado") != reg["estado"]:
-            reg["avisado"] = reg["estado"]
-            st.toast(f"⚠️ No se han podido guardar tus últimos cambios ({reg['estado'][2][:80]}). Se reintentará "
-                     "en el próximo cambio; si sigue, descarga una copia de seguridad.")
-    if reg.get("version"):
-        st.session_state["_version_datos"] = reg["version"]
-    otras = reg.pop("otras_cuentas", None)
+    with _CERROJO_GUARDAR:
+        if reg.get("pendiente") and not reg.get("hilo") and \
+                time.time() - reg.get("ultimo_fallo", 0) > min(10 * 2 ** reg.get("fallos", 0), 300):
+            _lanzar_guardado(reg)
+        estado = reg.get("estado")
+        otras = reg.pop("otras_cuentas", None)
+        version = reg.get("version")
+    if estado:
+        st.session_state["_guardado"] = estado
+        if estado[0] is False and reg.get("avisado") != estado:
+            reg["avisado"] = estado
+            st.toast(f"⚠️ No se han podido guardar tus últimos cambios ({estado[2][:80]}). Se reintenta solo; si "
+                     "sigue fallando, descarga una copia de seguridad.")
+    if version:
+        st.session_state["_version_datos"] = version
     if otras and d.get("cuentas"):
         for nombre, c in otras.items():
-            if nombre != d.get("cuenta_activa"):
+            if nombre != d.get("cuenta_activa") and nombre not in reg.get("cambiadas", set()):
                 d["cuentas"][nombre] = c
 
 
-def guardar_datos() -> None:
+def _registro_guardado() -> dict:
+    """El registro de guardado de esta sesión (versión y cuentas conocidas al cargar los datos)."""
+    reg = _GUARDADOS.get(_id_sesion())
+    if reg is None:
+        reg = _GUARDADOS[_id_sesion()] = {"version": st.session_state.get("_version_datos"),
+                                          "conocidas": set(st.session_state.get("_cuentas_conocidas", ())),
+                                          "cambiadas": set()}
+    return reg
+
+
+def guardar_datos(forzar: bool = False) -> None:
+    """Guarda tus datos. `forzar`: sustituir lo de la nube sin juntarlo con lo de otros dispositivos (al restaurar
+    una copia de seguridad)."""
     d = datos_usuario()
     if st.session_state.get("_carga_fallida"):
         st.session_state["_guardado"] = (False, _hora(), "tus datos no se cargaron; no se guarda para no borrarlos")
@@ -648,13 +728,16 @@ def guardar_datos() -> None:
         return
     copia = json.loads(json.dumps(cuentas.para_guardar(d), ensure_ascii=False, default=str))
     with _CERROJO_GUARDAR:
-        reg = _GUARDADOS.setdefault(_id_sesion(), {})
-        reg.setdefault("version", st.session_state.get("_version_datos"))
+        reg = _registro_guardado()
         reg["pendiente"] = (copia, d.get("cuenta_activa"))
-        if not reg.get("hilo"):
-            reg["hilo"] = threading.Thread(target=_trabajador_guardar, args=(alm, reg), daemon=True)
-            reg["hilo"].start()
-    st.session_state["_guardado"] = (True, _hora(), "")
+        reg["cambiadas"] = reg.get("cambiadas", set()) | {d.get("cuenta_activa")}
+        if forzar:
+            reg["forzar"] = True
+        reg["estado"] = (None, _hora(), "")
+        reg.pop("fallos", None)
+        reg.pop("ultimo_fallo", None)
+        _lanzar_guardado(reg)
+    st.session_state["_guardado"] = (None, _hora(), "")
 
 
 def aviso_datos_antiguos(hueco) -> None:
@@ -712,7 +795,9 @@ def hay_contrasena() -> bool:
 def estado_guardado() -> tuple[str, str]:
     """(icono y texto corto, explicación) del lugar donde se guardan tus datos."""
     alm = _almacen()
-    ok, hora, error = st.session_state.get("_guardado", (None, "", ""))
+    ok, hora, error = st.session_state.get("_guardado", ("", "", ""))
+    if ok is None:
+        return "⏳ Guardando en la nube…", "Tus últimos cambios se están guardando en tu Gist privado de GitHub."
     if ok is False:
         return f"❌ No se pudo guardar ({hora})", f"Error: {error}. Revisa el token y el id del Gist en Secrets."
     if alm.en_la_nube:
@@ -816,10 +901,11 @@ def selector_valor(clave: str, solo_invertibles: bool = False, defecto: str | No
     from bolsa.tickers import CATALOGO, NO_INVERTIBLES, grupo_de
 
     grupos = [g for g, d in CATALOGO.items() if not solo_invertibles or any(t not in NO_INVERTIBLES for t in d)]
-    if defecto and grupo_de(defecto) in grupos and st.session_state.get(f"{clave}_def") != defecto:
+    # `defecto` llega una sola vez (quien llama lo saca de la sesión al usarlo): se aplica siempre, también si ya
+    # habías abierto ese mismo valor antes (al volver a la página, Streamlit olvida lo que estaba elegido).
+    if defecto and grupo_de(defecto) in grupos:
         st.session_state[f"{clave}_grupo"] = grupo_de(defecto)
         st.session_state[f"{clave}_valor"] = defecto
-        st.session_state[f"{clave}_def"] = defecto
     c = st.columns([1, 2])
     grupo = c[0].selectbox("Mercado o tipo", grupos, key=f"{clave}_grupo")
     opciones = [t for t in CATALOGO[grupo] if not solo_invertibles or t not in NO_INVERTIBLES]
@@ -868,26 +954,22 @@ def ir_a(pagina: str, **estado):
 # --------------------------------------------------------------------------- estilo
 ESTILOS = """
 <style>
-/* Orden de compra/venta de la cartera virtual, con el aspecto de la de Bankinter. */
-.st-key-orden_ticket, .st-key-orden_confirmar { background: #f6f8fb; }
-.orden-titulo { letter-spacing: .04em; color: #4b5563; font-size: .95rem; border-bottom: 3px solid #4b5563;
+/* Orden de compra/venta de la cartera virtual, con el aspecto de la de Bankinter (sirve en tema claro y oscuro). */
+.st-key-orden_ticket, .st-key-orden_confirmar { background: rgba(128,128,128,.07); }
+.orden-titulo { letter-spacing: .04em; opacity: .75; font-size: .95rem; border-bottom: 3px solid currentColor;
   display: inline-block; padding-bottom: .2rem; margin-bottom: .6rem; }
 .orden-valor { font-size: 1.25rem; font-weight: 600; }
 .orden-precio { font-size: 1.35rem; font-weight: 700; }
-.orden-hora { color: #6b7280; font-size: .9rem; }
-.orden-caja { background: #e8edf3; border-radius: 6px; padding: .4rem .7rem; font-size: .85rem; }
+.orden-hora { opacity: .7; font-size: .9rem; }
+.orden-caja { background: rgba(128,128,128,.14); border-radius: 6px; padding: .4rem .7rem; font-size: .85rem; }
 .orden-caja-cab, .orden-caja-val { display: flex; justify-content: space-between; }
-.orden-caja-cab { color: #374151; letter-spacing: .03em; }
+.orden-caja-cab { opacity: .8; letter-spacing: .03em; }
 .orden-caja-val { font-weight: 600; font-size: 1rem; }
-.orden-caja-pie { color: #6b7280; font-size: .8rem; }
+.orden-caja-pie { opacity: .7; font-size: .8rem; }
 .st-key-orden_ticket [data-testid="stWidgetLabel"] p, .st-key-orden_confirmar [data-testid="stWidgetLabel"] p {
-  font-size: .8rem; letter-spacing: .03em; color: #4b5563; }
+  font-size: .8rem; letter-spacing: .03em; opacity: .8; }
 .st-key-orden_ticket button[kind="primary"], .st-key-orden_confirmar button[kind="primary"] {
   background: #f7941d; border-color: #f7941d; border-radius: 999px; letter-spacing: .06em; }
-@media (prefers-color-scheme: dark) {
-  .st-key-orden_ticket, .st-key-orden_confirmar { background: transparent; }
-  .orden-caja { background: rgba(255,255,255,.06); }
-}
 /* Cifras un poco más pequeñas: caben más sin hacer scroll. */
 [data-testid="stMetricValue"] { font-size: clamp(1.3rem, 2.4vw, 1.9rem); }
 @media (max-width: 640px) {

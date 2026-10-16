@@ -31,8 +31,15 @@ def nueva(lista: list[dict], ticker: str, nombre: str, tipo: str, precio: float,
                     "un aviso de bajada.")
     lista.append({"id": max((a["id"] for a in lista), default=0) + 1, "ticker": ticker, "nombre": nombre,
                   "tipo": tipo, "precio": float(precio), "nota": nota.strip(),
-                  "creada": (hoy or date.today()).isoformat(), "disparada": None, "precio_disparo": None})
+                  "creada": (hoy or date.today()).isoformat(), "creada_hora": None if hoy else _ahora_madrid(),
+                  "disparada": None, "precio_disparo": None})
     return None
+
+
+def _ahora_madrid() -> str:
+    from zoneinfo import ZoneInfo
+
+    return datetime.now(ZoneInfo("Europe/Madrid")).strftime("%Y-%m-%dT%H:%M")
 
 
 def cumple(tipo: str, nivel: float, minimo: float, maximo: float) -> bool:
@@ -94,10 +101,13 @@ def ultimo_cruce(a: dict, df: pd.DataFrame) -> tuple[pd.Timestamp, float] | None
     precio de ahora. None si no lo ha cruzado."""
     if df is None or df.empty:
         return None
-    df = df[df.index >= pd.Timestamp(a["creada"])]
+    # Desde el momento en que creaste el aviso (no desde las 00:00 de ese día): un movimiento de antes no cuenta.
+    df = df[df.index >= pd.Timestamp(a.get("creada_hora") or a["creada"])]
     if df.empty:
         return None
-    cruce, al_otro_lado = None, False
+    # Si ya estaba al otro lado en la primera vela (avisos antiguos sin hora), no es un cruce nuevo.
+    primero = float(df["Close"].iloc[0])
+    cruce, al_otro_lado = None, cumple(a["tipo"], a["precio"], primero, primero)
     for ts, f in df.iterrows():
         toca = cumple(a["tipo"], a["precio"], float(f["Low"]), float(f["High"]))
         if toca and not al_otro_lado:

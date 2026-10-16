@@ -42,9 +42,9 @@ def main() -> int:
         print("No hay avisos activos.")
         return 0
     try:
-        avisados = alm.leer_extra(ENVIADOS)
+        avisados, registro_ok = alm.leer_extra(ENVIADOS), True
     except Exception:  # noqa: BLE001 - sin el registro, como mucho se repite un aviso
-        avisados = {}
+        avisados, registro_ok = {}, False
     ahora = datetime.now(ZoneInfo("Europe/Madrid")).replace(tzinfo=None)
     tickers = sorted({a["ticker"] for lst in activas.values() for a in lst})
     intradia = {t: datos.intradia(t, "5d", "5m") for t in tickers}
@@ -58,7 +58,7 @@ def main() -> int:
         texto += "\n\nDecide con calma. Herramienta educativa, no es asesoramiento financiero."
         ok = avisos.enviar_telegram(os.environ["TELEGRAM_TOKEN"], os.environ["TELEGRAM_CHAT_ID"], texto)
         print("Telegram enviado" if ok else "Fallo al enviar a Telegram")
-        if ok:
+        if ok and registro_ok:          # sin haberlo leído bien, no se pisa el registro de avisos ya mandados
             alm.guardar_extra(ENVIADOS, avisados)
     return 0
 

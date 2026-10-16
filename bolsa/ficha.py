@@ -20,7 +20,8 @@ def _chequeos(fund: dict, precio: float | None, var_1a: float | None) -> dict[st
     beneficio, ventas = f.get("earningsGrowth"), f.get("revenueGrowth")
 
     def si(x, cond):
-        return None if x is None else bool(cond(x))
+        # Sin dato (o NaN, p. ej. variación de 1 año de una empresa que cotiza hace menos): no cuenta.
+        return None if x is None or (isinstance(x, float) and x != x) else bool(cond(x))
 
     return {
         "Valoración": [

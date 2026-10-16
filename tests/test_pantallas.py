@@ -727,3 +727,43 @@ def test_orden_virtual_como_en_el_broker_continuar_modificar_y_vender():
     cv = at.session_state["_datos"]["cartera_virtual"]
     vendido = sum(h["acciones"] for h in cv["historial"] if h["tipo"] == "Venta")
     assert vendido == 100 or any(o["sentido"] == "venta" for o in cv.get("ordenes", []))
+
+
+def test_si_cambias_la_orden_con_el_resumen_abierto_se_vuelve_al_formulario():
+    cv = cartera.nueva(10_000.0)
+    at = abrir("pagina_cartera_virtual", datos_usuario={"cartera_virtual": cv}, estado={"v_defecto": "SAN.MC"})
+    [b for b in at.button if b.label == "CONTINUAR"][0].click().run()
+    assert any(b.label == "CONFIRMAR ORDEN" for b in at.button)
+    at.number_input(key="v_n_SAN.MC_c").set_value(3).run()                     # cambio los títulos
+    assert not any(b.label == "CONFIRMAR ORDEN" for b in at.button)            # el resumen viejo ya no vale
+    [b for b in at.button if b.label == "CONTINUAR"][0].click().run()
+    assert any("3 títulos" in m.value for m in at.markdown)
+
+
+def test_modo_privado_tapa_los_importes_de_los_textos():
+    import ui_comun
+
+    assert ui_comun.ocultar("perderías unos 100.528 € y ahorras 1.120,50 €") == \
+        "perderías unos 100.528 € y ahorras 1.120,50 €"                 # sin modo privado, igual
+    st.session_state["_privado"] = True
+    try:
+        assert ui_comun.ocultar("perderías unos 100.528 € y −1.380 € hoy") == "perderías unos ••• € y ••• € hoy"
+    finally:
+        st.session_state.pop("_privado", None)
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()},
+               estado={"_privado": True, "mc_pestana": "🩺 Diagnóstico"})
+    sin_fallos(at)
+    import re
+    textos = [e.label for e in at.expander] + [m.value for m in at.markdown]
+    # (las definiciones y ejemplos del diccionario, «**Palabra**: ...», no son tu dinero)
+    tuyos = [t for t in textos if "💡" not in t and not re.match(r"\*\*[^*]+\*\*: ", t)]
+    assert not [t for t in tuyos if re.search(r"\d{1,3}(\.\d{3})+ €", t)]          # ningún importe a la vista
+
+
+def test_volver_a_abrir_el_mismo_valor_en_analizar():
+    at = abrir("pagina_analizar", estado={"analizar_ticker": "IDR.MC"})
+    assert at.selectbox(key="an_valor").value == "IDR.MC"
+    at.session_state["an_valor"] = "ACS.MC"
+    at.session_state["analizar_ticker"] = "IDR.MC"                    # vuelves a Analizar desde otra página
+    at.run()
+    assert at.selectbox(key="an_valor").value == "IDR.MC"

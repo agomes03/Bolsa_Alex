@@ -14,10 +14,10 @@ from bolsa.activos import clase_de
 from bolsa.tickers import nombre_de, sector_de
 from paginas_extra import (ICONO_NIVEL, ficha_activo, pintar_tabla_posiciones, revisar_cartera_real, selector_activo,
                            tabla_posiciones)
-from ui_comun import (cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, cotizacion_al_instante,
-                      cotizaciones_ahora, datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos,
-                      mercado_alcista_para, moneda_de, mostrar_plotly, num, palabras_de_la_pagina, pct, perfil,
-                      selector_valor)
+from ui_comun import (cargar_diario_real, cargar_fundamentales, cargar_historico, cargar_informe, cargar_intradia,
+                      cotizacion_al_instante, cotizaciones_ahora, datos_usuario, estrategia_actual, eur, fecha, fx,
+                      guardar_datos, mercado_alcista_para, moneda_de, mostrar_plotly, num, palabras_de_la_pagina, pct,
+                      perfil, selector_valor)
 from ui_comun import precio as txt_precio
 
 TIPOS = {"Limitada": "limitada", "A mercado": "mercado", "Stop (con límite)": "stop"}
@@ -78,10 +78,12 @@ def cartera_manual():
         with st.spinner("Actualizando cotizaciones..."):
             for t in tickers:
                 diario, intra, q = _datos_valor(t)
+                # Sin tipo de cambio fiable se usa el de la compra (nunca 1: un valor en peniques saldría 100 veces).
                 info[t] = {"barras": datos.barras_ejecucion(diario, intra), "q": q,
-                           "abierto": horario.estado_mercado(t)["abierto"], "fx": fx(t) or 1.0}
+                           "abierto": horario.estado_mercado(t)["abierto"],
+                           "fx": fx(t) or (cv["posiciones"].get(t) or {}).get("fx_medio")}
     barras = {t: v["barras"] for t, v in info.items()}
-    eventos = cartera.revisar_ordenes(cv, barras, pf.tarifa, {t: v["fx"] for t, v in info.items()})
+    eventos = cartera.revisar_ordenes(cv, barras, pf.tarifa, {t: v["fx"] for t, v in info.items() if v["fx"]})
     eventos += cartera.ejecutar_ordenes(cv, barras, pf.tarifa, ahora_iso,
                                         {t: (v["q"]["precio"], v["abierto"]) for t, v in info.items() if v["q"]})
     for e in st.session_state.pop("_avisos_virtual", []) + eventos:
@@ -90,7 +92,12 @@ def cartera_manual():
         guardar_datos()
 
     precios = {t: v["q"]["precio"] for t, v in info.items() if v["q"]}
-    fx_pos = {t: v["fx"] for t, v in info.items()}
+    for t in cv["posiciones"]:       # sin cotización ahora: el último cierre (no vale 0)
+        if t not in precios:
+            hist = cargar_historico(t, "1y")
+            if not hist.empty:
+                precios[t] = float(hist["Close"].iloc[-1])
+    fx_pos = {t: v["fx"] for t, v in info.items() if v["fx"]}
     _, res = cartera.valorar(cv, precios, fx_pos)
     libre = cartera.disponible(cv, pf.tarifa)
     c = st.columns(2 if pf.movil else 4)
@@ -172,6 +179,7 @@ def bloque_posiciones(cv: dict, info: dict):
     f_activo = selector_activo(filas, "cv_activo")
     if f_activo:
         ficha_activo(f_activo, filas)
+        _editar_stop_virtual(cv, info)
         return
     c = st.columns(3 if not pf.movil else 2)
     c[0].metric("Valor de tus posiciones", eur(total))
@@ -189,6 +197,10 @@ def bloque_posiciones(cv: dict, info: dict):
             st.markdown(f"{ICONO_NIVEL[f['nivel']]} **{f['nombre']}**: {f['consejo']}")
         st.caption("Igual que con tu cartera real: con el precio de ahora, tu stop-loss y la tendencia de cada valor.")
 
+    _editar_stop_virtual(cv, info)
+
+
+def _editar_stop_virtual(cv: dict, info: dict):
     with st.expander("✏️ Cambiar stop-loss u objetivo de una posición"):
         t = st.selectbox("Posición", list(cv["posiciones"]), format_func=nombre_de, key="v_cambiar_t")
         pos = cv["posiciones"][t]
@@ -285,12 +297,17 @@ def ficha_cotizacion(ticker: str, diario: pd.DataFrame, q: dict):
 VALIDEZ = ["Hasta fin de día", "Hasta fin de semana", "Hasta fin de mes", "Fecha concreta"]
 
 
+def _hoy() -> date:
+    """Hoy en España (el servidor puede ir con otra hora)."""
+    return horario.ahora_madrid().date()
+
+
 def _fecha_validez(opcion: str, concreta: date | None) -> date:
-    hoy = date.today()
+    hoy = _hoy()
     if opcion == "Hasta fin de día":
         return hoy
-    if opcion == "Hasta fin de semana":
-        return hoy + timedelta(days=max(4 - hoy.weekday(), 0))
+    if opcion == "Hasta fin de semana":         # el viernes (si hoy es sábado o domingo, el de la semana que viene)
+        return hoy + timedelta(days=(4 - hoy.weekday()) % 7)
     if opcion == "Hasta fin de mes":
         siguiente = (hoy.replace(day=28) + timedelta(days=4)).replace(day=1)
         return siguiente - timedelta(days=1)
@@ -304,7 +321,7 @@ def _cabecera_orden(ticker: str, q: dict, sentido: str) -> None:
     nombre = nombre_de(ticker).split(" (")[0].upper()
     var = q.get("variacion_pct")
     flecha = "↗" if (var or 0) >= 0 else "↘"
-    color = "#15803d" if (var or 0) >= 0 else "#b91c1c"
+    color = "#16a34a" if (var or 0) >= 0 else "#ef4444"          # se leen en tema claro y oscuro
     hora = pd.Timestamp(q["hora"])
     st.markdown(f"<div class='orden-titulo'>ORDEN DE {'COMPRA' if sentido == 'compra' else 'VENTA'}</div>",
                 unsafe_allow_html=True)
@@ -382,6 +399,12 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
             plan = senales.evaluar(ticker, hist, mercado_alcista=mercado_alcista_para(ticker),
                                    stop_atr=p.stop_atr, ratio_objetivo=p.ratio_objetivo).plan
 
+    try:     # la tasa Tobin solo la pagan las empresas grandes: hace falta su capitalización
+        cap = cargar_fundamentales(ticker).get("marketCap")
+    except Exception:  # noqa: BLE001
+        cap = None
+    tobin = costes.tasa_tobin_pct(ticker, cap)
+
     with st.container(border=True, key="orden_ticket"):
         _cabecera_orden(ticker, q, sentido)
         k = st.columns(2)
@@ -411,7 +434,7 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
                                            value=float(min(defecto, precio * 0.999)), format="%.3f",
                                            key=f"v_act_{ticker}")
             limite = k[1].number_input(f"PRECIO LÍMITE ({m})", 0.001, value=round(activacion * 0.98, 3),
-                                       format="%.3f", key=f"v_limst_{ticker}",
+                                       format="%.3f", key=f"v_limst_{ticker}_{activacion}",
                                        help="Un 2 % por debajo de la activación, para que se ejecute aunque caiga "
                                             "deprisa (Bankinter lo exige en los stop).")
         st.caption(EXPLICA_TIPO[tipo])
@@ -422,8 +445,9 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
             sugeridas = 0
             if plan and plan.stop < precio:
                 sugeridas = min(costes.tamano_por_riesgo(patrimonio, pf.riesgo, ref, plan.stop * f_eur),
-                                costes.acciones_asequibles(min(libre, patrimonio * 0.20), ref, ticker, pf.tarifa))
-            maximo = max(costes.acciones_asequibles(libre, ref, ticker, pf.tarifa), 1)
+                                costes.acciones_asequibles(min(libre, patrimonio * 0.20), ref, ticker, pf.tarifa,
+                                                           tobin))
+            maximo = max(costes.acciones_asequibles(libre, ref, ticker, pf.tarifa, tobin), 1)
             n = k[0].number_input("TÍTULOS", 1, 10_000_000, max(min(sugeridas, maximo), 1), key=f"v_n_{ticker}_c",
                                   help=f"La app propone {sugeridas} para que, si salta el stop, pierdas como mucho el "
                                        f"{num(pf.riesgo, 1)} % de tu cartera y ninguna empresa pase del 20 %. Con tu "
@@ -444,12 +468,12 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
         opcion = k[0].selectbox("VALIDEZ", VALIDEZ, index=0 if tipo == "mercado" else 2, key=f"v_validez_{clave}")
         concreta = None
         if opcion == "Fecha concreta":
-            concreta = k[1].date_input("Fecha", date.today() + timedelta(days=7), min_value=date.today(),
-                                       max_value=date.today() + timedelta(days=90), key=f"v_val_{clave}",
+            concreta = k[1].date_input("Fecha", _hoy() + timedelta(days=7), min_value=_hoy(),
+                                       max_value=_hoy() + timedelta(days=90), key=f"v_val_{clave}",
                                        format="DD/MM/YYYY")
         validez = _fecha_validez(opcion, concreta)
         estado = horario.estado_mercado(ticker)
-        if validez == date.today() and not estado["abierto"] and estado["apertura"].date() > date.today():
+        if validez == _hoy() and not estado["abierto"] and estado["apertura"].date() > _hoy():
             st.warning("El mercado ya ha cerrado por hoy: una orden «hasta fin de día» caducará sin ejecutarse. "
                        "Elige «Hasta fin de semana» o «Hasta fin de mes».")
 
@@ -480,13 +504,22 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
 
         orden = dict(clave=clave, ticker=ticker, sentido=sentido, tipo=tipo, n=int(n), limite=limite,
                      activacion=activacion, validez=validez.isoformat(), stop=stop, objetivo=objetivo,
-                     precio=precio, f_eur=f_eur, importe=importe)
+                     precio=precio, f_eur=f_eur, importe=importe, cap=cap)
+        # Si cambias algo de la orden con el resumen abierto, el resumen ya no vale: se vuelve al formulario.
+        if confirmar and any(confirmar.get(x) != orden[x] for x in ("ticker", "sentido", "tipo", "n", "limite",
+                                                                     "activacion", "validez", "stop", "objetivo")):
+            st.session_state.pop("v_confirmar", None)
+            confirmar = None
         if not confirmar:
             b = st.columns(2)
             b[0].button("✕ CANCELAR", key=f"v_cancelar_{clave}", width="stretch", type="tertiary",
                         on_click=_cancelar_orden, args=(ticker,))
-            b[1].button("CONTINUAR", key=f"v_continuar_{sentido}", type="primary", width="stretch",
-                        disabled=n <= 0, on_click=st.session_state.__setitem__, args=("v_confirmar", orden))
+            # Sin callback: así el resumen se hace con lo que hay escrito AHORA (en el móvil se suele pulsar
+            # «Continuar» sin salir antes del campo de títulos o de precio).
+            if b[1].button("CONTINUAR", key=f"v_continuar_{sentido}", type="primary", width="stretch",
+                           disabled=n <= 0):
+                st.session_state["v_confirmar"] = orden
+                st.rerun()
             return
 
     # Paso 2: resumen con los costes, como la pantalla de confirmación del bróker.
@@ -499,7 +532,8 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
         st.markdown(f"**{o['n']} títulos de {nombre_de(o['ticker'])}** · orden {como} · válida hasta "
                     f"**{fecha(o['validez'])}**")
         if o["sentido"] == "compra":
-            cc = costes.coste_compra(o["importe"], o["ticker"], pf.tarifa)
+            o["importe"] = o["n"] * (o["limite"] if o["tipo"] == "limitada" else precio) * o["f_eur"]
+            cc = costes.coste_compra(o["importe"], o["ticker"], pf.tarifa, o.get("cap"))
             filas = [("Importe aproximado", eur(o["importe"])), ("Comisión", eur(cc["comision"]))]
             if cc["cambio"]:
                 filas.append(("Cambio de divisa", eur(cc["cambio"])))
@@ -527,15 +561,16 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
                     on_click=lambda: st.session_state.pop("v_confirmar", None))
         if b[1].button("CONFIRMAR ORDEN", key=f"v_enviar_{o['sentido']}", type="primary", width="stretch"):
             ahora_iso = f"{horario.ahora_madrid():%Y-%m-%dT%H:%M}"
+            # Con el precio de AHORA (no el de cuando pulsaste «Continuar»).
             err = cartera.nueva_orden(cv, o["ticker"], o["sentido"], o["tipo"], o["n"], pf.tarifa,
-                                      precio_ref=o["precio"], ahora=ahora_iso, validez=o["validez"],
-                                      limite=o["limite"], activacion=o["activacion"], fx=o["f_eur"], stop=o["stop"],
-                                      objetivo=o["objetivo"])
+                                      precio_ref=precio, ahora=ahora_iso, validez=o["validez"],
+                                      limite=o["limite"], activacion=o["activacion"], fx=f_eur, stop=o["stop"],
+                                      objetivo=o["objetivo"], capitalizacion=o.get("cap"))
             if err:
                 st.error(err)
                 return
             abierto = horario.estado_mercado(o["ticker"])["abierto"]
-            eventos = cartera.ejecutar_ordenes(cv, {}, pf.tarifa, ahora_iso, {o["ticker"]: (o["precio"], abierto)})
+            eventos = cartera.ejecutar_ordenes(cv, {}, pf.tarifa, ahora_iso, {o["ticker"]: (precio, abierto)})
             guardar_datos()
             if not eventos:
                 eventos = ["📨 Orden enviada. Queda pendiente: "

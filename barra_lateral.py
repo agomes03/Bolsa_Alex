@@ -6,7 +6,7 @@ import streamlit as st
 
 from bolsa import asesor, costes, cuentas, noticias
 from ui_comun import (Perfil, cuenta_activa, datos_usuario, es_movil, estado_finnhub, estado_guardado, guardar_datos,
-                      hay_contrasena, olvidar_campos_de_cuenta, olvidar_datos_al_dia)
+                      hay_contrasena, olvidar_campos_de_cuenta, olvidar_datos_al_dia, privado)
 
 
 def _capital_por_defecto() -> float:
@@ -100,10 +100,15 @@ def barra_lateral() -> Perfil:
         st.toggle("🙈 Ocultar importes", key="_privado",
                   help="Modo privado: tus euros salen como «•••» y las tablas solo enseñan precios y porcentajes. "
                        "Para enseñar la app sin que se vea cuánto tienes.")
-        capital = st.number_input("Dinero para acciones sueltas (€)", min_value=100.0,
-                                  value=float(round(_capital_por_defecto(), -1)), step=100.0,
-                                  help="La parte de tu dinero para comprar acciones concretas (en 🎯 Mi plan se "
-                                       "calcula según tu perfil). Se usa para decirte cuántas comprar.")
+        if privado():                # sin enseñar tu dinero: se usa el de tu plan
+            capital = float(st.session_state.get("_capital_sueltas") or round(_capital_por_defecto(), -1))
+            st.caption("💶 Dinero para acciones sueltas: ••• € (oculto)")
+        else:
+            capital = st.number_input("Dinero para acciones sueltas (€)", min_value=100.0,
+                                      value=float(round(_capital_por_defecto(), -1)), step=100.0,
+                                      help="La parte de tu dinero para comprar acciones concretas (en 🎯 Mi plan se "
+                                           "calcula según tu perfil). Se usa para decirte cuántas comprar.")
+            st.session_state["_capital_sueltas"] = capital
         riesgo = st.slider("Máximo que aceptas perder por operación (% de ese dinero)", 0.5, 5.0, 1.0, 0.5,
                            help="Regla de oro de los profesionales: no arriesgar más de un 1-2% del capital "
                                 "en una sola operación. Así, aunque falles varias veces seguidas, sigues en el juego.")

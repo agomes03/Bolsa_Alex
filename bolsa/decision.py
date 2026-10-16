@@ -47,8 +47,8 @@ def consenso(fund: dict | None, precio: float | None, extra: dict | None = None)
     `extra`: lo de datos.analistas(); si falta, se usa el resumen de los datos de la empresa."""
     fund, extra = fund or {}, extra or {}
     rec = extra.get("recuento")
-    n = sum(rec.values()) if rec else fund.get("numberOfAnalystOpinions") or 0
-    if rec and n:
+    n = (sum(rec.values()) if rec else 0) or fund.get("numberOfAnalystOpinions") or 0
+    if rec and sum(rec.values()):
         media = (rec["strongBuy"] + 2 * rec["buy"] + 3 * rec["hold"] + 4 * rec["sell"] + 5 * rec["strongSell"]) / n
         clave = _clave_por_media(media)
     else:

@@ -57,18 +57,25 @@ def para_guardar(d: dict) -> dict:
     return {k: v for k, v in d.items() if k != "cartera_real"}
 
 
-def combinar(nuestros: dict, remotos: dict, cuenta: str) -> dict:
-    """Si otro dispositivo ha guardado mientras tanto: lo nuestro manda en la cuenta que estamos usando (y en lo
-    general de la app), y de las demás cuentas se toma lo guardado por el otro. Así, si tu madre apunta algo en su
-    móvil mientras tú tocas tu cuenta en el ordenador, no se pierde lo de ninguno de los dos."""
+def combinar(nuestros: dict, remotos: dict, cambiadas, conocidas=None) -> dict:
+    """Si otro dispositivo ha guardado mientras tanto, se juntan los dos:
+    - las cuentas que has tocado en esta sesión (`cambiadas`) y lo general de la app: lo tuyo;
+    - las demás cuentas: lo guardado por el otro (si tu madre apunta algo en su móvil, no se pierde);
+    - una cuenta que solo está en el otro lado: si ya la conocías (`conocidas`, las cuentas al abrir la app), es que
+      la has borrado o renombrado y no vuelve; si no, la ha creado el otro dispositivo y se añade."""
+    cambiadas = {cambiadas} if isinstance(cambiadas, str) else set(cambiadas or ())
     salida = copy.deepcopy(para_guardar(nuestros))
     remotos = copy.deepcopy(remotos or {})
     if not remotos.get("cuentas"):
         return salida
     asegurar(remotos)
+    mias = salida.setdefault("cuentas", {})
     for nombre, c in remotos["cuentas"].items():
-        if nombre != cuenta:
-            salida.setdefault("cuentas", {})[nombre] = c
+        if nombre in mias:
+            if nombre not in cambiadas:
+                mias[nombre] = c
+        elif conocidas is None or nombre not in conocidas:
+            mias[nombre] = c
     return salida
 
 

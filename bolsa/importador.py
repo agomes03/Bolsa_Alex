@@ -27,7 +27,7 @@ COLUMNAS = {
                  "titulos depositados", "units"],
     "precio_medio": ["precio medio", "pr medio", "p medio", "precio compra", "precio de compra", "coste medio",
                      "precio adquisicion", "cambio medio", "precio medio compra", "average price", "avg price",
-                     "precio medio de compra", "coste unitario", "pmc", "precio"],
+                     "precio medio de compra", "coste unitario", "pmc"],
     "coste_total": ["importe invertido", "coste total", "coste de adquisicion", "valor de adquisicion",
                     "precio de coste", "inversion", "importe de compra", "cost basis", "total cost"],
     "valor_mercado": ["valoracion", "valor de mercado", "valor mercado", "importe valorado", "market value",
@@ -49,11 +49,17 @@ ISIN_CONOCIDOS = {"IE00B4L5Y983": "IWDA.AS", "IE00BK5BQT80": "VWCE.DE", "IE00B5B
 PATRON_ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}\d$")
 
 
+# Columnas que parecen de precio pero NO son el de compra (el de hoy): nunca se toman como precio medio.
+_PRECIO_DE_HOY = re.compile(r"\b(actual|mercado|cierre|ultimo|hoy|cotizacion)\b")
+
+
 def _columna(columnas, campo: str, usadas: set) -> str | None:
     normal = {c: _norm(str(c)) for c in columnas}
+    if campo == "precio_medio":
+        normal = {c: n for c, n in normal.items() if not _PRECIO_DE_HOY.search(n)}
     sinonimos = [_norm(s) for s in COLUMNAS[campo]]
     for c, n in normal.items():   # primero coincidencia exacta
-        if c not in usadas and n in sinonimos:
+        if c not in usadas and (n in sinonimos or (campo == "precio_medio" and n == "precio")):
             return c
     for c, n in normal.items():
         if c not in usadas and any(n.startswith(s) for s in sinonimos):

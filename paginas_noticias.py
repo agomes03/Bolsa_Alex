@@ -60,10 +60,12 @@ def lista_de_noticias():
                    "(RSS) lo que sale en su web, y algunos solo publican cada cierto tiempo.")
 
     c1, c2, c3 = st.columns(3)
-    minimo = c1.slider("Impacto mínimo", 0, 10, 3)
-    tono = c2.selectbox("Tono", ["Todas", "🟢 Positivas", "🔴 Negativas"])
+    minimo = c1.slider("Impacto mínimo", 0, 10, 3, key="not_minimo")
+    tono = c2.selectbox("Tono", ["Todas", "🟢 Positivas", "🔴 Negativas"], key="not_tono")
     empresas = sorted({t for n in lista for t in n.empresas}, key=nombre_de)
-    filtro_emp = c3.selectbox("Empresa", ["Todas"] + empresas, format_func=lambda t: t if t == "Todas" else nombre_de(t))
+    # Con clave: el filtro no se borra solo cuando llegan noticias nuevas (y cambia la lista de empresas).
+    filtro_emp = c3.selectbox("Empresa", ["Todas"] + empresas, key="not_empresa",
+                              format_func=lambda t: t if t == "Todas" else nombre_de(t))
 
     filtradas = [n for n in lista if n.impacto >= minimo
                  and (tono == "Todas" or (tono.startswith("🟢") and n.sentimiento > 0) or (tono.startswith("🔴") and n.sentimiento < 0))

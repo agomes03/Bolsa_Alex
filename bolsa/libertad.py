@@ -8,6 +8,8 @@ ha durado unos 30 años o más. Para retiros más largos o más prudencia, un 3-
 
 from __future__ import annotations
 
+import math
+
 RENTABILIDAD_REAL = {"Conservador": 0.025, "Moderado": 0.04, "Dinámico": 0.05}
 
 
@@ -19,16 +21,20 @@ def calcular(gasto_mensual: float, capital: float, aportacion_mensual: float, re
     escenarios = {}
     for nombre, r in (("Pesimista", rentabilidad_real - 0.02), ("Esperado", rentabilidad_real),
                       ("Optimista", rentabilidad_real + 0.02)):
-        valores, anos = [capital], None
-        for ano in range(1, max_anos + 1):
-            valores.append(valores[-1] * (1 + r) + aportacion_mensual * 12)
-            if anos is None and valores[-1] >= objetivo:
-                anos = ano
+        valores, anos, v = [capital], None, capital
+        mensual = (1 + r) ** (1 / 12) - 1                  # mes a mes: cada aportación empieza a rentar ya
+        for mes in range(1, max_anos * 12 + 1):
+            v = v * (1 + mensual) + aportacion_mensual
+            if anos is None and v >= objetivo:
+                anos = math.ceil(mes / 12)
+            if mes % 12 == 0:
+                valores.append(v)
         if capital >= objetivo:
             anos = 0
         escenarios[nombre] = {"rentabilidad": r, "anos": anos, "valores": valores}
     return {"objetivo": objetivo, "renta_hoy": capital * tasa_retiro / 12,
-            "avance": capital / objetivo if objetivo else 0, "anos": escenarios["Esperado"]["anos"], "escenarios": escenarios}
+            "avance": capital / objetivo if objetivo else 0, "anos": escenarios["Esperado"]["anos"],
+            "escenarios": escenarios}
 
 
 __all__ = ["RENTABILIDAD_REAL", "calcular"]

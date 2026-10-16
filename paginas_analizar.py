@@ -16,10 +16,9 @@ from bolsa.tickers import NO_INVERTIBLES, nombre_de, sector_de, TODOS_LOS_VALORE
 from paginas_extra import bloque_operar, limite_empresa, pesos_cartera_real
 from paginas_hoy import bloque_que_puede_pasar_accion, pagina_radar_global
 from paginas_noticias import tarjeta_noticia
-from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, cargar_informe, cotizaciones_ahora, eur,
-                      fila_informe, fx,
-                      mercado_alcista_para, moneda_de, mostrar_plotly, noticias_empresa, num, palabras_de_la_pagina,
-                      pct, perfil, precio, selector_valor)
+from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, cargar_informe, cotizaciones_ahora,
+                      estrategia_actual, eur, fila_informe, fx, mercado_alcista_para, moneda_de, mostrar_plotly,
+                      noticias_empresa, num, palabras_de_la_pagina, pct, perfil, precio, selector_valor)
 
 
 def grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None = None) -> go.Figure:
@@ -119,8 +118,12 @@ def plan_de_compra(ticker, ev, fund, f_eur, m, etiqueta, color) -> float:
                 f"(como máximo el {num(riesgo, 1)} % de tus {eur(capital)}). Si llega al objetivo, "
                 f"ganarías unos **{eur(n * (p.objetivo - p.entrada) * f_eur)}** antes de impuestos. Nunca más del "
                 "20 % de tu dinero en una sola empresa.")
-            st.caption("El stop-loss está a 2 veces lo que se mueve en un día normal (para que el ruido diario no lo "
-                       "active) y el objetivo al doble de esa distancia: así ganas 2 € por cada 1 € que arriesgas.")
+            e = estrategia_actual()
+            st.caption(f"El stop-loss está a {num(e.stop_atr, 1)} veces lo que se mueve en un día normal (para que el "
+                       "ruido diario no lo active)" + (
+                           f" y el objetivo a {num(e.ratio_objetivo, 1)} veces esa distancia: ganas unos "
+                           f"{num(e.ratio_objetivo, 1)} € por cada 1 € que arriesgas." if e.ratio_objetivo else
+                           "; sin objetivo fijo: el stop se va subiendo para dejar correr la ganancia."))
             if n == 0:
                 st.info("Con tu dinero y tu riesgo máximo no llega para comprar ni una acción con este stop-loss.")
             elif iv and iv["pct"] > 2:
@@ -161,10 +164,12 @@ def pagina_analizar():
             riesgo_modelo = {"prob": fila["riesgo_caida"], "base": inf["modelo_riesgo"]["metricas"]["tasa_subidas"]}
         recientes = [n for n in news if n.horas is None or n.horas < 24 * 7]
         mercado_ok = mercado_alcista_para(ticker)
+        estrategia = estrategia_actual()         # la misma que en Mi cartera y la cartera virtual
         ev = senales.evaluar(ticker, df,
                              sentimiento_noticias=noticias.sentimiento_medio(recientes) if recientes else None,
                              n_noticias=len(recientes), mercado_alcista=mercado_ok, fundamentales=fund,
-                             riesgo=riesgo_modelo)
+                             riesgo=riesgo_modelo, stop_atr=estrategia.stop_atr,
+                             ratio_objetivo=estrategia.ratio_objetivo)
 
     m = moneda_de(ticker, fund)
     f_eur = fx(ticker, fund)
@@ -267,7 +272,8 @@ def bloque_ficha(fund: dict, precio_hoy: float | None, var_1a: float | None):
     st.subheader("🧭 Ficha de la empresa")
     st.markdown(f"**{ficha.resumen(f)}**")
     valores = [p or 0 for p in puntos]
-    media = sum(valores) / len(valores)
+    con_nota = [p for p in puntos if p is not None]           # los ejes sin datos no bajan la media
+    media = sum(con_nota) / len(con_nota)
     color = "#16a34a" if media >= 4 else "#f59e0b" if media >= 2.5 else "#dc2626"
     fig = go.Figure(go.Scatterpolar(r=valores + valores[:1], theta=ficha.EJES + ficha.EJES[:1], fill="toself",
                                     line=dict(color=color), fillcolor=color, opacity=0.55,

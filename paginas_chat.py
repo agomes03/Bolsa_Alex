@@ -10,7 +10,7 @@ import streamlit as st
 from bolsa import activos, bankinter, chat, diagnostico
 from bolsa.indicadores import rsi
 from bolsa.tickers import nombre_de
-from ui_comun import (cargar_activos, cargar_fundamentales, cargar_historico, cargar_informe, cuenta_activa,
+from ui_comun import (ocultar, cargar_activos, cargar_fundamentales, cargar_historico, cargar_informe, cuenta_activa,
                       datos_usuario, num, perfil)
 
 EJEMPLOS = [
@@ -224,5 +224,5 @@ def _bloque_claude_ai(texto: str):
     with st.expander("🤖 ¿Quieres una explicación más completa? Pregúntaselo gratis a Claude en claude.ai"):
         st.caption("Copia este texto (botón de la esquina del recuadro), abre claude.ai y pégalo. Lleva tu pregunta y "
                    "el contexto de tu cartera y del mercado, sin nombres ni datos de tu banco.")
-        st.code(texto, language=None, wrap_lines=True)
+        st.code(ocultar(texto), language=None, wrap_lines=True)
         st.link_button("Abrir claude.ai", "https://claude.ai/new")

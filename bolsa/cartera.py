@@ -26,13 +26,14 @@ def nueva(capital: float | None = 10_000.0) -> dict:
 
 def comprar(c: dict, ticker: str, acciones: int, precio: float, tarifa: Tarifa, fecha: str | None = None,
             stop: float | None = None, objetivo: float | None = None, nota: str = "", fx: float = 1.0,
-            orden: str | None = None) -> str | None:
+            orden: str | None = None, capitalizacion: float | None = None) -> str | None:
     """`fecha` puede llevar hora ('2026-10-15T12:35'): así los stop solo miran precios posteriores."""
     """Registra una compra. Devuelve un mensaje de error o None si ha ido bien."""
     if acciones <= 0 or precio <= 0:
         return "El número de acciones y el precio deben ser mayores que cero."
     importe = acciones * precio * fx
-    gastos = coste_compra(importe, ticker, tarifa)["total"]
+    # La tasa Tobin solo la pagan las empresas grandes (más de 1.000 M€): con la capitalización se sabe.
+    gastos = coste_compra(importe, ticker, tarifa, capitalizacion)["total"]
     if c.get("efectivo") is not None:
         if importe + gastos > c["efectivo"] + 1e-9:
             return (f"No tienes suficiente dinero virtual: necesitas {importe + gastos:,.2f} € "
@@ -115,8 +116,10 @@ def revisar_ordenes(c: dict, historicos: dict[str, pd.DataFrame], tarifa: Tarifa
                                f"({_cuando(_iso(fecha))}).")
                 break
         else:
-            if len(posteriores):
-                pos["revisado"] = _iso(posteriores.index[-1])
+            # La última vela aún se está formando (la de hoy o la de los últimos 15 min): se vuelve a mirar en la
+            # siguiente revisión, por si su mínimo acaba tocando el stop.
+            if len(posteriores) > 1:
+                pos["revisado"] = _iso(posteriores.index[-2])
     return eventos
 
 
@@ -139,7 +142,7 @@ MARGEN_MERCADO = 0.03   # para reservar dinero en una compra a mercado (el preci
 def _estimado_compra(o: dict, tarifa: Tarifa) -> float:
     precio = o["limite"] if o["tipo"] == "limitada" else o["precio_ref"] * (1 + MARGEN_MERCADO)
     importe = o["acciones"] * precio * o.get("fx", 1.0)
-    return importe + coste_compra(importe, o["ticker"], tarifa)["total"]
+    return importe + coste_compra(importe, o["ticker"], tarifa, o.get("cap"))["total"]
 
 
 def comprometido(c: dict, tarifa: Tarifa) -> float:
@@ -160,7 +163,8 @@ def acciones_libres(c: dict, ticker: str) -> int:
 
 def nueva_orden(c: dict, ticker: str, sentido: str, tipo: str, acciones: int, tarifa: Tarifa, *, precio_ref: float,
                 ahora: str, validez: str, limite: float | None = None, activacion: float | None = None,
-                fx: float = 1.0, stop: float | None = None, objetivo: float | None = None) -> str | None:
+                fx: float = 1.0, stop: float | None = None, objetivo: float | None = None,
+                capitalizacion: float | None = None) -> str | None:
     """Registra una orden pendiente. Devuelve un mensaje de error o None. `ahora` y `validez` en ISO."""
     if acciones <= 0:
         return "El número de títulos debe ser mayor que cero."
@@ -179,7 +183,7 @@ def nueva_orden(c: dict, ticker: str, sentido: str, tipo: str, acciones: int, ta
         return "La fecha de validez ya ha pasado."
     o = {"id": c.get("siguiente_id", 1), "ticker": ticker, "sentido": sentido, "tipo": tipo, "acciones": int(acciones),
          "limite": limite, "activacion": activacion, "precio_ref": precio_ref, "fx": fx, "creada": ahora,
-         "validez": validez, "stop": stop, "objetivo": objetivo}
+         "validez": validez, "stop": stop, "objetivo": objetivo, "cap": capitalizacion}
     if sentido == "compra":
         if stop is not None and stop >= (limite or precio_ref):
             return "El stop-loss debe estar por debajo del precio de compra."
@@ -227,7 +231,8 @@ def _ejecutar(c: dict, o: dict, precio: float, cuando: str, tarifa: Tarifa) -> s
     nombre = nombre_de(o["ticker"])
     if o["sentido"] == "compra":
         err = comprar(c, o["ticker"], o["acciones"], precio, tarifa, cuando, o.get("stop"), o.get("objetivo"),
-                      nota=f"Orden {o['tipo']} nº {o['id']}", fx=o.get("fx", 1.0), orden=o["tipo"])
+                      nota=f"Orden {o['tipo']} nº {o['id']}", fx=o.get("fx", 1.0), orden=o["tipo"],
+                      capitalizacion=o.get("cap"))
         if err:
             return f"❌ No se pudo ejecutar la compra de {nombre}: {err}"
         return f"✅ Compra ejecutada: {_titulos(o['acciones'])} de {nombre} a {_num(precio)} ({_cuando(cuando)})."

@@ -18,6 +18,7 @@ import pandas as pd
 from .costes import impuesto_ganancia
 
 RETENCION = 0.19
+RETENCION_ORIGEN = 0.15     # lo que suele retener el país de la empresa con convenio (EEUU, Alemania con papeles...)
 DIAS_REGLA_DOS_MESES = 61
 LIMITE_CRUZADO = 0.25       # las pérdidas de un tipo compensan como mucho el 25 % del saldo del otro
 
@@ -56,6 +57,8 @@ def ventas_del_ano(historial: list[dict], anio: int, nombres: dict[str, str] | N
     """Ventas de ese año con su resultado (ya descontados los gastos de compra y venta) y si la pérdida queda
     aplazada por la regla de los dos meses (recompra del mismo valor dos meses antes o después)."""
     nombres = nombres or {}
+    # Por fecha (y, el mismo día, en el orden en que se apuntaron): las operaciones pueden apuntarse tarde.
+    historial = sorted(historial, key=lambda h: str(h.get("fecha", ""))[:10])
     salida = []
     for i, h in enumerate(historial):
         if h.get("tipo") != "Venta" or _fecha(h["fecha"]).year != anio or h.get("resultado") is None:
@@ -98,8 +101,13 @@ def dividendos_del_ano(historial: list[dict], dividendos: dict[str, pd.Series], 
             if n <= 0:
                 continue
             bruto = n * float(importe) * fx.get(t, 1.0)
+            extranjero = not t.endswith(".MC")
+            # En España se retiene el 19 % de lo que llega DESPUÉS de la retención del otro país (≈15 % con
+            # convenio; recuperable en parte con la deducción por doble imposición).
+            base_es = bruto * (1 - RETENCION_ORIGEN) if extranjero else bruto
             salida.append({"fecha": dia.date().isoformat(), "ticker": t, "nombre": nombres.get(t, t), "acciones": n,
-                           "bruto": bruto, "retencion": bruto * RETENCION, "extranjero": not t.endswith(".MC")})
+                           "bruto": bruto, "retencion": base_es * RETENCION, "extranjero": extranjero,
+                           "retencion_origen": bruto - base_es})
     return sorted(salida, key=lambda d: d["fecha"])
 
 

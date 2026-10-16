@@ -23,8 +23,23 @@ def valor_diario(acciones: dict[str, float], cierres_eur: dict[str, pd.Series]) 
     if not series:
         return pd.Series(dtype=float)
     tabla = pd.DataFrame(series).sort_index().ffill()
-    tabla = tabla.dropna()                    # desde que todas cotizan
+    # Una empresa que salió a bolsa hace poco no recorta la historia de todas: se queda fuera de la curva si
+    # cotiza desde mucho después que las demás (y se dice en pantalla con `sin_historia`).
+    inicio = tabla.apply(lambda c: c.first_valid_index())
+    referencia = inicio.min()
+    largas = [t for t, d in inicio.items() if d <= referencia + pd.Timedelta(days=60)]
+    tabla = tabla[largas].dropna()
     return tabla.sum(axis=1)
+
+
+def sin_historia(acciones: dict[str, float], cierres_eur: dict[str, pd.Series]) -> list[str]:
+    """Las posiciones que no entran en la curva (sin datos o cotizando desde mucho después que las demás)."""
+    serie_ok = {t for t in acciones if t in cierres_eur and cierres_eur[t] is not None and len(cierres_eur[t].dropna())}
+    if not serie_ok:
+        return list(acciones)
+    inicio = {t: cierres_eur[t].dropna().index[0] for t in serie_ok}
+    referencia = min(inicio.values())
+    return [t for t in acciones if t not in serie_ok or inicio[t] > referencia + pd.Timedelta(days=60)]
 
 
 def _inicio(clave: str, fin: pd.Timestamp) -> pd.Timestamp:
@@ -62,4 +77,4 @@ def base_100(serie: pd.Series, desde: pd.Timestamp) -> pd.Series:
     return s / s.iloc[0] * 100 if len(s) else s
 
 
-__all__ = ["PERIODOS", "valor_diario", "por_periodos", "base_100"]
+__all__ = ["PERIODOS", "valor_diario", "sin_historia", "por_periodos", "base_100"]

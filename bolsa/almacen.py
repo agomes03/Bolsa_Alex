@@ -83,7 +83,14 @@ class Almacen:
         r = requests.get(f"https://api.github.com/gists/{self.gist_id}", headers=self._cabeceras(), timeout=15)
         r.raise_for_status()
         fichero = r.json().get("files", {}).get(nombre)
-        return json.loads(fichero.get("content") or "{}") if fichero else {}
+        if not fichero:
+            return {}
+        contenido = fichero.get("content") or "{}"
+        if fichero.get("truncated"):
+            rr = requests.get(fichero["raw_url"], headers=self._cabeceras(), timeout=15)
+            rr.raise_for_status()
+            contenido = rr.text
+        return json.loads(contenido)
 
     def guardar_extra(self, nombre: str, datos: dict) -> None:
         """Escribe SOLO ese archivo del Gist: no toca tus carteras."""
