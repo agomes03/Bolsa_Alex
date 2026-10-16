@@ -121,6 +121,51 @@ def cargar_noticias() -> tuple[list[noticias.Noticia], list[str]]:
     return noticias.descargar(extra=extra)
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _precios_recientes(tickers: tuple[str, ...]) -> dict[str, dict]:
+    return datos.precios_recientes(list(tickers))
+
+
+MAX_FINNHUB_TABLA = 20      # el plan gratuito permite unas 60 consultas por minuto
+
+
+def cotizaciones_ahora(tickers) -> dict[str, dict]:
+    """Precio de ahora para una lista de valores: en directo si su bolsa está abierta (Yahoo, ~15 min de retraso;
+    tiempo real para EEUU con Finnhub) y, si está cerrada, el cierre de la última sesión.
+    Cada valor: precio, anterior, variacion_pct, fecha, estado ('tiempo_real' | 'directo' | 'cierre')."""
+    from bolsa import horario
+
+    tickers = tuple(sorted(set(tickers)))
+    if not tickers:
+        return {}
+    recientes = _precios_recientes(tickers)
+    hoy = pd.Timestamp.now(tz=MADRID_TZ).date()
+    salida = {}
+    for t in tickers:
+        q = dict(recientes[t]) if t in recientes else None
+        if not q:
+            continue
+        abierto = horario.estado_mercado(t)["abierto"]
+        q["estado"] = "directo" if abierto and q["fecha"] >= hoy else "cierre"
+        salida[t] = q
+    eeuu = [t for t in tickers if finnhub.es_eeuu(t) and salida.get(t, {}).get("estado") == "directo"]
+    if clave_finnhub() and 0 < len(eeuu) <= MAX_FINNHUB_TABLA:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for t, f in zip(eeuu, pool.map(cotizacion_al_instante, eeuu)):
+                if f:
+                    salida[t].update(precio=f["precio"], variacion_pct=f.get("variacion_pct"), estado="tiempo_real")
+    return salida
+
+
+def texto_estado_precio(q: dict) -> str:
+    """«🟢 ahora», «⚡ tiempo real» o «cierre 15/10»."""
+    if q["estado"] == "tiempo_real":
+        return "⚡ tiempo real"
+    if q["estado"] == "directo":
+        return "🟢 ahora (~15 min)"
+    return f"cierre {q['fecha']:%d/%m}"
+
+
 @st.cache_data(ttl=20, show_spinner=False)
 def cotizacion_al_instante(ticker: str) -> dict | None:
     """Precio en tiempo real de Finnhub (acciones de EEUU con clave); None en los demás casos."""

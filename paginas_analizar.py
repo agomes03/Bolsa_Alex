@@ -17,7 +17,7 @@ from bolsa.tickers import NO_INVERTIBLES, nombre_de, sector_de, TODOS_LOS_VALORE
 from paginas_extra import bloque_operar, pesos_cartera_real
 from paginas_hoy import bloque_que_puede_pasar_accion, pagina_radar_global
 from paginas_noticias import tarjeta_noticia
-from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, cargar_informe, cotizacion_al_instante, eur,
+from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, cargar_informe, cotizaciones_ahora, eur,
                       fila_informe, fx,
                       mercado_alcista_para, moneda_de, mostrar_plotly, noticias_empresa, num, palabras_de_la_pagina,
                       pct, perfil, selector_valor)
@@ -169,16 +169,20 @@ def pagina_analizar():
     m = moneda_de(ticker, fund)
     f_eur = fx(ticker, fund)
     titulo = nombre_de(ticker) if ticker in TODOS_LOS_VALORES else fund.get("longName", ticker)
-    precio_txt = eur(ev.precio, m) + (f" (≈ {eur(ev.precio * f_eur)})" if f_eur and m != "€" else "")
+    try:
+        q = cotizaciones_ahora([ticker]).get(ticker)
+    except Exception:  # noqa: BLE001 - sin precio reciente, se queda el del histórico
+        q = None
+    precio_hoy = q["precio"] if q else ev.precio
+    precio_txt = eur(precio_hoy, m) + (f" (≈ {eur(precio_hoy * f_eur)})" if f_eur and m != "€" else "")
     st.header(f"{titulo} · {precio_txt}")
     st.caption(f"{sector_de(ticker)} · {bankinter.mercado_de(ticker)} · hoy {pct(ev.datos['var_1d'])} · "
                f"último año {pct(ev.datos['var_1a'], 0)}")
-    al_instante = cotizacion_al_instante(ticker)
-    if al_instante:
-        st.caption(f"⚡ Ahora mismo (tiempo real, Finnhub): **{eur(al_instante['precio'], m)}**"
-                   + (f" · {pct(al_instante['variacion_pct'], 2)} hoy" if al_instante.get("variacion_pct") is not None
-                      else "")
-                   + (f" · {al_instante['hora']:%H:%M}" if al_instante.get("hora") else ""))
+    if q:
+        cuando = {"tiempo_real": "⚡ Ahora mismo (tiempo real)", "directo": "🟢 Ahora (unos 15 min de retraso)"}.get(
+            q["estado"], f"🔒 Bolsa cerrada · cierre del {q['fecha']:%d/%m}")
+        st.markdown(f"{cuando}: **{eur(q['precio'], m)}**"
+                    + (f" ({pct(q['variacion_pct'], 2)} en la sesión)" if q.get("variacion_pct") is not None else ""))
 
     datos_v = fila or {"puntuacion": ev.puntuacion, "mercado_alcista": mercado_ok,
                        "resultados_pronto": any("resultados" in a for a in ev.avisos)}

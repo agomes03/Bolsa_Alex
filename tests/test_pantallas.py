@@ -73,6 +73,8 @@ def sin_internet(monkeypatch, tmp_path):
     monkeypatch.setattr(datos, "dividendos", lambda t: pd.Series(dtype=float))
     monkeypatch.setattr(datos, "dividendos_varios", lambda ts, periodo="5y": {})
     monkeypatch.setattr(datos, "buscar_simbolo", lambda q: None)
+    monkeypatch.setattr(datos, "precios_recientes",
+                        lambda ts: {t: datos.ultimo_precio(historico_falso(t, "5d")) for t in ts})
     titular = noticias.Noticia("El BCE baja los tipos de interés", "x", "Prueba", datetime.now(timezone.utc))
     monkeypatch.setattr(noticias, "descargar",
                         lambda *a, extra=None, **k: (noticias.combinar([titular] + list(extra or []), 72), []))
@@ -243,9 +245,16 @@ def test_finnhub_conectado(monkeypatch):
     sin_fallos(at)
     assert any("Finnhub conectado" in c.value for c in at.sidebar.caption)
     assert any("Fed holds rates" in e.label for e in at.expander)
+    from bolsa import horario
+
+    # Con la bolsa de EEUU abierta (y la vela de hoy), el precio de AAPL llega en tiempo real por Finnhub.
+    monkeypatch.setattr(horario, "estado_mercado", lambda t, ahora=None: {"abierto": True, "texto": "", "apertura": None})
+    hoy = pd.Timestamp.now(tz="Europe/Madrid").date()
+    monkeypatch.setattr(datos, "precios_recientes", lambda ts: {
+        t: {"precio": 230.0, "anterior": 229.0, "fecha": hoy, "variacion_pct": 0.44} for t in ts})
     at = abrir("pagina_analizar", secretos=secretos, estado={"analizar_ticker": "AAPL"})
     sin_fallos(at)
-    assert any("tiempo real, Finnhub" in c.value for c in at.caption)
+    assert any("Ahora mismo (tiempo real)" in m.value and "231,50" in m.value for m in at.markdown)
 
 
 def test_vigilar_sin_stop_desde_mi_cartera():
@@ -376,3 +385,12 @@ def test_mi_plan_es_de_cada_cuenta():
     [s for s in at.sidebar.selectbox if s.label == "👤 Cuenta"][0].set_value("Mamá").run()
     sin_fallos(at)
     assert any("Tu plan de rentas" in s.value for s in at.subheader)
+
+
+def test_radar_con_precio_de_ahora_o_de_cierre():
+    at = abrir("pagina_radar")
+    sin_fallos(at)
+    tabla = at.dataframe[0].value
+    assert {"Precio", "Hoy (%)", "Cotización"} <= set(tabla.columns)
+    assert tabla["Precio"].str.endswith("€").all()
+    assert tabla["Cotización"].str.contains("ahora|cierre|tiempo real").all()

@@ -13,8 +13,9 @@ from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import asesor_hoy, pesos_cartera_real
 from paginas_seguimiento import bloque_pendientes
-from ui_comun import (cargar_informe, cargar_varios, conclusion_noticia, cuenta_activa, dias_informe, eur, fecha,
-                      hora_espana, ir_a, moneda_de, num, palabras_de_la_pagina, pct, perfil, reducir)
+from ui_comun import (cargar_informe, cargar_varios, conclusion_noticia, cotizaciones_ahora, cuenta_activa,
+                      dias_informe, eur, fecha, hora_espana, ir_a, moneda_de, num, palabras_de_la_pagina, pct, perfil,
+                      reducir, texto_estado_precio)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
                   "ambar": ("warning", "🟡 Mercado mixto"),
@@ -257,20 +258,38 @@ def pagina_radar_global() -> bool:
         f = f[f["veredicto_txt"] == "Candidata a comprar"]
     if buscar:
         f = f[f["nombre"].str.lower().str.contains(buscar) | f["ticker"].str.lower().str.contains(buscar)]
+    with st.spinner("Actualizando precios..."):
+        precios = cotizaciones_ahora(f["ticker"].tolist())
+
+    def precio_txt(t: str, divisa) -> str:
+        q = precios.get(t)
+        if not q:
+            return "—"
+        return f"{num(q['precio'], 2)} {'€' if divisa in (None, 'EUR') or t.endswith('.MC') else divisa}"
+
     tabla = pd.DataFrame({
         "": ["⭐" if t in ideas else "" for t in f["ticker"]],
-        "Empresa": f["nombre"], "Veredicto": f["veredicto_txt"], "Nota": f["nota"],
+        "Empresa": f["nombre"],
+        "Precio": [precio_txt(t, d) for t, d in zip(f["ticker"], f.get("divisa", [None] * len(f)))],
+        "Hoy (%)": [round(precios[t]["variacion_pct"], 2) if precios.get(t, {}).get("variacion_pct") is not None
+                    else None for t in f["ticker"]],
+        "Cotización": [texto_estado_precio(precios[t]) if t in precios else "—" for t in f["ticker"]],
+        "Veredicto": f["veredicto_txt"], "Nota": f["nota"],
         "Riesgo de caída": f["riesgo_nivel"].map(ICONO_RIESGO),
-        "Último año (%)": (f["momentum"] * 100).round(0), "Hoy (%)": f["var_1d"].round(1),
+        "Último año (%)": (f["momentum"] * 100).round(0),
         "Mercado": f["mercado"], "Ticker": f["ticker"],
     })
     if pf.movil:
-        tabla = tabla[["", "Empresa", "Veredicto", "Nota", "Ticker"]]
+        tabla = tabla[["", "Empresa", "Precio", "Hoy (%)", "Nota", "Ticker"]]
     st.caption(f"{len(tabla)} valores ordenados por **nota global** (100 = la mejor hoy). ⭐ = idea del día. "
                "**Toca una fila** para ver su análisis y la orden para Bankinter.")
+    st.caption("💶 **Precio**: con la bolsa abierta, el de ahora (Yahoo, unos 15 minutos de retraso; en tiempo real "
+               "para EEUU si tienes Finnhub); con la bolsa cerrada, el cierre de la última sesión. Se actualiza cada "
+               "minuto.")
     sel = st.dataframe(tabla, hide_index=True, width="stretch", height=min(38 * len(tabla) + 40, 900),
                        on_select="rerun", selection_mode="single-row",
                        column_config={"Nota": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d"),
+                                      "Hoy (%)": st.column_config.NumberColumn(format="%+.2f %%"),
                                       "Ticker": None})
     filas = sel.selection.rows if sel and sel.selection else []
     if filas:

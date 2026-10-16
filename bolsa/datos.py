@@ -143,6 +143,76 @@ def barras_ejecucion(diario: pd.DataFrame, intradia_df: pd.DataFrame) -> pd.Data
     return pd.concat([diario[diario.index < inicio], intradia_df]).sort_index()
 
 
+def ultimo_precio(df: pd.DataFrame | None) -> dict | None:
+    """Último precio, cierre anterior, variación del día y fecha de la última vela diaria.
+    Mientras la bolsa está abierta, la vela de hoy se va actualizando (con el retraso de Yahoo, ~15 min)."""
+    if df is None or df.empty:
+        return None
+    c = df["Close"].dropna()
+    if c.empty:
+        return None
+    precio = float(c.iloc[-1])
+    anterior = float(c.iloc[-2]) if len(c) > 1 else None
+    return {"precio": precio, "anterior": anterior, "fecha": pd.Timestamp(c.index[-1]).date(),
+            "variacion_pct": (precio / anterior - 1) * 100 if anterior else None}
+
+
+def combinar_precio(diario: pd.Series | None, intradia: pd.Series | None) -> dict | None:
+    """Precio más reciente de un valor uniendo velas diarias (cierre oficial, con subasta) e intradía de 15 minutos
+    (en hora de Madrid). Yahoo a veces tarda horas en publicar la vela diaria; la intradía llega antes.
+    Devuelve precio, anterior (cierre de la sesión previa), fecha de la sesión y variación del día."""
+    por_dia = {}
+    if diario is not None:
+        for f, v in diario.dropna().items():
+            por_dia[pd.Timestamp(f).date()] = ("diario", float(v))
+    if intradia is not None and len(intradia.dropna()):
+        s = intradia.dropna()
+        idx = s.index.tz_convert("Europe/Madrid") if s.index.tz is not None else s.index
+        for dia, v in pd.Series(s.values, index=idx).groupby(idx.date).last().items():
+            # La vela diaria manda si existe: durante la sesión lleva el último precio y, al cierre, la subasta.
+            por_dia.setdefault(dia, ("intradia", float(v)))
+    if not por_dia:
+        return None
+    dias = sorted(por_dia)
+    precio = por_dia[dias[-1]][1]
+    anterior = por_dia[dias[-2]][1] if len(dias) > 1 else None
+    return {"precio": precio, "anterior": anterior, "fecha": dias[-1],
+            "variacion_pct": (precio / anterior - 1) * 100 if anterior else None}
+
+
+def precios_recientes(tickers: list[str]) -> dict[str, dict]:
+    """Último precio de muchos valores a la vez (dos descargas en bloque: diaria e intradía de 15 minutos)."""
+    import yfinance as yf
+
+    salida = {}
+    if not tickers:
+        return salida
+
+    def columnas(bruto):
+        if bruto is None or bruto.empty or "Close" not in bruto:
+            return {}
+        c = bruto["Close"]
+        if isinstance(c, pd.Series):
+            return {tickers[0]: c}
+        return {t: c[t] for t in c.columns if t in tickers}
+
+    try:
+        diario = columnas(yf.download(tickers, period="5d", interval="1d", auto_adjust=False, progress=False,
+                                      threads=True))
+    except Exception:  # noqa: BLE001
+        diario = {}
+    try:
+        intradia = columnas(yf.download(tickers, period="5d", interval="15m", auto_adjust=False, progress=False,
+                                        threads=True))
+    except Exception:  # noqa: BLE001
+        intradia = {}
+    for t in tickers:
+        q = combinar_precio(diario.get(t), intradia.get(t))
+        if q:
+            salida[t] = q
+    return salida
+
+
 def cotizacion(diario: pd.DataFrame, intradia_df: pd.DataFrame) -> dict | None:
     """Ficha de cotización como la del bróker: último, variación, apertura, máximo, mínimo, volumen..."""
     if (diario is None or diario.empty) and (intradia_df is None or intradia_df.empty):
