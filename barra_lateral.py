@@ -66,7 +66,9 @@ def _pie():
     elif st.button("🔒 Salir", width="stretch"):
         st.session_state.pop("_acceso_ok", None)
         st.rerun()
-    if st.button("🔄 Actualizar ahora", width="stretch"):
+    st.caption("Los precios y las noticias se actualizan solos cada minuto.")
+    if st.button("🔄 Actualizar todo ahora", width="stretch",
+                 help="Vuelve a descargarlo todo (también el histórico y los datos de las empresas)."):
         st.cache_data.clear()
         st.rerun()
 

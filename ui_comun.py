@@ -149,7 +149,18 @@ def linea_frescura(lista: list[noticias.Noticia]) -> str:
     return texto
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+SEGUNDOS_PRECIOS = 60       # cada cuánto se refrescan solos los precios en Hoy, Mi cartera, Radar y Mercados
+
+
+def linea_actualizado() -> str:
+    from datetime import datetime
+
+    return (f"🔄 Actualizado a las {datetime.now(MADRID_TZ):%H:%M:%S} · se actualiza solo cada minuto, sin tocar "
+            "nada")
+
+
+# La caché dura un poco menos que el refresco automático, para que cada refresco traiga precios nuevos.
+@st.cache_data(ttl=SEGUNDOS_PRECIOS - 10, show_spinner=False)
 def _precios_recientes(tickers: tuple[str, ...]) -> dict[str, dict]:
     return datos.precios_recientes(list(tickers))
 

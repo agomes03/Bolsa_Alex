@@ -7,7 +7,8 @@ import streamlit as st
 
 from bolsa.tickers import CATALOGO, nombre_de
 from paginas_hoy import bloque_fases
-from ui_comun import cargar_activos, cargar_informe, cargar_varios, ir_a, num, palabras_de_la_pagina, pct, perfil
+from ui_comun import (SEGUNDOS_PRECIOS, cargar_activos, cargar_informe, cargar_varios, cotizaciones_ahora, ir_a,
+                      linea_actualizado, num, palabras_de_la_pagina, pct, perfil)
 
 
 BANDERAS = {"^IBEX": "🇪🇸", "^STOXX50E": "🇪🇺", "^GDAXI": "🇩🇪", "^FCHI": "🇫🇷", "FTSEMIB.MI": "🇮🇹", "^AEX": "🇳🇱",
@@ -51,15 +52,8 @@ def pagina_resumen():
         grupo = st.selectbox("Mercado", GRUPOS_ACCIONES, key="mk_acciones")
     else:
         grupo = pestana
-    tickers = tuple(CATALOGO[grupo])
-    with st.spinner("Descargando cotizaciones..."):
-        filas = filas_grupo(tickers)
-    if not filas:
-        st.error("No se han podido descargar cotizaciones ahora mismo. Pulsa «Actualizar ahora» en la barra lateral.")
+    if not bloque_mercado(grupo):
         return
-
-    if grupo == "Índices":
-        tarjetas_indices(filas)
     texto_ayuda = {
         "Divisas": "Cuántos euros vale 1 unidad de cada moneda. Si sube, esa moneda se ha revalorizado frente al euro "
                    "(tus inversiones en ella valen más en euros).",
@@ -73,7 +67,6 @@ def pagina_resumen():
     }.get(grupo)
     if texto_ayuda:
         st.caption(texto_ayuda)
-    tabla_mercado(grupo, filas)
 
     palabras_de_la_pagina(["Índice bursátil", "Tendencia", "Media de 200 sesiones", "Volatilidad", "VIX", "Bono",
                            "Tipos de interés", "Fondo indexado", "ETF", "Valor liquidativo", "Criptomonedas", "Oro"])
@@ -82,6 +75,38 @@ def pagina_resumen():
             for a in cargar_activos():
                 st.markdown(f"- {a['lectura']}")
         bloque_fases(cargar_informe())
+
+
+def filas_al_dia(tickers: tuple[str, ...]) -> list[dict]:
+    """Tendencia y variación anual del histórico (se descarga cada 10 min) con el precio de ahora encima."""
+    filas = [dict(f) for f in filas_grupo(tickers)]
+    try:
+        ahora = cotizaciones_ahora(tickers)
+    except Exception:  # noqa: BLE001
+        ahora = {}
+    for f in filas:
+        q = ahora.get(f["ticker"])
+        if q:
+            f["precio"] = q["precio"]
+            f["var_1d"] = q.get("variacion_pct")
+            f["var_abs"] = q["precio"] - q["anterior"] if q.get("anterior") else f["var_abs"]
+            f["fecha"] = q["fecha"].strftime("%d/%m")
+    return filas
+
+
+@st.fragment(run_every=SEGUNDOS_PRECIOS)
+def bloque_mercado(grupo: str) -> bool:
+    """Tarjetas de índices y tabla del grupo, con precios de ahora. Se refresca solo cada minuto."""
+    with st.spinner("Descargando cotizaciones..."):
+        filas = filas_al_dia(tuple(CATALOGO[grupo]))
+    if not filas:
+        st.error("No se han podido descargar cotizaciones ahora mismo. Se volverá a intentar en un minuto.")
+        return False
+    if grupo == "Índices":
+        tarjetas_indices(filas)
+    tabla_mercado(grupo, filas)
+    st.caption(linea_actualizado())
+    return True
 
 
 def tarjetas_indices(filas: list[dict]):
@@ -94,10 +119,9 @@ def tarjetas_indices(filas: list[dict]):
         with cols[i % len(cols)].container(border=True):
             st.metric(f"{BANDERAS.get(f['ticker'], '')} {nombre_de(f['ticker']).split(' (')[0]}",
                       num(f["precio"], 2), pct(f["var_1d"], 2) if f["var_1d"] is not None else None,
-                      help=f"Último cierre: {f['fecha']}. 1 año: {pct(f['var_1a'], 1)}.")
+                      help=f"Precio del {f['fecha']}. 1 año: {pct(f['var_1a'], 1)}.")
 
 
-@st.fragment
 def tabla_mercado(grupo: str, filas: list[dict]):
     movil = perfil().movil
     invertible = grupo not in ("Índices", "Tipos de interés y macro")

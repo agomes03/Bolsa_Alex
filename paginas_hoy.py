@@ -14,8 +14,9 @@ from bolsa.tickers import nombre_de
 from paginas_extra import asesor_hoy, limite_empresa, pesos_cartera_real
 from paginas_seguimiento import bloque_pendientes
 from ui_comun import (cargar_informe, cargar_noticias, cargar_varios, conclusion_noticia, cotizaciones_ahora,
-                      cuenta_activa, dias_informe, eur, fecha, hora_espana, ir_a, linea_frescura, moneda_de, num,
-                      palabras_de_la_pagina, pct, perfil, reducir, SEGUNDOS_NOTICIAS, texto_estado_precio)
+                      cuenta_activa, dias_informe, eur, fecha, guardar_datos, hora_espana, ir_a, linea_actualizado,
+                      linea_frescura, moneda_de, num, palabras_de_la_pagina, pct, perfil, reducir, SEGUNDOS_NOTICIAS,
+                      SEGUNDOS_PRECIOS, texto_estado_precio)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
                   "ambar": ("warning", "🟡 Mercado mixto"),
@@ -107,6 +108,15 @@ def pagina_hoy():
     pf = perfil()
     st.title("🧭 Hoy")
     inf = cargar_informe()
+    cta = cuenta_activa()
+    solo_mia = False
+    if cta.get("posiciones"):
+        solo_mia = st.toggle("🎯 Solo lo de mi cartera", value=cta.get("solo_mi_cartera", True),
+                             help="Encendido: Hoy se centra en las acciones que ya tienes (esperar, diversificar o poner "
+                                  "stop-loss) y oculta las ideas de compra nuevas. Apágalo para ver también ideas.")
+        if solo_mia != cta.get("solo_mi_cartera", True):
+            cta["solo_mi_cartera"] = solo_mia
+            guardar_datos()
     bloque_pendientes()
     asesor_hoy(inf)
     if not inf:
@@ -122,6 +132,9 @@ def pagina_hoy():
                    "indexado de ese mercado y sigues esta regla, revisa 📦 Carteras modelo.")
 
     por_ticker = {r["ticker"]: r for r in inf["ranking"]}
+    if solo_mia:
+        mostrar_contexto(inf, mer)
+        return
     st.subheader("💡 Ideas del día en España")
     st.caption("Las acciones españolas con mejor nota, de sectores distintos, con su mercado al alza, sin riesgo alto "
                "de caída y sin resultados inminentes. En Bankinter cuestan de 0 a 8 € por operación.")
@@ -164,6 +177,11 @@ def pagina_hoy():
         if st.button("Ver mi cartera modelo", width="stretch"):
             ir_a("carteras")
 
+    mostrar_contexto(inf, mer)
+
+
+def mostrar_contexto(inf: dict, mer: dict) -> None:
+    """Lo que se ve en Hoy en los dos modos: qué pasó otras veces, palabras de la página y noticias."""
     with st.expander("🔮 Qué ha pasado otras veces en una situación como la de hoy"):
         for t, nombre in (("^IBEX", "El IBEX 35"), ("^STOXX50E", "El Euro Stoxx 50"), ("^GSPC", "El S&P 500")):
             f = mer.get("fases", {}).get(t)
@@ -250,34 +268,10 @@ def bloque_que_puede_pasar(pesos: dict[str, float], importe: float, mensual: flo
 
 
 # --------------------------------------------------------------------------- 📡 Radar
-def pagina_radar_global() -> bool:
-    """Radar con todas las empresas del informe. Devuelve False si no hay informe."""
+@st.fragment(run_every=SEGUNDOS_PRECIOS)
+def tabla_radar(f: pd.DataFrame, ideas: set[str]):
+    """La tabla del radar con los precios de ahora. Se refresca sola cada minuto."""
     pf = perfil()
-    inf = cargar_informe()
-    if not inf:
-        return False
-    st.title("📡 Radar")
-    aviso_antiguedad(inf)
-    df = pd.DataFrame(inf["ranking"])
-    df = df[~df["etf"]]
-    ideas = set(inf.get("ideas_es", [])) | set(inf.get("ideas", []))
-    c = st.columns(1 if pf.movil else 3)
-    ambito = c[0].segmented_control("Acciones", ["España", "Todas"], default="España",
-                                    help="España: comisión de 0 a 8 € en Bankinter. Todas: incluye Europa y EEUU "
-                                         "(20 € por operación + divisa).") or "España"
-    sectores = sorted(df["sector"].dropna().unique())
-    sector = c[1 % len(c)].selectbox("Sector", ["Todos"] + sectores)
-    solo = c[2 % len(c)].toggle("Solo candidatas a comprar", value=False)
-    buscar = st.text_input("Buscar empresa", "").strip().lower()
-    f = df if ambito == "Todas" else df[df["ticker"].str.endswith(".MC")]
-    if sector != "Todos":
-        f = f[f["sector"] == sector]
-    veredictos = [asesor.veredicto(r) for r in f.to_dict("records")]
-    f = f.assign(veredicto_txt=[v[0] for v in veredictos])
-    if solo:
-        f = f[f["veredicto_txt"] == "Candidata a comprar"]
-    if buscar:
-        f = f[f["nombre"].str.lower().str.contains(buscar) | f["ticker"].str.lower().str.contains(buscar)]
     with st.spinner("Actualizando precios..."):
         precios = cotizaciones_ahora(f["ticker"].tolist())
 
@@ -314,6 +308,38 @@ def pagina_radar_global() -> bool:
     filas = sel.selection.rows if sel and sel.selection else []
     if filas:
         ir_a("analizar", analizar_ticker=tabla.iloc[filas[0]]["Ticker"])
+    st.caption(linea_actualizado())
+
+
+def pagina_radar_global() -> bool:
+    """Radar con todas las empresas del informe. Devuelve False si no hay informe."""
+    pf = perfil()
+    inf = cargar_informe()
+    if not inf:
+        return False
+    st.title("📡 Radar")
+    aviso_antiguedad(inf)
+    df = pd.DataFrame(inf["ranking"])
+    df = df[~df["etf"]]
+    ideas = set(inf.get("ideas_es", [])) | set(inf.get("ideas", []))
+    c = st.columns(1 if pf.movil else 3)
+    ambito = c[0].segmented_control("Acciones", ["España", "Todas"], default="España",
+                                    help="España: comisión de 0 a 8 € en Bankinter. Todas: incluye Europa y EEUU "
+                                         "(20 € por operación + divisa).") or "España"
+    sectores = sorted(df["sector"].dropna().unique())
+    sector = c[1 % len(c)].selectbox("Sector", ["Todos"] + sectores)
+    solo = c[2 % len(c)].toggle("Solo candidatas a comprar", value=False)
+    buscar = st.text_input("Buscar empresa", "").strip().lower()
+    f = df if ambito == "Todas" else df[df["ticker"].str.endswith(".MC")]
+    if sector != "Todos":
+        f = f[f["sector"] == sector]
+    veredictos = [asesor.veredicto(r) for r in f.to_dict("records")]
+    f = f.assign(veredicto_txt=[v[0] for v in veredictos])
+    if solo:
+        f = f[f["veredicto_txt"] == "Candidata a comprar"]
+    if buscar:
+        f = f[f["nombre"].str.lower().str.contains(buscar) | f["ticker"].str.lower().str.contains(buscar)]
+    tabla_radar(f, ideas)
     with st.expander("¿Qué significa cada columna?"):
         st.markdown("- **Veredicto**: la conclusión de la app (la misma que verás al analizarla).\n"
                     "- **Nota**: puesto frente a todas las demás combinando subida del último año (50 %), tendencia "

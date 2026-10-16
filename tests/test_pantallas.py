@@ -441,3 +441,18 @@ def test_tabla_de_mi_cartera_con_todas_las_columnas():
     # En el móvil también se ven precio actual y de compra (la tabla se desliza de lado).
     at = abrir("pagina_bankinter", movil=True, datos_usuario={"cartera_real": cartera_de_prueba()})
     assert {"Precio actual", "Precio compra", "Hoy (%)", "Ganancia (€)"} <= set(at.dataframe[0].value.columns)
+
+
+def test_hoy_dice_que_hacer_con_cada_accion_y_puede_centrarse_en_mi_cartera():
+    at = abrir("pagina_hoy", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    textos = " ".join(m.value for m in at.markdown)
+    assert "Qué hacer con cada acción tuya" in textos
+    assert any(x in textos for x in ("Diversificar · ", "Poner stop-loss · ", "Esperar · ", "Vigilar · "))
+    assert any("analistas" in c.value for c in at.caption)                    # el consenso de los brókers
+    assert any("se actualiza solo cada minuto" in c.value for c in at.caption)
+    assert not any("Ideas del día" in s.value for s in at.subheader)        # «solo mi cartera», encendido
+    [x for x in at.toggle if x.label == "🎯 Solo lo de mi cartera"][0].set_value(False).run()
+    sin_fallos(at)
+    assert any("Ideas del día" in s.value for s in at.subheader)
+    assert at.session_state["_datos"]["cartera_real"]["solo_mi_cartera"] is False
