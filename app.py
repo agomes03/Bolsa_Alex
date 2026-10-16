@@ -24,9 +24,10 @@ from paginas_aprende import pagina_aprende  # noqa: E402
 from paginas_calculadoras import pagina_calculadoras  # noqa: E402
 from paginas_chat import pagina_chat  # noqa: E402
 from paginas_extra import pagina_bankinter, pagina_cartera_virtual, pagina_simulador  # noqa: E402
-from paginas_hoy import pagina_carteras, pagina_hoy, pagina_plan  # noqa: E402
+from paginas_hoy import pagina_carteras, pagina_hoy  # noqa: E402
 from paginas_mercados import pagina_resumen  # noqa: E402
 from paginas_noticias import pagina_noticias  # noqa: E402
+from paginas_plan import pagina_plan  # noqa: E402
 from paginas_seguimiento import pagina_seguimiento  # noqa: E402
 
 st.session_state["_perfil"] = barra_lateral()

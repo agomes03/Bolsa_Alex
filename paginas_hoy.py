@@ -14,7 +14,7 @@ from bolsa.tickers import nombre_de
 from paginas_extra import asesor_hoy, pesos_cartera_real
 from paginas_seguimiento import bloque_pendientes
 from ui_comun import (cargar_informe, cargar_varios, conclusion_noticia, cuenta_activa, dias_informe, eur, fecha,
-                      guardar_datos, hora_espana, ir_a, moneda_de, num, palabras_de_la_pagina, pct, perfil, reducir)
+                      hora_espana, ir_a, moneda_de, num, palabras_de_la_pagina, pct, perfil, reducir)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
                   "ambar": ("warning", "🟡 Mercado mixto"),
@@ -191,108 +191,7 @@ def pagina_hoy():
             st.caption("💡 " + n["explicaciones"][0])
 
 
-# --------------------------------------------------------------------------- 🎯 Mi plan
-def pagina_plan():
-    pf = perfil()
-    st.title("🎯 Mi plan: dónde invertir")
-    st.caption("Responde 6 preguntas y la app te propone un reparto concreto en euros, con productos que puedes "
-               "contratar en Bankinter, y te enseña qué podría pasar con él.")
-    d = cuenta_activa()
-    previo = d.get("perfil_inversor", {})
-    with st.form("cuestionario"):
-        c = st.columns(2)
-        importe = c[0].number_input("¿Cuánto quieres invertir ahora? (€)", 0.0, 10_000_000.0,
-                                    float(previo.get("importe", 5_000.0)), 500.0)
-        mensual = c[1].number_input("¿Cuánto podrías aportar cada mes? (€)", 0.0, 100_000.0,
-                                    float(previo.get("mensual", 150.0)), 25.0)
-        horizonte = st.slider("¿Dentro de cuántos años podrías necesitar este dinero?", 1, 40,
-                              int(previo.get("horizonte", 10)))
-        reaccion = st.radio("Si tu inversión bajara un 20 % en pocas semanas, ¿qué harías?", list(asesor.REACCIONES),
-                            index=list(asesor.REACCIONES).index(previo.get("reaccion", list(asesor.REACCIONES)[1])))
-        experiencia = st.radio("Tu experiencia invirtiendo", list(asesor.EXPERIENCIA),
-                               index=list(asesor.EXPERIENCIA).index(previo.get("experiencia", list(asesor.EXPERIENCIA)[1])))
-        c = st.columns(2)
-        colchon = c[0].checkbox("Tengo ahorrados 3-6 meses de gastos aparte de esto", previo.get("colchon", True))
-        deudas = c[1].checkbox("Tengo deudas caras (tarjetas, préstamos de más del 7 %)", previo.get("deudas", False))
-        if st.form_submit_button("Ver mi plan", type="primary", width="stretch"):
-            d["perfil_inversor"] = {"importe": importe, "mensual": mensual, "horizonte": horizonte,
-                                    "reaccion": reaccion, "experiencia": experiencia, "colchon": colchon,
-                                    "deudas": deudas}
-            guardar_datos()
-    p = d.get("perfil_inversor")
-    if not p:
-        return
-    perfil_inv = asesor.perfil_inversor(p["horizonte"], p["reaccion"], p["experiencia"], p["colchon"], p["deudas"])
-    st.header(f"Tu perfil: {perfil_inv.nombre}")
-    st.caption(" · ".join(perfil_inv.motivos))
-    for a in perfil_inv.alertas:
-        st.warning(a)
-
-    inf = cargar_informe() or {}
-    ranking = {r["ticker"]: r for r in inf.get("ranking", [])}
-    minimo = asesor.MINIMO_POR_ACCION_CERO if pf.tarifa.broker_cero else asesor.MINIMO_POR_ACCION
-    propia = cartera_del_perfil(inf) if inf else None
-    if propia:
-        candidatas = [ranking[x["ticker"]] for x in propia[1]["composicion"] if x["ticker"] in ranking]
-    else:
-        candidatas = [ranking[t] for t in inf.get("ideas_es", []) if t in ranking]
-    candidatas = [r for r in candidatas if precio_eur(r)]
-    aviso_cartera = None
-    if perfil_inv.invertir_en_bolsa and propia and candidatas:
-        euros_acciones = p["importe"] * asesor.REPARTOS[perfil_inv.nombre]["Acciones individuales"] / 100
-        necesario = len(candidatas) * minimo
-        if euros_acciones < necesario:
-            aviso_cartera = (f"Para seguir bien la {propia[1]['nombre']} hacen falta unos {eur(necesario)} "
-                             f"({len(candidatas)} empresas × {eur(minimo)}), y tu parte para acciones es de "
-                             f"{eur(euros_acciones)}. Comprar solo algunas no es la misma estrategia, así que de momento "
-                             "esa parte va también al fondo indexado.")
-            candidatas = []
-    plan = asesor.plan_inversion(p["importe"], p["mensual"], perfil_inv, candidatas, minimo)
-    if aviso_cartera:
-        plan["avisos"] = [aviso_cartera]
-    fase = inf.get("mercado", {}).get("fases", {}).get("^IBEX", {}).get("fase")
-    st.info("⏱️ " + asesor.ritmo_de_entrada(fase))
-
-    st.subheader("Reparto propuesto")
-    for l in plan["lineas"]:
-        with st.container(border=True):
-            c = st.columns([3, 1])
-            c[0].markdown(f"**{l['parte']}** · {l['pct']} %")
-            c[1].markdown(f"**{eur(l['euros'])}**")
-            st.caption(l["que"])
-    for a in plan["avisos"]:
-        st.caption("ℹ️ " + a)
-    if plan["acciones"]:
-        nombre_cartera = propia[1]["nombre"] if propia else "Ideas del día"
-        st.markdown(f"**Acciones individuales — {nombre_cartera}** (españolas, sectores distintos, revisión mensual):")
-        filas, ordenes = [], []
-        for a in plan["acciones"]:
-            pe = precio_eur(a)
-            n = int(a["euros"] // pe) if pe else 0
-            filas.append({"Empresa": a["nombre"], "Sector": a["sector"], "Títulos": n,
-                          "Precio": round(a["precio"], 2), "Importe": eur(n * pe) if pe else "—",
-                          "Stop-loss": round(a["stop"], 2) if a.get("stop") else None})
-            if n:
-                ordenes.append(bankinter.ticket_compra(a["ticker"], n, a["precio"], tarifa=pf.tarifa,
-                                                       importe_eur=n * pe))
-                if a.get("stop"):
-                    ordenes.append(bankinter.ticket_stop(a["ticker"], n, a["stop"]))
-        st.dataframe(pd.DataFrame(filas), hide_index=True, width="stretch")
-        with st.expander("📋 Órdenes para copiar en Bankinter"):
-            for o in ordenes:
-                st.code(o, language=None)
-    if p["mensual"]:
-        st.markdown(f"**Cada mes:** {eur(plan['mensual_fondo'])} al fondo indexado"
-                    + (f" y {eur(plan['mensual_seguro'])} a la parte segura" if plan["mensual_seguro"] > 0 else "")
-                    + ".")
-        st.caption("En Bankinter puedes programar una aportación periódica al fondo (Fondos → tu fondo → «Aportaciones "
-                   "periódicas»). Así inviertes cada mes sin pensar en si es buen momento.")
-
-    st.subheader("🔮 ¿Qué podría pasar con este plan?")
-    pesos = asesor.pesos_para_escenarios(plan)
-    bloque_que_puede_pasar(pesos, p["importe"], p["mensual"], p["horizonte"])
-
-
+# --------------------------------------------------------------------------- escenarios
 def bloque_que_puede_pasar(pesos: dict[str, float], importe: float, mensual: float = 0.0, anos: int = 10):
     """Escenarios a 1 año (con la historia real de esos productos) y pruebas de estrés en crisis reales."""
     pf = perfil()

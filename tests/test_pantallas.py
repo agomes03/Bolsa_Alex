@@ -18,6 +18,7 @@ import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from bolsa import cartera, costes, datos, noticias
+from bolsa import plan as plan_mod
 
 APP = str(Path(__file__).resolve().parent.parent / "app.py")
 SESIONES = {"10y": 2500, "5y": 1260, "max": 5000, "1y": 250, "6mo": 126, "1mo": 21, "5d": 5}
@@ -341,3 +342,37 @@ def test_renombrar_y_borrar_cuenta_desde_la_pantalla():
     sin_fallos(at)
     d = at.session_state["_datos"]
     assert list(d["cuentas"]) == ["Yo"] and d["cartera_real"]["posiciones"]["SAN.MC"]["acciones"] == 2500
+
+
+@pytest.mark.parametrize("objetivo, intereses, titulo", [
+    ("operacion", ["Acciones españolas", "Divisas", "Oro", "Criptomonedas"], "Tu operación"),
+    ("rentas", [], "Tu plan de rentas"),
+    ("proteger", [], "Tu plan para proteger"),
+    ("crecer", ["Fondos indexados y ETF", "Acciones españolas", "Oro"], "Reparto propuesto"),
+])
+def test_mi_plan_segun_el_objetivo(objetivo, intereses, titulo):
+    at = abrir("pagina_plan")
+    sin_fallos(at)
+    [r for r in at.radio if r.label.startswith("1️⃣")][0].set_value(objetivo)
+    if intereses:
+        [m for m in at.multiselect if m.label.startswith("3️⃣")][0].set_value(intereses)
+    [b for b in at.button if b.label == "Ver mi plan para hoy"][0].click().run()
+    sin_fallos(at)
+    assert any(titulo in s.value for s in at.subheader)
+    assert any("El mercado hoy" in m.value for m in at.markdown)
+    guardado = at.session_state["_datos"]["cartera_real"]["perfil_inversor"]
+    assert guardado["objetivo"] == objetivo
+    assert guardado["intereses"] == (intereses or plan_mod.INTERESES_POR_DEFECTO[objetivo])
+
+
+def test_mi_plan_es_de_cada_cuenta():
+    datos = _familia()
+    datos["cuentas"]["Mamá"]["perfil_inversor"] = {
+        "objetivo": "rentas", "importe": 20_000.0, "mensual": 0.0, "intereses": ["Acciones españolas"],
+        "plazo": "1-3 meses", "perdida_max": 5, "horizonte": 10, "reaccion": "Me preocuparía, pero esperaría",
+        "experiencia": "Ninguna", "colchon": True, "deudas": False}
+    at = abrir("pagina_plan", datos_usuario=datos)
+    assert not any("Tu plan de rentas" in s.value for s in at.subheader)     # yo aún no he hecho el test
+    [s for s in at.sidebar.selectbox if s.label == "👤 Cuenta"][0].set_value("Mamá").run()
+    sin_fallos(at)
+    assert any("Tu plan de rentas" in s.value for s in at.subheader)
