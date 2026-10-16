@@ -660,3 +660,18 @@ def test_ayuda_tactil_en_la_pagina():
     from ui_comun import AYUDAS_TACTILES
 
     assert "blur()" in AYUDAS_TACTILES and "touchstart" in AYUDAS_TACTILES and "http" not in AYUDAS_TACTILES
+
+
+def test_ver_solo_un_activo_en_mi_cartera():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    at.selectbox(key="mc_activo").set_value("IDR.MC").run()
+    sin_fallos(at)
+    etiquetas = {m.label: m.value for m in at.metric}
+    assert "Valor de Indra" in etiquetas or any(k.startswith("Valor de Indra") for k in etiquetas)
+    assert {"Ganancia o pérdida (sin vender)", "Precio de compra", "Precio actual", "Títulos"} <= set(etiquetas)
+    assert etiquetas["Precio de compra"].startswith("60,80")
+    assert any("Cómo ha ido el precio" in m.value for m in at.markdown)
+    at.selectbox(key="mc_activo").set_value("Toda la cartera").run()
+    sin_fallos(at)
+    assert any(m.label == "Valor de tu cartera" for m in at.metric)

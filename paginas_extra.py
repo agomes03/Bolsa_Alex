@@ -18,12 +18,12 @@ from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
 from ui_comun import (SEGUNDOS_REFRESCO, almacen_actual, cargar_activos, cargar_analistas, cargar_composiciones,
-                      cargar_dividendos_varios, cargar_fundamentales, cargar_fundamentales_varios, cargar_historico,
-                      cargar_informe, cargar_noticias, cargar_varios, cotizaciones_ahora, cuenta_activa,
-                      datos_usuario, descargas_en_paralelo, enlace, estrategia_actual, eur, fecha, fx, guardar_datos,
-                      historia_larga_eur, linea_actualizado, mercado_alcista_para, mostrar_plotly, num,
-                      olvidar_campos_de_cuenta, palabras_de_la_pagina, pct, perfil, pestanas, privado, reducir,
-                      selector_valor)
+                      cargar_diario_real, cargar_dividendos_varios, cargar_fundamentales, cargar_fundamentales_varios,
+                      cargar_historico, cargar_informe, cargar_noticias, cargar_varios, cotizaciones_ahora,
+                      cuenta_activa, datos_usuario, descargas_en_paralelo, enlace, estrategia_actual, eur, fecha, fx,
+                      guardar_datos, historia_larga_eur, linea_actualizado, mercado_alcista_para, moneda_de,
+                      mostrar_plotly, num, olvidar_campos_de_cuenta, palabras_de_la_pagina, pct, perfil, pestanas,
+                      precio, privado, reducir, selector_valor, texto_estado_precio)
 
 UNIVERSOS = {
     "IBEX 35": (tuple(IBEX35), "^IBEX"),
@@ -863,6 +863,79 @@ def pintar_tabla_posiciones(tabla: pd.DataFrame, ayuda_peso: str) -> None:
                + (". En el móvil, desliza la tabla hacia la izquierda para ver más columnas." if pf.movil else "."))
 
 
+TODA = "Toda la cartera"
+
+
+def selector_activo(filas: list[dict], clave: str) -> dict | None:
+    """«🔎 Ver»: toda la cartera o un solo activo (por ejemplo, solo Indra). Devuelve su fila o None."""
+    opciones = [TODA] + [f["ticker"] for f in filas]
+    nombres = {f["ticker"]: f["nombre"] for f in filas}
+    if st.session_state.get(clave) not in opciones:
+        st.session_state.pop(clave, None)
+    elegido = st.selectbox("🔎 Ver", opciones, key=clave, format_func=lambda t: nombres.get(t, t),
+                           help="Elige un activo para ver solo cuánto ganas o pierdes con él.")
+    return next((f for f in filas if f["ticker"] == elegido), None)
+
+
+def ficha_activo(f: dict, filas: list[dict]) -> None:
+    """Cuánto ganas o pierdes con UN activo: valor, ganancia, hoy, precios, peso, su evolución y su gráfico."""
+    pf = perfil()
+    t, pos, precio_ahora = f["ticker"], f["pos"], f["precio"]
+    if not precio_ahora:
+        st.info(f"No hay cotización de {f['nombre']} ahora mismo.")
+        return
+    _, total, _, _ = tabla_posiciones(filas)
+    valor = pos["acciones"] * precio_ahora * f["fx"]
+    invertido = pos["acciones"] * pos["precio_medio"] * pos.get("fx_medio", 1.0)
+    ganancia = valor - invertido
+    hoy = valor - valor / (1 + f["var_1d"]) if f.get("var_1d") is not None else None
+    m = moneda_de(t)
+    c = st.columns(3 if not pf.movil else 2)
+    c[0].metric(f"Valor de {f['nombre']}", eur(valor))
+    c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia), pct(ganancia / invertido * 100, 1) if invertido
+                else None, help="Lo que vale hoy menos lo que te costó (en euros, con el cambio de divisa).")
+    c[2 % len(c)].metric("Hoy", eur(hoy) if hoy is not None else "—",
+                         pct(f["var_1d"] * 100, 2) if f.get("var_1d") is not None else None)
+    k = st.columns(4 if not pf.movil else 2)
+    k[0].metric("Precio de compra", precio(pos["precio_medio"], m), help="Tu precio medio.")
+    k[1].metric("Precio actual", precio(precio_ahora, m), pct((precio_ahora / pos["precio_medio"] - 1) * 100, 1),
+                help=texto_estado_precio(f["cotizacion"]) if f.get("cotizacion") else None)
+    k[2 % len(k)].metric("Títulos", "•••" if privado() else num(pos["acciones"], 0 if float(pos["acciones"])
+                                                                .is_integer() else 4))
+    k[3 % len(k)].metric("Peso en la cartera", f"{valor / total * 100:.1f} %".replace(".", ",") if total else "—")
+    if pos.get("stop"):
+        st.caption(f"🛡️ Stop-loss en {precio(pos['stop'], m)} ({pct((pos['stop'] / precio_ahora - 1) * 100, 1)} desde "
+                   "el precio de ahora).")
+    st.markdown(f"{ICONO_NIVEL[f['nivel']]} {f['consejo']}")
+
+    try:
+        diario = cargar_diario_real(t, "2y")
+    except Exception:  # noqa: BLE001
+        diario = pd.DataFrame()
+    if diario.empty:
+        return
+    cierres = diario["Close"].dropna()
+    periodos = rentabilidad.por_periodos(cierres, f["var_1d"] * 100 if f.get("var_1d") is not None else None)
+    periodos = [p for p in periodos if p["periodo"] in ("Hoy", "1 semana", "1 mes", "En el año", "1 año")]
+    if periodos:
+        st.markdown("**Cómo ha ido el precio:** " + " · ".join(f"{p['periodo'].lower()} {pct(p['pct'], 1)}"
+                                                                for p in periodos))
+    desde = pd.Timestamp(pos.get("fecha") or cierres.index[-1]) - pd.Timedelta(days=30)
+    desde = min(desde, cierres.index[-1] - pd.Timedelta(days=180))
+    serie = cierres[cierres.index >= desde]
+    fig = go.Figure(go.Scatter(x=serie.index, y=serie.values, name=f["nombre"],
+                               line=dict(color="#16a34a" if precio_ahora >= pos["precio_medio"] else "#dc2626")))
+    fig.add_hline(y=pos["precio_medio"], line_dash="dash", annotation_text="tu precio de compra",
+                  annotation_position="top left")
+    if pos.get("stop"):
+        fig.add_hline(y=pos["stop"], line_dash="dot", line_color="#dc2626", annotation_text="stop-loss",
+                      annotation_position="bottom left")
+    fig.update_layout(height=260, showlegend=False, yaxis_title=m)
+    mostrar_plotly(fig)
+    st.caption("Por encima de la línea discontinua vas ganando; por debajo, perdiendo. Elige «Toda la cartera» "
+               "arriba para volver al resumen.")
+
+
 @st.fragment(run_every=SEGUNDOS_REFRESCO)
 def resumen_cartera(nombres: list[str], elegida: str):
     """Valor, ganancia, cambio de hoy y tabla de posiciones. Se refresca solo cada minuto."""
@@ -874,6 +947,11 @@ def resumen_cartera(nombres: list[str], elegida: str):
     if avisos:
         st.warning(f"🔔 {len(avisos)} posición(es) necesitan tu atención.")
     tabla, total, ganancia, cambio_hoy = tabla_posiciones(filas)
+    f_activo = selector_activo(filas, "mc_activo")
+    if f_activo:
+        ficha_activo(f_activo, filas)
+        st.caption(linea_actualizado())
+        return
     c = st.columns(3 if not pf.movil else 2)
     c[0].metric("Valor de tu cartera" if len(nombres) == 1 else f"Valor de «{elegida}»", eur(total))
     c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia),

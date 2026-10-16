@@ -12,7 +12,8 @@ import streamlit as st
 from bolsa import asesor, bankinter, cartera, costes, datos, ejercicios, horario, senales
 from bolsa.activos import clase_de
 from bolsa.tickers import nombre_de, sector_de
-from paginas_extra import ICONO_NIVEL, pintar_tabla_posiciones, revisar_cartera_real, tabla_posiciones
+from paginas_extra import (ICONO_NIVEL, ficha_activo, pintar_tabla_posiciones, revisar_cartera_real, selector_activo,
+                           tabla_posiciones)
 from ui_comun import (cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, cotizacion_al_instante,
                       cotizaciones_ahora, datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos,
                       mercado_alcista_para, moneda_de, mostrar_plotly, num, palabras_de_la_pagina, pct, perfil,
@@ -168,6 +169,10 @@ def bloque_posiciones(cv: dict, info: dict):
     # La misma tabla y el mismo consejo que en 🏦 Mi cartera, para seguirla igual que la real.
     filas = revisar_cartera_real(cv)
     vista, total, ganancia, cambio_hoy = tabla_posiciones(filas)
+    f_activo = selector_activo(filas, "cv_activo")
+    if f_activo:
+        ficha_activo(f_activo, filas)
+        return
     c = st.columns(3 if not pf.movil else 2)
     c[0].metric("Valor de tus posiciones", eur(total))
     c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia),
