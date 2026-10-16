@@ -595,3 +595,38 @@ def test_modo_privado_oculta_tus_importes():
     assert "•••" in valor.value
     tabla = at.dataframe[0].value
     assert "Valor (€)" not in tabla.columns and "Precio actual" in tabla.columns
+
+
+def _boton_enviar(at):
+    return [b for b in at.button if "Enviar" in b.label][0]
+
+
+def test_virtual_compra_totalenergies_con_limite_por_debajo_del_stop_propuesto():
+    at = abrir("pagina_cartera_virtual", estado={"v_defecto": "TTE.PA"})
+    sin_fallos(at)
+    assert [s.value for s in at.selectbox if s.label == "Valor"][0] == "TTE.PA"
+    stop = at.number_input(key="v_slc_TTE.PA").value
+    at.number_input(key="v_lim_TTE.PA_compra").set_value(round(stop * 0.95, 3)).run()   # compra por debajo del stop
+    sin_fallos(at)
+    assert any("lo bajo a" in i.value for i in at.info)
+    _boton_enviar(at).click().run()
+    sin_fallos(at)
+    assert not at.error
+    cv = at.session_state["_datos"]["cartera_virtual"]
+    compras = [h for h in cv["historial"] if h["tipo"] == "Compra" and h["ticker"] == "TTE.PA"]
+    assert cv.get("ordenes") or compras                     # la orden se ha aceptado (y, si toca, ejecutado)
+    for o in cv.get("ordenes", []):
+        assert o["stop"] < o["limite"]
+
+
+def test_virtual_opera_aunque_falle_la_cotizacion_intradia(monkeypatch):
+    # Como en la realidad cuando Yahoo limita: las descargas devuelven tablas vacías.
+    monkeypatch.setattr(datos, "intradia", lambda *_a, **_k: pd.DataFrame())
+    monkeypatch.setattr(datos, "diario_sin_ajustar", lambda *_a, **_k: pd.DataFrame())
+    at = abrir("pagina_cartera_virtual", estado={"v_defecto": "TTE.PA"})
+    sin_fallos(at)
+    assert not [e for e in at.error if "cotización" in e.value]
+    _boton_enviar(at).click().run()
+    sin_fallos(at)
+    cv = at.session_state["_datos"]["cartera_virtual"]
+    assert "TTE.PA" in cv["posiciones"] or cv.get("ordenes")

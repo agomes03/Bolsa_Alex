@@ -14,8 +14,9 @@ from bolsa.activos import clase_de
 from bolsa.tickers import nombre_de, sector_de
 from paginas_extra import ICONO_NIVEL, pintar_tabla_posiciones, revisar_cartera_real, tabla_posiciones
 from ui_comun import (cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, cotizacion_al_instante,
-                      datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de,
-                      mostrar_plotly, num, palabras_de_la_pagina, pct, perfil, selector_valor)
+                      cotizaciones_ahora, datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos,
+                      mercado_alcista_para, moneda_de, mostrar_plotly, num, palabras_de_la_pagina, pct, perfil,
+                      selector_valor)
 from ui_comun import precio as txt_precio
 
 TIPOS = {"Limitada": "limitada", "A mercado": "mercado", "Stop (con límite)": "stop"}
@@ -31,6 +32,25 @@ EXPLICA_TIPO = {
 def _cuando(iso: str) -> str:
     ts = pd.Timestamp(iso)
     return fecha(iso) if (ts.hour, ts.minute) == (0, 0) else f"{ts:%d/%m/%Y %H:%M}"
+
+
+_SUFIJOS_EURO = (".MC", ".PA", ".DE", ".AS", ".MI", ".BR", ".LS", ".HE", ".F")
+
+
+def _cotizacion_de_respaldo(ticker: str):
+    """Si la cotización intradía no llega (Yahoo limita a veces), el último cierre del histórico y, si lo hay, el
+    precio de ahora de la consulta en bloque. Así se puede operar igual."""
+    try:
+        diario = cargar_historico(ticker, "1y")
+        q = datos.cotizacion(diario, None) if not diario.empty else None
+        ahora = cotizaciones_ahora([ticker]).get(ticker)
+    except Exception:  # noqa: BLE001
+        return pd.DataFrame(), None
+    if q and ahora:
+        q.update(precio=ahora["precio"], variacion_pct=ahora.get("variacion_pct"), hora=pd.Timestamp(ahora["fecha"]),
+                 anterior=ahora.get("anterior") or q.get("anterior"))
+        q["variacion"] = q["precio"] - q["anterior"] if q.get("anterior") else None
+    return diario, q
 
 
 def _datos_valor(ticker: str):
@@ -276,10 +296,18 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
         ticker = c[1].selectbox("Valor", con_posicion, format_func=nombre_de, key="v_ticker_venta")
     else:
         ticker = selector_valor("v_compra", solo_invertibles=True, defecto=st.session_state.pop("v_defecto", None))
-    diario, intra, q = _datos_valor(ticker)
+    try:
+        diario, _, q = _datos_valor(ticker)
+    except Exception:  # noqa: BLE001 - Yahoo falla: se intenta con el histórico
+        diario, q = pd.DataFrame(), None
+    if not q:
+        diario, q = _cotizacion_de_respaldo(ticker)
     f_eur = fx(ticker)
+    if f_eur is None and ticker.endswith(_SUFIJOS_EURO):
+        f_eur = 1.0
     if not q or f_eur is None:
-        st.error("No hay cotización o tipo de cambio disponible para este valor ahora mismo.")
+        st.error("Yahoo no da ahora mismo la cotización de este valor (a veces limita las consultas). Prueba de nuevo "
+                 "en un minuto con «🔄 Actualizar todo ahora» en el menú lateral.")
         return
     ficha_cotizacion(ticker, diario, q)
     m = moneda_de(ticker)
@@ -344,8 +372,12 @@ def bloque_operar_virtual(cv: dict, libre: float, patrimonio: float):
         stop, objetivo = stop or None, objetivo or None
         compra_a = limite if tipo == "limitada" else precio
         if stop and stop >= compra_a:
-            st.warning(f"El stop-loss ({num(stop, 3)}) tiene que quedar por debajo del precio de compra "
-                       f"({num(compra_a, 3)}). Bájalo o pon 0 si no quieres stop.")
+            # Pasa al poner un límite por debajo del stop propuesto: se recoloca a la misma distancia (en %)
+            # bajo tu precio, en vez de no dejarte enviar la orden.
+            distancia = (precio - plan.stop) / precio if plan and plan.stop < precio else 0.07
+            stop = round(compra_a * (1 - distancia), 3)
+            st.info(f"🛡️ Has puesto la compra por debajo del stop-loss propuesto: lo bajo a **{num(stop, 3)}** "
+                    f"({pct(-distancia * 100, 1)} bajo tu precio). Puedes cambiarlo arriba.")
 
     # Estimación de costes, como la pantalla de confirmación del bróker.
     precio_estimado = limite if tipo == "limitada" else (activacion if tipo == "stop" else precio)
