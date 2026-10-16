@@ -17,10 +17,10 @@ from bolsa import (alertas, asesor, asesor_diario, avisos, bankinter, cartera, c
 from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
-from ui_comun import (almacen_actual, cargar_activos, cargar_dividendos_varios, cargar_fundamentales_varios,
-                      cargar_historico, cargar_informe, cargar_noticias, cargar_varios, cotizaciones_ahora,
-                      cuenta_activa, datos_usuario, enlace, estrategia_actual, eur, fecha, fx, guardar_datos,
-                      historia_larga_eur, linea_actualizado, mercado_alcista_para, mostrar_plotly, num,
+from ui_comun import (almacen_actual, cargar_activos, cargar_analistas, cargar_dividendos_varios,
+                      cargar_fundamentales_varios, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
+                      cotizaciones_ahora, cuenta_activa, datos_usuario, enlace, estrategia_actual, eur, fecha, fx,
+                      guardar_datos, historia_larga_eur, linea_actualizado, mercado_alcista_para, mostrar_plotly, num,
                       palabras_de_la_pagina, pct, perfil, reducir, SEGUNDOS_PRECIOS, selector_valor)
 
 UNIVERSOS = {
@@ -584,29 +584,40 @@ def decisiones_por_accion(filas: list[dict]) -> None:
         return
     valores = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in con_precio}
     total = sum(valores.values()) + max(cuenta_activa().get("otros_ahorros", 0.0), 0.0)
+    acciones = tuple(sorted(f["ticker"] for f in con_precio if f["clase"] == "Acciones"))
     try:
-        funds = cargar_fundamentales_varios(tuple(sorted(valores)))
+        funds = cargar_fundamentales_varios(acciones)
+        extra = cargar_analistas(acciones)
     except Exception:  # noqa: BLE001 - sin datos de analistas, se decide con el resto
-        funds = {}
+        funds, extra = {}, {}
     tope = limite_empresa()
     lista = []
     for f in con_precio:
-        analistas = decision.consenso(funds.get(f["ticker"]), f["precio"]) if f["clase"] == "Acciones" else None
+        analistas = (decision.consenso(funds.get(f["ticker"]), f["precio"], extra.get(f["ticker"]))
+                     if f["clase"] == "Acciones" else None)
         lista.append((f, decision.decidir(f, valores[f["ticker"]], total, tope, analistas, f["precio"] * f["fx"])))
     orden = list(decision.ACCIONES)
     lista.sort(key=lambda x: orden.index(x[1]["clave"]))
     st.markdown("**📌 Qué hacer con cada acción tuya**")
     for f, d in lista:
         with st.container(border=True):
-            st.markdown(f"{d['icono']} **{d['titulo']} · {f['nombre']}** ({d['peso'] * 100:.0f} % de tu dinero)  \n"
-                        f"{d['texto']}")
+            st.markdown(f"**{f['nombre']}** · {d['peso'] * 100:.0f} % de tu dinero"
+                        + (f"  \n<small>{d['situacion']}</small>" if d.get("situacion") else ""),
+                        unsafe_allow_html=True)
+            st.markdown(f"👉 Te recomiendo: {d['icono']} **{d['titulo']}**  \n{d['texto']}")
             for x in d["tambien"]:
                 st.markdown(x)
             for m in d["motivos"]:
                 st.caption(m)
-    st.caption("Consenso de analistas: la recomendación media y el precio objetivo de los analistas de bancos y "
-               "brókers que siguen cada empresa (Yahoo Finance). No se usan foros: ahí opina cualquiera, sin "
-               "responsabilidad y a veces para mover el precio. Los analistas también fallan: es una mirada más.")
+            if d.get("analistas"):
+                with st.expander("🏦 Qué dicen los analistas"):
+                    for linea in d["analistas"]:
+                        st.markdown(f"- {linea}")
+    st.caption("Analistas: los de los bancos y brókers que siguen cada empresa (entre 10 y 30 en las grandes), "
+               "recogidos por Yahoo Finance: qué recomiendan, a qué precio creen que llegará (la mediana, que no "
+               "distorsiona un analista extremo) y si suben o bajan sus previsiones. La fiabilidad sube cuantos más "
+               "son y más de acuerdo están. No se usan foros: ahí opina cualquiera, sin responsabilidad y a veces "
+               "para mover el precio. Los analistas también fallan: es una mirada más, no la decisión.")
 
 
 def bloque_telegram():

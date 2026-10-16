@@ -222,6 +222,13 @@ def cargar_fundamentales(ticker: str) -> dict:
     return datos.fundamentales(ticker)
 
 
+@st.cache_data(ttl=6 * 3600, show_spinner=False)
+def cargar_analistas(tickers: tuple[str, ...]) -> dict[str, dict]:
+    """Datos de analistas de varias empresas (cambian poco: se piden cada 6 horas)."""
+    with ThreadPoolExecutor(max_workers=3) as pool:      # pocas a la vez: Yahoo limita las peticiones
+        return dict(zip(tickers, pool.map(datos.analistas, tickers)))
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def cargar_fundamentales_varios(tickers: tuple[str, ...]) -> dict[str, dict]:
     with ThreadPoolExecutor(max_workers=8) as pool:

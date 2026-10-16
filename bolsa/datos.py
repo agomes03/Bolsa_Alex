@@ -332,6 +332,54 @@ def fundamentales(ticker: str) -> dict:
     return {k: info.get(k) for k in CAMPOS_FUNDAMENTALES if info.get(k) is not None}
 
 
+def analistas(ticker: str) -> dict:
+    """Todo lo que publican los analistas sobre una empresa (Yahoo Finance, que agrega a los bancos y brókers que
+    la siguen): recuento de recomendaciones hoy y hace 3 meses, precios objetivo (media, mediana, mínimo y
+    máximo), revisiones de las previsiones de beneficio y cambios de recomendación recientes de cada firma.
+    Cada parte es opcional: si Yahoo no la da, no aparece."""
+    import yfinance as yf
+
+    tk = yf.Ticker(ticker)
+    salida: dict = {}
+    try:
+        r = tk.recommendations
+        if r is not None and not r.empty:
+            filas = {str(f["period"]): {k: int(f.get(k, 0) or 0) for k in
+                                        ("strongBuy", "buy", "hold", "sell", "strongSell")} for _, f in r.iterrows()}
+            salida["recuento"] = filas.get("0m")
+            salida["recuento_antes"] = filas.get("-3m") or filas.get("-2m") or filas.get("-1m")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        o = tk.analyst_price_targets
+        if o and o.get("mean"):
+            salida["objetivos"] = {k: float(o[k]) for k in ("mean", "median", "low", "high") if o.get(k)}
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        e = tk.eps_trend
+        if e is not None and not e.empty:
+            fila = e.loc["+1y"] if "+1y" in e.index else e.loc["0y"] if "0y" in e.index else None
+            if fila is not None and fila.get("current") and fila.get("90daysAgo"):
+                salida["revision_beneficios"] = float(fila["current"]) / float(fila["90daysAgo"]) - 1
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        u = tk.upgrades_downgrades
+        if u is not None and not u.empty:
+            idx = pd.to_datetime(u.index)
+            if idx.tz is not None:
+                idx = idx.tz_localize(None)
+            recientes = u[idx >= pd.Timestamp.now() - pd.Timedelta(days=180)]
+            salida["cambios"] = [{"fecha": pd.Timestamp(f).date().isoformat(), "firma": c.get("Firm"),
+                                  "a": c.get("ToGrade"), "de": c.get("FromGrade"), "accion": c.get("Action"),
+                                  "objetivo": c.get("currentPriceTarget")}
+                                 for f, c in recientes.head(6).iterrows()]
+    except Exception:  # noqa: BLE001
+        pass
+    return salida
+
+
 def noticias_yahoo(ticker: str) -> list[dict]:
     """Titulares de Yahoo Finance para un ticker: [{titulo, enlace, fuente, fecha(datetime)}]."""
     from datetime import datetime, timezone
