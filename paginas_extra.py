@@ -18,10 +18,10 @@ from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
 from ui_comun import (almacen_actual, cargar_activos, cargar_dividendos_varios, cargar_fundamentales_varios,
-                      cargar_historico, cargar_informe, cargar_noticias, cargar_varios, cuenta_activa, datos_usuario,
-                      enlace, estrategia_actual, eur, fecha, fx, guardar_datos, historia_larga_eur,
-                      mercado_alcista_para, mostrar_plotly, num, palabras_de_la_pagina, pct, perfil, reducir,
-                      selector_valor)
+                      cargar_historico, cargar_informe, cargar_noticias, cargar_varios, cotizaciones_ahora,
+                      cuenta_activa, datos_usuario, enlace, estrategia_actual, eur, fecha, fx, guardar_datos,
+                      historia_larga_eur, mercado_alcista_para, mostrar_plotly, num, palabras_de_la_pagina, pct, perfil,
+                      reducir, selector_valor)
 
 UNIVERSOS = {
     "IBEX 35": (tuple(IBEX35), "^IBEX"),
@@ -473,7 +473,24 @@ def revisar_cartera_real(cr: dict | None = None) -> list[dict]:
         filas.append({**base, "precio": ev.precio, "nivel": nivel, "consejo": texto, "var_1d": _var_1d(df),
                       "ev": ev, "stop_sugerido": stop_sug, "fx": fx(t, funds.get(t)) or 1.0,
                       "resultados_pronto": any("resultados" in a for a in ev.avisos)})
+    _precios_frescos(filas)
     return filas
+
+
+def _precios_frescos(filas: list[dict]) -> None:
+    """Sustituye el precio del histórico diario (que Yahoo a veces publica con horas de retraso) por el de ahora o
+    el del último cierre, y guarda de dónde sale (en directo, tiempo real o cierre)."""
+    try:
+        ahora = cotizaciones_ahora([f["ticker"] for f in filas if f["precio"]])
+    except Exception:  # noqa: BLE001 - sin precio reciente, se queda el del histórico
+        return
+    for f in filas:
+        q = ahora.get(f["ticker"])
+        if q and f["precio"]:
+            f["precio"] = q["precio"]
+            f["cotizacion"] = q
+            if q.get("variacion_pct") is not None:
+                f["var_1d"] = q["variacion_pct"] / 100
 
 
 def limite_empresa() -> float:
@@ -641,29 +658,61 @@ def pagina_bankinter():
         avisos = [f for f in filas if f["nivel"] not in ("mantener",)]
         if avisos:
             st.warning(f"🔔 {len(avisos)} posición(es) necesitan tu atención.")
-        vista, total, ganancia = [], 0.0, 0.0
+        vista, total, ganancia, cambio_hoy = [], 0.0, 0.0, 0.0
+        valores = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
+        total_valor = sum(valores.values())
         for f in filas:
             pos, precio = f["pos"], f["precio"]
-            valor = pos["acciones"] * precio * f["fx"] if precio else None
+            valor = valores.get(f["ticker"])
             invertido = pos["acciones"] * pos["precio_medio"] * pos.get("fx_medio", 1.0)
             total += valor or 0
             ganancia += (valor - invertido) if valor else 0
-            vista.append({"": ICONO_NIVEL[f["nivel"]], "Activo": f["nombre"], "Tipo": f["clase"],
-                          "Títulos": pos["acciones"],
-                          "Precio medio": round(pos["precio_medio"], 2),
-                          "Precio actual": round(precio, 2) if precio else None,
-                          "Valor (€)": round(valor, 2) if valor else None,
-                          "Ganancia (%)": round((precio / pos["precio_medio"] - 1) * 100, 1) if precio else None,
-                          "Stop-loss": pos.get("stop")})
+            if valor and f.get("var_1d") is not None:
+                cambio_hoy += valor - valor / (1 + f["var_1d"])
+            proteccion = (f"stop {num(pos['stop'], 2)}" if pos.get("stop") else
+                          f"alarma {num(pos['alarma'], 2)}" if pos.get("sin_stop") and pos.get("alarma") else
+                          "sin stop")
+            vista.append({
+                "": ICONO_NIVEL[f["nivel"]], "Activo": f["nombre"],
+                "Precio actual": round(precio, 2) if precio else None,
+                "Hoy (%)": round(f["var_1d"] * 100, 2) if f.get("var_1d") is not None else None,
+                "Precio compra": round(pos["precio_medio"], 2),
+                "Títulos": pos["acciones"],
+                "Invertido (€)": round(invertido, 2),
+                "Valor (€)": round(valor, 2) if valor else None,
+                "Ganancia (€)": round(valor - invertido, 2) if valor else None,
+                "Ganancia (%)": round((precio / pos["precio_medio"] - 1) * 100, 1) if precio else None,
+                "Peso (%)": round(valor / total_valor * 100, 1) if valor and total_valor else None,
+                "Protección": proteccion, "Tipo": f["clase"],
+                "Precio de": ({"tiempo_real": "⚡ tiempo real", "directo": "🟢 ahora (~15 min)"}.get(
+                    f["cotizacion"]["estado"], f"cierre {f['cotizacion']['fecha']:%d/%m}") if f.get("cotizacion")
+                    else "—")})
         tabla = pd.DataFrame(vista)
-        c = st.columns(2)
+        c = st.columns(3 if not pf.movil else 2)
         c[0].metric("Valor de tu cartera" if len(nombres) == 1 else f"Valor de «{elegida}»", eur(total))
-        c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia))
-        st.caption("Precios en la divisa de cada valor, como en tu bróker; valores y ganancias en euros. La "
-                   "ganancia en % es la del precio (sin comisiones ni efecto divisa).")
+        c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia),
+                    pct(ganancia / (total - ganancia) * 100, 1) if total - ganancia else None)
+        c[2 % len(c)].metric("Hoy", eur(cambio_hoy),
+                             pct(cambio_hoy / (total - cambio_hoy) * 100, 2) if total - cambio_hoy else None)
         if pf.movil:
-            tabla = tabla[["", "Activo", "Ganancia (%)", "Valor (€)"]]
-        st.dataframe(tabla, hide_index=True, width="stretch")
+            tabla = tabla[["", "Activo", "Precio actual", "Hoy (%)", "Precio compra", "Ganancia (%)", "Ganancia (€)",
+                           "Valor (€)", "Peso (%)", "Títulos", "Protección"]]
+        st.dataframe(tabla, hide_index=True, width="stretch", column_config={
+            "": st.column_config.TextColumn(width=30, pinned=True),
+            "Activo": st.column_config.TextColumn(pinned=True),
+            "Precio actual": st.column_config.NumberColumn(format="localized",
+                                                           help="En la moneda del valor, como en tu bróker."),
+            "Hoy (%)": st.column_config.NumberColumn(format="%+.2f %%", help="Frente al cierre anterior."),
+            "Precio compra": st.column_config.NumberColumn(format="localized", help="Tu precio medio de compra."),
+            "Invertido (€)": st.column_config.NumberColumn(format="localized"),
+            "Valor (€)": st.column_config.NumberColumn(format="localized"),
+            "Ganancia (€)": st.column_config.NumberColumn(format="localized"),
+            "Ganancia (%)": st.column_config.NumberColumn(format="%+.1f %%"),
+            "Peso (%)": st.column_config.NumberColumn(format="%.1f %%", help="Parte de esta cuenta en ese valor."),
+        })
+        st.caption("Precios en la moneda de cada valor, como en tu bróker; invertido, valor y ganancias en euros. La "
+                   "ganancia en % es la del precio (sin comisiones ni efecto divisa)."
+                   + (" En el móvil, desliza la tabla hacia la izquierda para ver más columnas." if pf.movil else ""))
         p_hacer, p_diag, p_div, p_comp, p_anadir = st.tabs(["📋 Qué hacer", "🩺 Diagnóstico", "💶 Dividendos",
                                                              "📊 Comparar", "➕ Añadir"])
         with p_hacer:

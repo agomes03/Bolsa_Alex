@@ -312,7 +312,7 @@ def test_cada_cuenta_se_asesora_por_separado():
     sin_fallos(at)
     tabla = at.dataframe[0].value
     san = tabla[tabla["Activo"].str.contains("Santander")].iloc[0]
-    assert san["Títulos"] == 1000 and san["Precio medio"] == 14.2
+    assert san["Títulos"] == 1000 and san["Precio compra"] == 14.2
     assert at.session_state["_datos"]["cuenta_activa"] == "Mamá"
 
 
@@ -424,3 +424,20 @@ def test_diagnostico_cambia_con_el_perfil():
     assert "conservador" in lim_c[0] and "máximo 5 % por empresa" in lim_c[0]
     assert "dinámico" in lim_d[0] and "máximo 20 % por empresa" in lim_d[0]
     assert len(rojos_c) > len(rojos_d)
+
+
+def test_tabla_de_mi_cartera_con_todas_las_columnas():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    tabla = at.dataframe[0].value
+    for col in ("Precio actual", "Hoy (%)", "Precio compra", "Títulos", "Invertido (€)", "Valor (€)", "Ganancia (€)",
+                "Ganancia (%)", "Peso (%)", "Protección"):
+        assert col in tabla.columns, col
+    assert abs(tabla["Peso (%)"].sum() - 100) < 0.5
+    san = tabla[tabla["Activo"].str.contains("Santander")].iloc[0]
+    assert san["Precio compra"] == 12.46 and san["Títulos"] == 2500
+    assert abs(san["Ganancia (€)"] - (san["Valor (€)"] - san["Invertido (€)"])) < 0.05
+    assert any(m.label == "Hoy" for m in at.metric)
+    # En el móvil también se ven precio actual y de compra (la tabla se desliza de lado).
+    at = abrir("pagina_bankinter", movil=True, datos_usuario={"cartera_real": cartera_de_prueba()})
+    assert {"Precio actual", "Precio compra", "Hoy (%)", "Ganancia (€)"} <= set(at.dataframe[0].value.columns)
