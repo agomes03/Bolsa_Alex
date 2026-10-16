@@ -17,6 +17,8 @@ import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
+import ui_comun
+
 from bolsa import cartera, costes, datos, noticias
 from bolsa import plan as plan_mod
 
@@ -85,6 +87,7 @@ def sin_internet(monkeypatch, tmp_path):
     monkeypatch.setattr(st, "Page", lambda fn, **kw: fn)
     monkeypatch.setattr(st, "switch_page", lambda p: None)
     st.cache_data.clear()
+    ui_comun.olvidar_datos_al_dia()
     yield
 
 
@@ -455,7 +458,7 @@ def test_hoy_dice_que_hacer_con_cada_accion_y_puede_centrarse_en_mi_cartera():
     assert "Te recomiendo:" in textos and "Tienes 2.500 acciones compradas a 12,46" in textos
     assert any("analistas" in c.value for c in at.caption)                    # el consenso de los brókers
     assert any("Fiabilidad del consenso" in m.value for m in at.markdown)
-    assert any("se actualiza solo cada minuto" in c.value for c in at.caption)
+    assert any("se actualizan solos cada minuto" in c.value for c in at.caption)
     assert not any("Ideas del día" in s.value for s in at.subheader)        # «solo mi cartera», encendido
     [x for x in at.toggle if x.label == "🎯 Solo lo de mi cartera"][0].set_value(False).run()
     sin_fallos(at)

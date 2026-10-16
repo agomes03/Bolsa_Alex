@@ -7,7 +7,7 @@ import streamlit as st
 
 from bolsa import noticias
 from bolsa.tickers import nombre_de
-from ui_comun import (SEGUNDOS_NOTICIAS, cargar_noticias, conclusion_noticia, linea_frescura,
+from ui_comun import (SEGUNDOS_REFRESCO, cargar_noticias, conclusion_noticia, linea_frescura,
                       mostrar_conclusion, perfil)
 
 
@@ -39,7 +39,7 @@ def pagina_noticias():
     lista_de_noticias()
 
 
-@st.fragment(run_every=SEGUNDOS_NOTICIAS)
+@st.fragment(run_every=SEGUNDOS_REFRESCO)
 def lista_de_noticias():
     """Se vuelve a dibujar sola cada minuto con lo que hayan publicado las fuentes (sin recargar la página)."""
     movil = perfil().movil

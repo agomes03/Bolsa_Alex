@@ -19,9 +19,9 @@ from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
 from ui_comun import (almacen_actual, cargar_activos, cargar_analistas, cargar_dividendos_varios,
                       cargar_fundamentales_varios, cargar_historico, cargar_informe, cargar_noticias, cargar_varios,
-                      cotizaciones_ahora, cuenta_activa, datos_usuario, enlace, estrategia_actual, eur, fecha, fx,
+                      cotizaciones_ahora, cuenta_activa, datos_usuario, descargas_en_paralelo, enlace, estrategia_actual, eur, fecha, fx,
                       guardar_datos, historia_larga_eur, linea_actualizado, mercado_alcista_para, mostrar_plotly, num,
-                      palabras_de_la_pagina, pct, perfil, reducir, SEGUNDOS_PRECIOS, selector_valor)
+                      palabras_de_la_pagina, pct, perfil, reducir, SEGUNDOS_REFRESCO, selector_valor)
 
 UNIVERSOS = {
     "IBEX 35": (tuple(IBEX35), "^IBEX"),
@@ -513,7 +513,7 @@ ICONO_NIVEL = {"vender": "🔴", "vigilar": "🟠", "poner_stop": "🟡", "subir
                "sin_datos": "⚪"}
 
 
-@st.fragment(run_every=SEGUNDOS_PRECIOS)
+@st.fragment(run_every=SEGUNDOS_REFRESCO)
 def asesor_hoy(inf: dict | None):
     """«🧑‍💼 Tu asesor hoy»: tu dinero, qué hacer con cada acción y lo demás de hoy. Se refresca solo cada minuto."""
     pf = perfil()
@@ -527,8 +527,16 @@ def asesor_hoy(inf: dict | None):
                         "Kutxabank...) en 🏦 Mi cartera y aquí verás cada día cuánto vale tu dinero y qué hacer con él.")
             enlace("bankinter", "Ir a Mi cartera", "🏦")
             return
+        tickers = sorted(cr["posiciones"])
+        acciones = tuple(t for t in tickers if (cr["posiciones"][t].get("clase") or clase_de(t)) == "Acciones")
         try:
-            filas = revisar_cartera_real()
+            # Lo que se necesita más abajo (analistas, dividendos, otros activos) se descarga a la vez que se
+            # revisa la cartera: la primera carga de la mañana tarda la mitad.
+            with descargas_en_paralelo(cargar_activos, lambda: cargar_analistas(acciones),
+                                       lambda: cargar_dividendos_varios(
+                                           [t for t in tickers if (cr["posiciones"][t].get("clase") or clase_de(t))
+                                            in ("Acciones", "Fondos y ETF")])):
+                filas = revisar_cartera_real()
             activos_hoy = cargar_activos()
         except Exception as e:  # noqa: BLE001 - la página Hoy nunca debe romperse por la cartera
             st.caption(f"No se ha podido revisar tu cartera ahora mismo ({e}).")
@@ -740,7 +748,7 @@ def pagina_bankinter():
                            "Compensación de pérdidas", "Regla de los 2 meses", "Fondo indexado", "Rebalanceo"])
 
 
-@st.fragment(run_every=SEGUNDOS_PRECIOS)
+@st.fragment(run_every=SEGUNDOS_REFRESCO)
 def resumen_cartera(nombres: list[str], elegida: str):
     """Valor, ganancia, cambio de hoy y tabla de posiciones. Se refresca solo cada minuto."""
     pf = perfil()

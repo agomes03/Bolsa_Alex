@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 from pathlib import Path
 
 import pandas as pd
@@ -12,6 +13,15 @@ import pandas as pd
 # cambios en su web), se usan los últimos datos buenos y la app avisa de que son antiguos.
 CARPETA_RESPALDO = Path(os.environ.get("BOLSA_RESPALDO", Path(__file__).resolve().parent.parent / ".respaldo_datos"))
 RESPALDOS_USADOS: dict[str, float] = {}     # ticker -> fecha (epoch) de los datos de respaldo usados
+
+# yf.download guarda sus resultados en un diccionario global: dos descargas a la vez se mezclan. Se hacen de una
+# en una (las demás peticiones, como fundamentales o analistas, sí van en paralelo).
+_CERROJO_YF = threading.Lock()
+
+
+def _descargar_yf(yf, *a, **k):
+    with _CERROJO_YF:
+        return yf.download(*a, **k)
 
 
 def _ruta_respaldo(ticker: str, tipo: str) -> Path:
@@ -71,7 +81,7 @@ def varios(tickers: list[str], periodo: str = "2y") -> dict[str, pd.DataFrame]:
     import yfinance as yf
 
     try:
-        bruto = yf.download(tickers, period=periodo, interval="1d", auto_adjust=True,
+        bruto = _descargar_yf(yf, tickers, period=periodo, interval="1d", auto_adjust=True,
                             group_by="ticker", progress=False, threads=True)
     except Exception:  # noqa: BLE001
         bruto = pd.DataFrame()
@@ -197,12 +207,12 @@ def precios_recientes(tickers: list[str]) -> dict[str, dict]:
         return {t: c[t] for t in c.columns if t in tickers}
 
     try:
-        diario = columnas(yf.download(tickers, period="5d", interval="1d", auto_adjust=False, progress=False,
+        diario = columnas(_descargar_yf(yf, tickers, period="5d", interval="1d", auto_adjust=False, progress=False,
                                       threads=True))
     except Exception:  # noqa: BLE001
         diario = {}
     try:
-        intradia = columnas(yf.download(tickers, period="5d", interval="15m", auto_adjust=False, progress=False,
+        intradia = columnas(_descargar_yf(yf, tickers, period="5d", interval="15m", auto_adjust=False, progress=False,
                                         threads=True))
     except Exception:  # noqa: BLE001
         intradia = {}
@@ -296,7 +306,7 @@ def dividendos_varios(tickers: list[str], periodo: str = "5y") -> dict[str, pd.S
     if not tickers:
         return {}
     try:
-        bruto = yf.download(tickers, period=periodo, interval="1d", actions=True, group_by="ticker",
+        bruto = _descargar_yf(yf, tickers, period=periodo, interval="1d", actions=True, group_by="ticker",
                             progress=False, threads=True, auto_adjust=True)
     except Exception:  # noqa: BLE001
         return {}

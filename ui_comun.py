@@ -6,7 +6,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -112,11 +115,7 @@ def _a_noticias(items: list[dict]) -> list[noticias.Noticia]:
 SEGUNDOS_NOTICIAS = 60      # cada cuánto se vuelven a leer todas las fuentes (y se refrescan solas las páginas)
 
 
-# La caché dura un poco menos que el refresco automático: así, cuando la página se refresca, ya ha caducado.
-@st.cache_data(ttl=SEGUNDOS_NOTICIAS - 10, show_spinner=False)
-def _descargar_noticias() -> tuple[list[noticias.Noticia], list[str], str]:
-    from datetime import datetime
-
+def _leer_noticias() -> tuple[list[noticias.Noticia], list[str]]:
     extra = []
     clave = clave_finnhub()
     if clave:
@@ -124,8 +123,12 @@ def _descargar_noticias() -> tuple[list[noticias.Noticia], list[str], str]:
             extra = _a_noticias(finnhub.noticias_mercado(clave))
         except Exception:  # noqa: BLE001 - si Finnhub falla, quedan las demás fuentes
             extra = []
-    lista, fallos = noticias.descargar(extra=extra)
-    return lista, fallos, datetime.now(MADRID_TZ).strftime("%H:%M:%S")
+    return noticias.descargar(extra=extra)
+
+
+def _descargar_noticias() -> tuple[list[noticias.Noticia], list[str], str]:
+    (lista, fallos), hora = al_dia(("noticias",), _leer_noticias, SEGUNDOS_NOTICIAS - 15)
+    return lista, fallos, hora
 
 
 def cargar_noticias() -> tuple[list[noticias.Noticia], list[str]]:
@@ -150,19 +153,89 @@ def linea_frescura(lista: list[noticias.Noticia]) -> str:
 
 
 SEGUNDOS_PRECIOS = 60       # cada cuánto se refrescan solos los precios en Hoy, Mi cartera, Radar y Mercados
+SEGUNDOS_REFRESCO = 30      # cada cuánto miran las páginas si ya hay datos nuevos (mostrarlos no cuesta nada)
+
+# --------------------------------------------------------------------------- datos «siempre al día» sin esperas
+# Precios y noticias se piden de nuevo en segundo plano: la pantalla enseña al momento lo último que hay y, cuando
+# llega lo nuevo, el siguiente refresco lo muestra. Así la app nunca se queda congelada esperando a Yahoo.
+_VIVOS: dict[tuple, dict] = {}
+_CERROJO_VIVOS = threading.Lock()
+_ULTIMA_HORA: dict[str, str] = {}
+
+
+def _renovar(clave: tuple, funcion) -> None:
+    try:
+        valor = funcion()
+    except Exception:  # noqa: BLE001 - se queda el último dato bueno
+        valor = None
+    with _CERROJO_VIVOS:
+        e = _VIVOS.get(clave)
+        if e is not None:
+            e["renovando"] = False
+            if valor is not None:
+                e.update(valor=valor, t=time.time(), hora=_hora_ahora())
+
+
+def _hora_ahora() -> str:
+    from datetime import datetime
+
+    return datetime.now(MADRID_TZ).strftime("%H:%M:%S")
+
+
+def al_dia(clave: tuple, funcion, segundos: int):
+    """(valor, hora): lo último descargado al instante; si tiene más de `segundos`, se renueva en segundo plano.
+    Solo la primera vez (nada guardado) se espera a la descarga."""
+    with _CERROJO_VIVOS:
+        e = _VIVOS.get(clave)
+        if e is not None and time.time() - e["t"] >= segundos and not e["renovando"]:
+            e["renovando"] = True
+            threading.Thread(target=_renovar, args=(clave, funcion), daemon=True).start()
+    if e is None:
+        valor = funcion()
+        with _CERROJO_VIVOS:
+            if len(_VIVOS) > 300:                     # muchos grupos distintos: se olvidan los más viejos
+                for k in sorted(_VIVOS, key=lambda k: _VIVOS[k]["t"])[:100]:
+                    _VIVOS.pop(k, None)
+            e = _VIVOS[clave] = {"valor": valor, "t": time.time(), "hora": _hora_ahora(), "renovando": False}
+    _ULTIMA_HORA[clave[0]] = e["hora"]
+    return e["valor"], e["hora"]
+
+
+@contextmanager
+def descargas_en_paralelo(*funciones):
+    """Lanza ya, a la vez, descargas que la página necesitará más abajo (cada una guarda su resultado en la caché)
+    mientras se hace lo de dentro del bloque; al salir, se esperan. Si alguna falla, se repite luego sin hilos."""
+    from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+
+    ctx = get_script_run_ctx()
+
+    def lanzar(f):
+        add_script_run_ctx(threading.current_thread(), ctx)
+        try:
+            f()
+        except Exception:  # noqa: BLE001
+            pass
+
+    with ThreadPoolExecutor(max_workers=max(len(funciones), 1)) as pool:
+        for f in funciones:
+            pool.submit(lanzar, f)
+        yield
+
+
+def olvidar_datos_al_dia() -> None:
+    """Para «Actualizar todo ahora» (y las pruebas): la próxima vez se descarga todo de nuevo."""
+    with _CERROJO_VIVOS:
+        _VIVOS.clear()
 
 
 def linea_actualizado() -> str:
-    from datetime import datetime
-
-    return (f"🔄 Actualizado a las {datetime.now(MADRID_TZ):%H:%M:%S} · se actualiza solo cada minuto, sin tocar "
-            "nada")
+    hora = _ULTIMA_HORA.get("precios") or _hora_ahora()
+    return f"🔄 Precios de las {hora} · se actualizan solos cada minuto, sin tocar nada"
 
 
-# La caché dura un poco menos que el refresco automático, para que cada refresco traiga precios nuevos.
-@st.cache_data(ttl=SEGUNDOS_PRECIOS - 10, show_spinner=False)
 def _precios_recientes(tickers: tuple[str, ...]) -> dict[str, dict]:
-    return datos.precios_recientes(list(tickers))
+    # Un poco antes del minuto: así cada refresco automático encuentra ya los precios nuevos.
+    return al_dia(("precios", tickers), lambda: datos.precios_recientes(list(tickers)), SEGUNDOS_PRECIOS - 15)[0]
 
 
 MAX_FINNHUB_TABLA = 20      # el plan gratuito permite unas 60 consultas por minuto

@@ -6,7 +6,7 @@ import streamlit as st
 
 from bolsa import asesor, bankinter, costes, cuentas, noticias
 from ui_comun import (Perfil, cuenta_activa, datos_usuario, es_movil, estado_finnhub, estado_guardado, guardar_datos,
-                      hay_contrasena)
+                      hay_contrasena, olvidar_datos_al_dia)
 
 
 def _capital_por_defecto() -> float:
@@ -70,6 +70,7 @@ def _pie():
     if st.button("🔄 Actualizar todo ahora", width="stretch",
                  help="Vuelve a descargarlo todo (también el histórico y los datos de las empresas)."):
         st.cache_data.clear()
+        olvidar_datos_al_dia()
         st.rerun()
 
 

@@ -7,7 +7,7 @@ import streamlit as st
 
 from bolsa.tickers import CATALOGO, nombre_de
 from paginas_hoy import bloque_fases
-from ui_comun import (SEGUNDOS_PRECIOS, cargar_activos, cargar_informe, cargar_varios, cotizaciones_ahora, ir_a,
+from ui_comun import (SEGUNDOS_REFRESCO, cargar_activos, cargar_informe, cargar_varios, cotizaciones_ahora, ir_a,
                       linea_actualizado, num, palabras_de_la_pagina, pct, perfil)
 
 
@@ -94,7 +94,7 @@ def filas_al_dia(tickers: tuple[str, ...]) -> list[dict]:
     return filas
 
 
-@st.fragment(run_every=SEGUNDOS_PRECIOS)
+@st.fragment(run_every=SEGUNDOS_REFRESCO)
 def bloque_mercado(grupo: str) -> bool:
     """Tarjetas de índices y tabla del grupo, con precios de ahora. Se refresca solo cada minuto."""
     with st.spinner("Descargando cotizaciones..."):
