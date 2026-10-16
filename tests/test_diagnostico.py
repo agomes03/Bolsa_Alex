@@ -91,3 +91,30 @@ def test_las_vigiladas_sin_stop_no_cuentan_como_sin_stop():
     titulos = [h["titulo"] for h in dg_mod.diagnosticar(pos)["hallazgos"]]
     sin = [t for t in titulos if t.startswith("Sin stop-loss")]
     assert sin and "Santander" not in sin[0] and "Inditex" in sin[0]
+
+
+def test_el_perfil_cambia_la_valoracion():
+    from bolsa import diagnostico as dg_mod
+
+    # Cartera de ejemplo: tres acciones españolas (dos bancos) y un fondo mundial; 94 % de todo en bolsa.
+    pos = [{"ticker": "SAN.MC", "acciones": 1200, "precio_medio": 10, "precio": 10, "fx": 1.0, "clase": "Acciones"},
+           {"ticker": "BBVA.MC", "acciones": 1300, "precio_medio": 10, "precio": 10, "fx": 1.0, "clase": "Acciones"},
+           {"ticker": "ITX.MC", "acciones": 900, "precio_medio": 10, "precio": 10, "fx": 1.0, "clase": "Acciones"},
+           {"ticker": "IWDA.AS", "acciones": 2600, "precio_medio": 10, "precio": 10, "fx": 1.0,
+            "clase": "Fondos y ETF"}]
+    r = {p: dg_mod.diagnosticar(pos, otros_ahorros=4_000, perfil=p) for p in ("Conservador", "Moderado", "Dinámico")}
+    titulos = {p: [h["titulo"] for h in x["hallazgos"] if h["gravedad"] != "ok"] for p, x in r.items()}
+    assert r["Conservador"]["limites"]["empresa"] == 0.05 and r["Dinámico"]["limites"]["empresa"] == 0.20
+    # Inditex (14 %) pesa demasiado para un conservador o un moderado, pero no para un dinámico.
+    assert any(t.startswith("Inditex pesa") for t in titulos["Conservador"])
+    assert any(t.startswith("Inditex pesa") for t in titulos["Moderado"])
+    assert not any(t.startswith("Inditex pesa") for t in titulos["Dinámico"])
+    # Un 94 % en bolsa es demasiado para un conservador o un moderado; para un dinámico encaja.
+    assert any("está en bolsa" in t for t in titulos["Moderado"])
+    assert not any("está en bolsa" in t for t in titulos["Dinámico"])
+    assert len(titulos["Conservador"]) > len(titulos["Moderado"]) > len(titulos["Dinámico"])
+    graves = {p: sum(h["gravedad"] == "alta" for h in x["hallazgos"]) for p, x in r.items()}
+    assert graves["Conservador"] > graves["Moderado"] > graves["Dinámico"] == 0
+    # La propuesta de venta también cambia: el conservador vende más.
+    assert r["Conservador"]["liberado"] > r["Moderado"]["liberado"] >= r["Dinámico"]["liberado"]
+    assert r["Conservador"]["semaforo"] == "rojo" and r["Dinámico"]["semaforo"] != "rojo"

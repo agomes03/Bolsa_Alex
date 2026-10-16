@@ -1,10 +1,12 @@
 """Diagnóstico de una cartera real, como lo haría un asesor: concentración, sectores, países, encaje con tu
 perfil y una propuesta concreta de reequilibrio con sus costes e impuestos.
 
-Las reglas son las de la gestión prudente que comparten casi todos los manuales y supervisores:
-- Ninguna empresa debería pesar más del 20 % de lo que tienes invertido (una mala noticia no te hunde).
-- Ningún sector más del 40 % (bancos, eléctricas... suelen caer juntos).
-- Con menos de ~5 empresas "efectivas" el riesgo de una sola empresa domina tu resultado.
+Las reglas son las de la gestión prudente que comparten casi todos los manuales y supervisores, y se ajustan a
+tu perfil (`LIMITES_PERFIL`): cuanto más conservador, menos puede pesar cada empresa, cada sector, cada país y la
+bolsa en total. Sin perfil se usan los límites más amplios (los del dinámico):
+- Ninguna empresa debería pesar demasiado (una mala noticia no te hunde).
+- Ningún sector demasiado (bancos, eléctricas... suelen caer juntos).
+- Con pocas empresas "efectivas", el riesgo de una sola empresa domina tu resultado.
 - Lo que no sean acciones sueltas, en fondos indexados (miles de empresas de todo el mundo).
 
 No es asesoramiento financiero regulado: es un análisis educativo con tus datos.
@@ -21,6 +23,22 @@ from .tickers import nombre_de, sector_de
 MAX_EMPRESA = 0.20
 MAX_SECTOR = 0.40
 MIN_EMPRESAS_EFECTIVAS = 5
+
+# Límites prudentes según el perfil (sobre todo tu dinero: acciones, fondos y liquidez apuntada).
+# «bolsa» = acciones + fondos de bolsa + cripto, en línea con el reparto de 🎯 Mi plan (asesor.REPARTOS).
+LIMITES_PERFIL = {
+    "Conservador": {"empresa": 0.05, "sector": 0.20, "empresas": 10, "bolsa": 0.40, "pais": 0.50},
+    "Moderado": {"empresa": 0.10, "sector": 0.30, "empresas": 7, "bolsa": 0.75, "pais": 0.60},
+    "Dinámico": {"empresa": MAX_EMPRESA, "sector": MAX_SECTOR, "empresas": MIN_EMPRESAS_EFECTIVAS, "bolsa": 0.95,
+                 "pais": 0.70},
+}
+
+
+def limites_de(perfil: str | None) -> dict:
+    """Límites para ese perfil; sin perfil, los más amplios y sin comprobar el total en bolsa."""
+    if perfil in LIMITES_PERFIL:
+        return dict(LIMITES_PERFIL[perfil])
+    return {**LIMITES_PERFIL["Dinámico"], "bolsa": None}
 
 PAIS_POR_SUFIJO = {".MC": "España", ".DE": "Alemania", ".PA": "Francia", ".AS": "Países Bajos", ".MI": "Italia",
                    ".BR": "Bélgica", ".HE": "Finlandia", ".L": "Reino Unido", ".SW": "Suiza", ".LS": "Portugal"}
@@ -58,17 +76,24 @@ def destino_por_perfil(perfil: str | None) -> dict[str, float]:
 
 def diagnosticar(posiciones: list[dict], otros_ahorros: float = 0.0, perfil: str | None = None,
                  tarifa: costes.Tarifa | None = None, filas_informe: dict[str, dict] | None = None,
-                 max_empresa: float = MAX_EMPRESA, max_sector: float = MAX_SECTOR) -> dict:
+                 max_empresa: float | None = None, max_sector: float | None = None) -> dict:
     """`posiciones`: dicts con ticker, acciones, precio_medio y precio (en la divisa del valor), fx y fx_medio
     (euros por unidad de esa divisa) y, opcionalmente, stop. `otros_ahorros`: dinero fuera de estas acciones
     (cuentas, depósitos, fondos) en euros. `filas_informe`: filas del informe diario por ticker."""
     tarifa = tarifa or costes.Tarifa()
     filas_informe = filas_informe or {}
+    lim = limites_de(perfil)
+    if max_empresa is not None:
+        lim["empresa"] = max_empresa
+    if max_sector is not None:
+        lim["sector"] = max_sector
+    max_empresa, max_sector = lim["empresa"], lim["sector"]
+    nombre_perfil = f"un perfil {perfil.lower()}" if perfil in LIMITES_PERFIL else "cualquier perfil"
     pos = [dict(p, clase=p.get("clase") or clase_de(p["ticker"])) for p in posiciones
            if p.get("precio") and p.get("acciones", 0) > 0]
     total_invertido = sum(_valor(p) for p in pos)
     if total_invertido <= 0:
-        return {"total_acciones": 0.0, "hallazgos": [], "propuesta": [], "semaforo": "sin_datos"}
+        return {"total_acciones": 0.0, "hallazgos": [], "propuesta": [], "semaforo": "sin_datos", "limites": lim}
     patrimonio = total_invertido + max(otros_ahorros, 0.0)
 
     empresas = sorted(({"ticker": p["ticker"], "nombre": _nombre(p), "valor": _valor(p), "clase": p["clase"],
@@ -99,12 +124,15 @@ def diagnosticar(posiciones: list[dict], otros_ahorros: float = 0.0, perfil: str
     # 1. Concentración por empresa (los fondos y ETF ya están diversificados por dentro)
     grandes = [e for e in acciones if e["peso"] > max_empresa]
     for e in grandes:
-        h("alta" if e["peso"] > 0.35 else "media", f"{e['nombre']} pesa el {e['peso'] * 100:.0f} % de tu dinero",
-          f"Lo prudente es que ninguna empresa pase del {max_empresa * 100:.0f} %. Si {e['nombre']} cayera un 40 % "
+        h("alta" if e["peso"] > max_empresa * 1.75 else "media",
+          f"{e['nombre']} pesa el {e['peso'] * 100:.0f} % de tu dinero",
+          f"Para {nombre_perfil}, lo prudente es que ninguna empresa pase del {max_empresa * 100:.0f} %. "
+          f"Si {e['nombre']} cayera un 40 % "
           f"(les ha pasado a grandes empresas en una sola mala noticia), perderías unos "
           f"{_eur(e['valor'] * 0.4)}, el {e['peso'] * 40:.0f} % de todo lo que tienes aquí.")
     if acciones and not grandes:
-        h("ok", "Ninguna empresa pesa demasiado", f"Todas están por debajo del {max_empresa * 100:.0f} %.")
+        h("ok", "Ninguna empresa pesa demasiado",
+          f"Todas están por debajo del {max_empresa * 100:.0f} %, el máximo prudente para {nombre_perfil}.")
 
     # 2. Sectores
     grandes_t = {e["ticker"] for e in grandes}
@@ -113,25 +141,41 @@ def diagnosticar(posiciones: list[dict], otros_ahorros: float = 0.0, perfil: str
         if len(del_sector) == 1 and del_sector[0] in grandes_t:
             continue  # ya avisado: es una sola empresa
         if w > max_sector and s != "—":
-            h("alta" if w > 0.6 else "media", f"El sector {s} es el {w * 100:.0f} % de tu dinero",
+            h("alta" if w > max_sector * 1.5 else "media", f"El sector {s} es el {w * 100:.0f} % de tu dinero",
               "Las empresas de un mismo sector suelen caer a la vez (por ejemplo, los bancos cuando bajan los tipos "
-              f"de interés). Lo prudente es no pasar del {max_sector * 100:.0f} % en un sector.")
+              f"de interés). Para {nombre_perfil}, lo prudente es no pasar del {max_sector * 100:.0f} % en un sector.")
 
     # 3. Número de empresas (solo importa si las acciones sueltas son una parte grande de tu dinero)
-    if acciones and n_efectivo < MIN_EMPRESAS_EFECTIVAS and peso_acciones > 0.3:
+    if acciones and n_efectivo < lim["empresas"] and peso_acciones > 0.3:
         ne = f"{n_efectivo:.1f}".replace(".", ",")
-        h("media", f"Tus acciones equivalen a {ne} empresas",
+        h("alta" if n_efectivo < lim["empresas"] / 2 and perfil in LIMITES_PERFIL else "media",
+          f"Tus acciones equivalen a {ne} empresas",
           "Contando cuánto pesa cada una, tu riesgo es el de tener solo "
-          f"{ne} empresas a partes iguales. Con menos de {MIN_EMPRESAS_EFECTIVAS}, lo que le pase a una sola "
+          f"{ne} empresas a partes iguales. Para {nombre_perfil}, lo prudente es al menos {lim['empresas']}; con "
+          "menos, lo que le pase a una sola "
           "empresa decide tu resultado. Un fondo indexado mundial reparte tu dinero entre más de 1.000 empresas.")
 
     # 4. Países
     if paises:
         pais_max, w_pais = max(paises.items(), key=lambda x: x[1])
-        if w_pais > 0.7 and peso_acciones > 0.3:
+        if w_pais > lim["pais"] and peso_acciones > 0.3:
             h("media", f"El {w_pais * 100:.0f} % de tu dinero depende de la bolsa de {pais_max}",
-              f"Si a la economía de {pais_max} le va mal unos años, todo tu dinero lo nota. La bolsa de un solo país "
-              "es una parte pequeña de la bolsa mundial; un fondo indexado mundial te reparte entre decenas de países.")
+              f"Si a la economía de {pais_max} le va mal unos años, todo tu dinero lo nota. Para {nombre_perfil}, lo "
+              f"prudente es no pasar del {lim['pais'] * 100:.0f} % en un solo país; un fondo indexado mundial te "
+              "reparte entre decenas de países.")
+
+    # 4 bis. Cuánto de tu dinero está en bolsa (lo que más decide cuánto puede caer en una crisis)
+    en_bolsa = sum(clases.get(c, 0.0) for c in ("Acciones", "Fondos y ETF", "Criptomonedas"))
+    if lim["bolsa"] is not None:
+        if en_bolsa > lim["bolsa"] + 0.05:
+            h("alta" if en_bolsa > lim["bolsa"] + 0.20 else "media",
+              f"El {en_bolsa * 100:.0f} % de tu dinero está en bolsa",
+              f"Para {nombre_perfil}, lo prudente es como mucho un {lim['bolsa'] * 100:.0f} %. En una caída como la "
+              f"de marzo de 2020 (un 35 %), perderías unos {_eur(patrimonio * en_bolsa * 0.35)}. El resto, mejor en "
+              "Letras del Tesoro, monetario o renta fija a corto plazo.")
+        else:
+            h("ok", f"Tu dinero en bolsa ({en_bolsa * 100:.0f} %) encaja con {nombre_perfil}",
+              f"Por debajo del {lim['bolsa'] * 100:.0f} % que se suele recomendar.")
 
     # 5. Reparto por tipo de activo frente al perfil
     perfil_ref = perfil if perfil in asesor.REPARTOS else None
@@ -178,7 +222,7 @@ def diagnosticar(posiciones: list[dict], otros_ahorros: float = 0.0, perfil: str
         etiqueta, color, _ = asesor.veredicto(f)
         nombre = _nombre(p)
         if f.get("riesgo_nivel") == "alto":
-            h("media", f"{nombre}: riesgo de caída alto",
+            h("alta" if perfil == "Conservador" else "media", f"{nombre}: riesgo de caída alto",
               "El modelo de riesgo la sitúa entre las que más a menudo han caído más de un 10 % en un mes. Asegúrate "
               "de tener el stop-loss puesto y no aumentes la posición.")
         elif color in ("red", "orange"):
@@ -208,7 +252,7 @@ def diagnosticar(posiciones: list[dict], otros_ahorros: float = 0.0, perfil: str
     semaforo = "rojo" if "alta" in gravedades else "ambar" if "media" in gravedades else "verde"
     return {"total_acciones": total_acciones, "patrimonio": patrimonio, "peso_acciones": peso_acciones,
             "empresas": empresas, "sectores": sectores, "paises": paises, "n_efectivo": n_efectivo, "clases": clases,
-            "hallazgos": hallazgos, "semaforo": semaforo, **propuesta}
+            "hallazgos": hallazgos, "semaforo": semaforo, "limites": lim, "en_bolsa": en_bolsa, **propuesta}
 
 
 def proponer_reequilibrio(pos: list[dict], patrimonio: float, tarifa: costes.Tarifa, perfil: str | None,
@@ -252,4 +296,5 @@ def _eur(x: float) -> str:
     return f"{x:,.0f} €".replace(",", ".")
 
 
-__all__ = ["diagnosticar", "proponer_reequilibrio", "destino_por_perfil", "pais_de", "MAX_EMPRESA", "MAX_SECTOR"]
+__all__ = ["diagnosticar", "proponer_reequilibrio", "destino_por_perfil", "pais_de", "limites_de", "MAX_EMPRESA",
+           "MAX_SECTOR", "LIMITES_PERFIL"]

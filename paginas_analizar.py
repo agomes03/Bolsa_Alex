@@ -11,10 +11,9 @@ from plotly.subplots import make_subplots
 
 from bolsa import asesor, bankinter, costes, noticias, senales
 from bolsa.activos import clase_de
-from bolsa.diagnostico import MAX_EMPRESA
 from bolsa.indicadores import calcular_todo
 from bolsa.tickers import NO_INVERTIBLES, nombre_de, sector_de, TODOS_LOS_VALORES
-from paginas_extra import bloque_operar, pesos_cartera_real
+from paginas_extra import bloque_operar, limite_empresa, pesos_cartera_real
 from paginas_hoy import bloque_que_puede_pasar_accion, pagina_radar_global
 from paginas_noticias import tarjeta_noticia
 from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, cargar_informe, cotizaciones_ahora, eur,
@@ -207,10 +206,11 @@ def pagina_analizar():
     for a in ev.avisos:
         st.warning(a)
     peso = pesos_cartera_real().get(ticker, 0.0)
-    if peso > MAX_EMPRESA:
+    tope = limite_empresa()
+    if peso > tope:
         st.warning(f"⚖️ **Ya tienes demasiada:** {titulo} es el {peso * 100:.0f} % de tu dinero. Aunque hoy tenga buen "
-                   "veredicto, no compres más: lo prudente es que ninguna empresa pase del "
-                   f"{MAX_EMPRESA * 100:.0f} %. Mira en 🏦 Mi cartera cómo repartir el riesgo.")
+                   "veredicto, no compres más: para tu perfil, lo prudente es que ninguna empresa pase del "
+                   f"{tope * 100:.0f} %. Mira en 🏦 Mi cartera cómo repartir el riesgo.")
         etiqueta, color = "Ya tienes demasiada", "orange"
 
     with st.expander(f"🧠 Por qué (puntuación técnica {ev.puntuacion}/100, explicada paso a paso)"):

@@ -403,3 +403,24 @@ def test_noticias_dicen_cuando_se_leyeron_y_hoy_usa_las_de_ahora():
     at = abrir("pagina_hoy")
     sin_fallos(at)
     assert any("El BCE baja los tipos" in m.value for m in at.markdown)     # la noticia de ahora, no la del informe
+
+
+def test_diagnostico_cambia_con_el_perfil():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    perfil_sel = [s for s in at.selectbox if s.label == "Tu perfil"][0]
+
+    def lectura():
+        limites = [c.value for c in at.caption if c.value.startswith("📏")]
+        rojos = [e.label for e in at.expander if e.label.startswith("🔴")]
+        return limites, rojos
+
+    perfil_sel.set_value("Conservador").run()
+    sin_fallos(at)
+    lim_c, rojos_c = lectura()
+    [s for s in at.selectbox if s.label == "Tu perfil"][0].set_value("Dinámico").run()
+    sin_fallos(at)
+    lim_d, rojos_d = lectura()
+    assert "conservador" in lim_c[0] and "máximo 5 % por empresa" in lim_c[0]
+    assert "dinámico" in lim_d[0] and "máximo 20 % por empresa" in lim_d[0]
+    assert len(rojos_c) > len(rojos_d)

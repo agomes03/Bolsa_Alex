@@ -476,6 +476,11 @@ def revisar_cartera_real(cr: dict | None = None) -> list[dict]:
     return filas
 
 
+def limite_empresa() -> float:
+    """Lo máximo que debería pesar una empresa según el perfil de la cuenta activa."""
+    return diagnostico.limites_de(_perfil_guardado())["empresa"]
+
+
 def pesos_cartera_real() -> dict[str, float]:
     """Parte de tu dinero (cartera + ahorros apuntados) en cada valor que tienes. Vacío si no hay cartera."""
     try:
@@ -968,6 +973,12 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     dg = diagnostico.diagnosticar(posiciones, otros, perfil_nombre, pf.tarifa, filas_inf)
     if dg["semaforo"] == "sin_datos":
         return False
+    lim = dg["limites"]
+    st.caption(("📏 **Límites para un perfil " + perfil_nombre.lower() + "**: " if perfil_nombre else
+                "📏 **Sin perfil se usan los límites más amplios** (elige el tuyo para afinarlos): ")
+               + f"máximo {lim['empresa'] * 100:.0f} % por empresa, {lim['sector'] * 100:.0f} % por sector y "
+               f"{lim['pais'] * 100:.0f} % en un país; al menos {lim['empresas']} empresas"
+               + (f"; como mucho {lim['bolsa'] * 100:.0f} % de tu dinero en bolsa." if lim.get("bolsa") else "."))
 
     mayor = dg["empresas"][0]
     m = st.columns(2 if pf.movil else 4)
@@ -980,11 +991,11 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     m[3 % len(m)].metric("País principal", f"{pais} {w_pais * 100:.0f} %")
 
     figura = go.Figure(go.Bar(x=[e["peso"] * 100 for e in dg["empresas"]], y=[e["nombre"] for e in dg["empresas"]],
-                              orientation="h", marker_color=["#d62728" if e["peso"] > diagnostico.MAX_EMPRESA
+                              orientation="h", marker_color=["#d62728" if e["peso"] > lim["empresa"]
                                                              else "#2ca02c" for e in dg["empresas"]],
                               text=[f"{e['peso'] * 100:.0f} %" for e in dg["empresas"]], textposition="auto"))
-    figura.add_vline(x=diagnostico.MAX_EMPRESA * 100, line_dash="dash",
-                     annotation_text=f"máximo prudente {diagnostico.MAX_EMPRESA * 100:.0f} %")
+    figura.add_vline(x=lim["empresa"] * 100, line_dash="dash",
+                     annotation_text=f"máximo prudente {lim['empresa'] * 100:.0f} %")
     figura.update_layout(height=80 + 45 * len(dg["empresas"]), margin=dict(l=0, r=0, t=30, b=0),
                          xaxis_title="% de tu dinero", yaxis=dict(autorange="reversed"))
     mostrar_plotly(figura)
@@ -996,7 +1007,7 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     if not dg["propuesta"]:
         return False
     st.markdown("#### 🧭 Propuesta: repartir el riesgo")
-    st.write(f"Para que ninguna empresa pase del {diagnostico.MAX_EMPRESA * 100:.0f} % de tu dinero, venderías:")
+    st.write(f"Para que ninguna empresa pase del {lim['empresa'] * 100:.0f} % de tu dinero, venderías:")
     propuesta = pd.DataFrame([{
         "Empresa": v["nombre"], "Vender (títulos)": v["acciones"], "Importe": eur(v["importe"]),
         "Resultado a declarar": eur(v["ganancia"]), "Peso después": f"{v['queda_peso'] * 100:.0f} %"}

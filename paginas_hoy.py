@@ -8,10 +8,10 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from bolsa import asesor, bankinter, costes, diagnostico, estrategias, noticias, patrones
+from bolsa import asesor, bankinter, costes, estrategias, noticias, patrones
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
-from paginas_extra import asesor_hoy, pesos_cartera_real
+from paginas_extra import asesor_hoy, limite_empresa, pesos_cartera_real
 from paginas_seguimiento import bloque_pendientes
 from ui_comun import (cargar_informe, cargar_noticias, cargar_varios, conclusion_noticia, cotizaciones_ahora,
                       cuenta_activa, dias_informe, eur, fecha, hora_espana, ir_a, linea_frescura, moneda_de, num,
@@ -76,7 +76,7 @@ def tarjeta_idea(r: dict, clave: str, peso: float = 0.0):
     etiqueta, color, _ = asesor.veredicto(r)
     with st.container(border=True):
         st.markdown(f"**{r['nombre']}** · {r['sector']}")
-        if peso > diagnostico.MAX_EMPRESA:
+        if peso > limite_empresa():
             st.markdown(f":orange[**Ya tienes demasiada**] · pesa el {peso * 100:.0f} % de tu dinero: no compres "
                         "más aunque tenga buena nota.")
         else:
@@ -128,7 +128,8 @@ def pagina_hoy():
     ideas = [por_ticker[t] for t in inf.get("ideas_es", []) if t in por_ticker]
     pesos = pesos_cartera_real()
     # Las que ya tienes de sobra, al final: no son ideas para ti hoy.
-    ideas.sort(key=lambda r: pesos.get(r["ticker"], 0.0) > diagnostico.MAX_EMPRESA)
+    tope = limite_empresa()
+    ideas.sort(key=lambda r: pesos.get(r["ticker"], 0.0) > tope)
     if ideas:
         visibles = ideas[:3] if pf.movil else ideas
         cols = st.columns(1 if pf.movil else min(len(ideas), 3))
