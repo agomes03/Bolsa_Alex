@@ -27,7 +27,7 @@ COLUMNAS = {
                  "titulos depositados", "units"],
     "precio_medio": ["precio medio", "pr medio", "p medio", "precio compra", "precio de compra", "coste medio",
                      "precio adquisicion", "cambio medio", "precio medio compra", "average price", "avg price",
-                     "precio medio de compra", "coste unitario", "pmc"],
+                     "precio medio de compra", "coste unitario", "pmc", "precio"],
     "coste_total": ["importe invertido", "coste total", "coste de adquisicion", "valor de adquisicion",
                     "precio de coste", "inversion", "importe de compra", "cost basis", "total cost"],
     "valor_mercado": ["valoracion", "valor de mercado", "valor mercado", "importe valorado", "market value",
@@ -139,8 +139,15 @@ def leer_tabla(df: pd.DataFrame, resolver: Callable[[str], dict | None] | None =
                 ticker = ticker_txt + sufijo
             else:
                 ticker = buscar_ticker(ticker_txt) or ticker_txt
-        ticker = ticker or ISIN_CONOCIDOS.get(isin) or ticker_cripto(nombre) or ticker_cripto(ticker_txt) \
-            or buscar_ticker(nombre) or ""
+        # «Santander Acciones Españolas FI» es un fondo, no la acción de Santander: en los fondos manda el ISIN.
+        es_fondo = bool(re.search(r"\b(fi|fim|fondo|fund|etf|ucits|sicav|plan de pensiones|pp)\b", _norm(nombre or "")))
+        ticker = ticker or ISIN_CONOCIDOS.get(isin) or ""
+        if not ticker and es_fondo and resolver and isin:
+            hallado = resolver(isin)
+            if hallado:
+                ticker, tipo = hallado["symbol"], hallado.get("type")
+        ticker = ticker or ticker_cripto(nombre) or ticker_cripto(ticker_txt) \
+            or ("" if es_fondo else buscar_ticker(nombre)) or ""
         if not ticker and resolver:
             hallado = resolver(isin) if isin else None
             hallado = hallado or (resolver(nombre) if nombre else None)

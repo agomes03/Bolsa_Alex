@@ -90,8 +90,16 @@ def mercado_de(ticker: str) -> str | None:
         return "UK"
     if "." not in ticker and not ticker.startswith("^") and "=" not in ticker and "-" not in ticker:
         return "US"
-    if ticker in ("^GSPC", "^NDX", "^IXIC", "^DJI", "^RUT"):
+    if ticker in ("^GSPC", "^NDX", "^IXIC", "^DJI", "^RUT", "^VIX", "^TNX", "^TYX", "^FVX", "^IRX"):
         return "US"
+    if ticker == "^FTSE":
+        return "UK"
+    if ticker in ("^GDAXI", "^STOXX50E"):
+        return "DE"
+    if ticker in ("^FCHI", "^AEX"):
+        return "EURONEXT"
+    if ticker == "^SSMI":
+        return "CH"
     if ticker in ("^IBEX",):
         return "ES"
     return None

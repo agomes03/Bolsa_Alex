@@ -51,6 +51,8 @@ def _cuestionario(cta: dict) -> dict | None:
         colchon = c[0].checkbox("Tengo ahorrados 3-6 meses de gastos aparte de esto", previo.get("colchon", True))
         deudas = c[1].checkbox("Tengo deudas caras (tarjetas, préstamos de más del 7 %)", previo.get("deudas", False))
         if st.form_submit_button("Ver mi plan para hoy", type="primary", width="stretch"):
+            cta.pop("perfil_elegido", None)        # el test nuevo manda sobre lo elegido a mano
+            st.session_state.pop("perfil_diag", None)
             cta["perfil_inversor"] = {"objetivo": objetivo, "importe": importe, "mensual": mensual,
                                       "intereses": intereses or plan.INTERESES_POR_DEFECTO[objetivo],
                                       "plazo": plazo, "perdida_max": perdida, "horizonte": max(horizonte, 0),

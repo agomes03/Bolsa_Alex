@@ -18,8 +18,9 @@ def rsi(serie: pd.Series, dias: int = 14) -> pd.Series:
     media_baj = bajadas.ewm(alpha=1 / dias, min_periods=dias, adjust=False).mean()
     rs = media_sub / media_baj.replace(0, np.nan)
     resultado = 100 - 100 / (1 + rs)
-    # Si no ha habido ninguna bajada, el RSI es 100.
-    return resultado.where(media_baj != 0, 100.0).where(media_sub.notna())
+    # Si no ha habido ninguna bajada, el RSI es 100; si el precio no se ha movido nada, 50 (neutral).
+    resultado = resultado.where(media_baj != 0, 100.0).where((media_baj != 0) | (media_sub != 0), 50.0)
+    return resultado.where(media_sub.notna())
 
 
 def macd(serie: pd.Series, rapida: int = 12, lenta: int = 26, senal: int = 9) -> pd.DataFrame:

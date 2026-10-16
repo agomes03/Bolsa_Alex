@@ -42,7 +42,8 @@ def main() -> int:
                              iteraciones=args.iteraciones, con_noticias=not args.sin_noticias, log=log)
 
     token, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
-    if token and chat:
+    # El sábado solo se reentrena: el mensaje del viernes (con el resumen de la semana) ya salió el viernes noche.
+    if token and chat and datetime.now(timezone.utc).weekday() != 5:
         propios, semana, pendientes = [], "", ""
         if os.environ.get("GIST_TOKEN") and os.environ.get("GIST_ID"):
             try:

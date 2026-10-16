@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from bolsa import asesor, bankinter, costes, cuentas, noticias
+from bolsa import asesor, costes, cuentas, noticias
 from ui_comun import (Perfil, cuenta_activa, datos_usuario, es_movil, estado_finnhub, estado_guardado, guardar_datos,
-                      hay_contrasena, olvidar_datos_al_dia)
+                      hay_contrasena, olvidar_campos_de_cuenta, olvidar_datos_al_dia)
 
 
 def _capital_por_defecto() -> float:
@@ -85,6 +85,7 @@ def selector_de_cuenta() -> None:
                                 "Las cuentas no se suman. Créalas en 🏦 Mi cartera → 🗂️ Cuentas.")
     if elegida != d["cuenta_activa"]:
         cuentas.activar(d, elegida)
+        olvidar_campos_de_cuenta()
         guardar_datos()
     st.divider()
 
@@ -110,7 +111,7 @@ def barra_lateral() -> Perfil:
         if broker != d.get("broker", "Bankinter"):
             d["broker"] = broker
             guardar_datos()
-        bankinter.BROKER = broker
+        st.session_state["_broker"] = broker
         with st.expander(f"Tus comisiones en {broker if broker != 'Otro' else 'tu bróker'}"):
             tarifa = _tarifa_bankinter() if broker == "Bankinter" else _tarifa_otro(broker, d)
         _pie()

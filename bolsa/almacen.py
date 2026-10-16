@@ -33,23 +33,33 @@ class Almacen:
         return {"Authorization": f"Bearer {self.gist_token}", "Accept": "application/vnd.github+json"}
 
     def cargar(self) -> dict:
+        return self.cargar_con_version()[0]
+
+    def cargar_con_version(self) -> tuple[dict, str]:
+        """(datos, versión). La versión cambia cada vez que alguien guarda (otro móvil, otro ordenador, el aviso de
+        Telegram): sirve para no pisar lo que otro haya guardado mientras tanto."""
         if self.en_la_nube:
             import requests
 
             r = requests.get(f"https://api.github.com/gists/{self.gist_id}", headers=self._cabeceras(), timeout=15)
             r.raise_for_status()
-            fichero = r.json().get("files", {}).get(NOMBRE_GIST)
+            js = r.json()
+            version = str(js.get("updated_at", ""))
+            fichero = js.get("files", {}).get(NOMBRE_GIST)
             if not fichero:
-                return {}
+                return {}, version
             contenido = fichero.get("content", "")
             if fichero.get("truncated"):
-                contenido = requests.get(fichero["raw_url"], headers=self._cabeceras(), timeout=15).text
-            return json.loads(contenido or "{}")
+                rr = requests.get(fichero["raw_url"], headers=self._cabeceras(), timeout=15)
+                rr.raise_for_status()
+                contenido = rr.text
+            return json.loads(contenido or "{}"), version
         if self.ruta.exists():
-            return json.loads(self.ruta.read_text(encoding="utf-8") or "{}")
-        return {}
+            return json.loads(self.ruta.read_text(encoding="utf-8") or "{}"), str(self.ruta.stat().st_mtime_ns)
+        return {}, ""
 
-    def guardar(self, datos: dict) -> None:
+    def guardar(self, datos: dict) -> str:
+        """Guarda y devuelve la nueva versión."""
         texto = json.dumps(datos, ensure_ascii=False, indent=1, default=str)
         if self.en_la_nube:
             import requests
@@ -57,9 +67,35 @@ class Almacen:
             r = requests.patch(f"https://api.github.com/gists/{self.gist_id}", headers=self._cabeceras(),
                                json={"files": {NOMBRE_GIST: {"content": texto}}}, timeout=15)
             r.raise_for_status()
-            return
+            return str(r.json().get("updated_at", ""))
         self.ruta.parent.mkdir(parents=True, exist_ok=True)
         self.ruta.write_text(texto, encoding="utf-8")
+        return str(self.ruta.stat().st_mtime_ns)
+
+
+    def leer_extra(self, nombre: str) -> dict:
+        """Otro archivo del mismo Gist (p. ej. los avisos ya mandados por Telegram). Vacío si no existe."""
+        if not self.en_la_nube:
+            ruta = self.ruta.parent / nombre
+            return json.loads(ruta.read_text(encoding="utf-8") or "{}") if ruta.exists() else {}
+        import requests
+
+        r = requests.get(f"https://api.github.com/gists/{self.gist_id}", headers=self._cabeceras(), timeout=15)
+        r.raise_for_status()
+        fichero = r.json().get("files", {}).get(nombre)
+        return json.loads(fichero.get("content") or "{}") if fichero else {}
+
+    def guardar_extra(self, nombre: str, datos: dict) -> None:
+        """Escribe SOLO ese archivo del Gist: no toca tus carteras."""
+        texto = json.dumps(datos, ensure_ascii=False, indent=1, default=str)
+        if not self.en_la_nube:
+            (self.ruta.parent / nombre).write_text(texto, encoding="utf-8")
+            return
+        import requests
+
+        r = requests.patch(f"https://api.github.com/gists/{self.gist_id}", headers=self._cabeceras(),
+                           json={"files": {nombre: {"content": texto}}}, timeout=15)
+        r.raise_for_status()
 
 
 def desde_secrets(secrets) -> Almacen:

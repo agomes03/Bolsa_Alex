@@ -12,7 +12,7 @@ import html
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus
 
 from .tickers import TODAS_LAS_ACCIONES
@@ -153,6 +153,13 @@ class Noticia:
     explicaciones: list[str] = field(default_factory=list)
     empresas: list[str] = field(default_factory=list)  # tickers
     repeticiones: int = 1                  # nº de fuentes que publican la misma noticia
+
+    def __post_init__(self):
+        # Algún canal publica con la zona horaria mal y la noticia parece «del futuro»: mejor sin hora que con una
+        # falsa (si no, saldría como recién publicada y más importante de lo que es).
+        if self.fecha is not None and self.fecha.tzinfo is not None and \
+                self.fecha > datetime.now(timezone.utc) + timedelta(minutes=5):
+            self.fecha = None
 
     @property
     def etiqueta_sentimiento(self) -> str:

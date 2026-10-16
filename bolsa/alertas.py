@@ -2,8 +2,8 @@
 
 Se comprueban de dos formas:
 - en la app, cada vez que la abres (con las velas diarias desde que creaste el aviso);
-- por Telegram, cada hora en horario de mercado (scripts/alertas.py), solo cuando el precio CRUZA el nivel en la
-  última hora. Así no recibes el mismo aviso una y otra vez mientras el precio sigue al otro lado.
+- por Telegram, cada hora en horario de mercado (scripts/alertas.py), solo cuando el precio CRUZA el nivel, una
+  vez por cruce. Así no recibes el mismo aviso una y otra vez mientras el precio sigue al otro lado.
 """
 
 from __future__ import annotations
@@ -89,6 +89,44 @@ def cruces_en_ventana(lista: list[dict], intradia: dict[str, pd.DataFrame], desd
     return cruzados
 
 
+def ultimo_cruce(a: dict, df: pd.DataFrame) -> tuple[pd.Timestamp, float] | None:
+    """Momento (vela intradía) en que el precio cruzó por última vez el nivel del aviso desde que se creó, y el
+    precio de ahora. None si no lo ha cruzado."""
+    if df is None or df.empty:
+        return None
+    df = df[df.index >= pd.Timestamp(a["creada"])]
+    if df.empty:
+        return None
+    cruce, al_otro_lado = None, False
+    for ts, f in df.iterrows():
+        toca = cumple(a["tipo"], a["precio"], float(f["Low"]), float(f["High"]))
+        if toca and not al_otro_lado:
+            cruce = ts
+        al_otro_lado = cumple(a["tipo"], a["precio"], float(f["Close"]), float(f["Close"]))
+    return (cruce, float(df["Close"].iloc[-1])) if cruce is not None else None
+
+
+def cruces_nuevos(lista: list[dict], intradia: dict[str, pd.DataFrame], avisados: dict[str, str], cuenta: str,
+                  ahora: datetime, horas: int = 26) -> list[dict]:
+    """Avisos activos con un cruce que aún no se ha mandado por Telegram (`avisados`: aviso -> momento del último
+    cruce ya avisado, se actualiza). No depende de a qué hora se ejecute el aviso: si GitHub va con retraso o
+    Yahoo publica tarde, el cruce se avisa en la siguiente vuelta, y nunca dos veces."""
+    salida = []
+    for a in lista:
+        if a.get("disparada"):
+            continue
+        r = ultimo_cruce(a, intradia.get(a["ticker"]))
+        if not r:
+            continue
+        cruce, precio = r
+        clave = f"{cuenta}|{a['id']}|{a['creada']}"
+        if avisados.get(clave) == cruce.isoformat() or cruce < pd.Timestamp(ahora) - pd.Timedelta(hours=horas):
+            continue
+        avisados[clave] = cruce.isoformat()
+        salida.append({**a, "precio_ahora": precio})
+    return salida
+
+
 def _num(x: float) -> str:
     return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
@@ -105,4 +143,5 @@ def describir(a: dict) -> str:
     return f"Avísame si {a['nombre']} {TIPOS[a['tipo']]} {_num(a['precio'])}"
 
 
-__all__ = ["TIPOS", "nueva", "cumple", "revisar", "cruces_en_ventana", "texto", "describir"]
+__all__ = ["TIPOS", "nueva", "cumple", "revisar", "cruces_en_ventana", "ultimo_cruce", "cruces_nuevos", "texto",
+           "describir"]

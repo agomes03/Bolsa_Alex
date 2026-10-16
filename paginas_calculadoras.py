@@ -52,8 +52,9 @@ def pagina_calculadoras():
         c[2 % len(c)].metric("Te queda limpio", eur(g - imp))
         st.caption("Tramos del ahorro: 19% hasta 6.000 €, 21% hasta 50.000 €, 23% hasta 200.000 €, "
                    "27% hasta 300.000 €, 30% a partir de ahí. Las pérdidas se pueden compensar con ganancias "
-                   "(durante 4 años). Ojo con la 'regla de los 2 meses': si vendes con pérdidas y recompras la "
-                   "misma acción en menos de 2 meses, no puedes aplicar esa pérdida todavía. "
+                   "(durante 4 años). Ojo con la 'regla de los 2 meses': si vendes con pérdidas y compras la "
+                   "misma acción en los 2 meses anteriores o posteriores (y la conservas), no puedes aplicar esa "
+                   "pérdida todavía. "
                    "Bankinter te envía el informe fiscal para la declaración.")
     with t3:
         st.write("Para la mayoría de personas, la forma más eficaz de hacer crecer el dinero es **aportar una "

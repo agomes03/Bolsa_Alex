@@ -272,14 +272,15 @@ def bloque_que_puede_pasar(pesos: dict[str, float], importe: float, mensual: flo
 def tabla_radar(f: pd.DataFrame, ideas: set[str]):
     """La tabla del radar con los precios de ahora. Se refresca sola cada minuto."""
     pf = perfil()
-    with st.spinner("Actualizando precios..."):
-        precios = cotizaciones_ahora(f["ticker"].tolist())
+    precios = cotizaciones_ahora(f["ticker"].tolist(), esperar=False)
+    del_informe = dict(zip(f["ticker"], f["precio"])) if "precio" in f else {}
 
     def precio_txt(t: str, divisa) -> str:
         q = precios.get(t)
-        if not q:
+        p = q["precio"] if q else del_informe.get(t)
+        if p is None or pd.isna(p):
             return "—"
-        return f"{num(q['precio'], 2)} {'€' if divisa in (None, 'EUR') or t.endswith('.MC') else divisa}"
+        return f"{num(p, 2)} {'€' if divisa in (None, 'EUR') or t.endswith('.MC') else divisa}"
 
     tabla = pd.DataFrame({
         "": ["⭐" if t in ideas else "" for t in f["ticker"]],
@@ -287,7 +288,7 @@ def tabla_radar(f: pd.DataFrame, ideas: set[str]):
         "Precio": [precio_txt(t, d) for t, d in zip(f["ticker"], f.get("divisa", [None] * len(f)))],
         "Hoy (%)": [round(precios[t]["variacion_pct"], 2) if precios.get(t, {}).get("variacion_pct") is not None
                     else None for t in f["ticker"]],
-        "Cotización": [texto_estado_precio(precios[t]) if t in precios else "—" for t in f["ticker"]],
+        "Cotización": [texto_estado_precio(precios[t]) if t in precios else "cierre (cargando…)" for t in f["ticker"]],
         "Veredicto": f["veredicto_txt"], "Nota": f["nota"],
         "Riesgo de caída": f["riesgo_nivel"].map(ICONO_RIESGO),
         "Último año (%)": (f["momentum"] * 100).round(0),

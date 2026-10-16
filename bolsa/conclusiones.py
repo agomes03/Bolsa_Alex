@@ -92,13 +92,13 @@ REGLAS = [
           "general.",
           "Las caídas por aranceles a veces se recuperan cuando hay acuerdos: si quieres aprovecharlas, entra poco a "
           "poco y solo en empresas con buen veredicto.", ("Automoción", "Lujo", "Materiales")),
-    Regla(r"(petr[oó]leo|brent|crudo|\bopep\b|\bopec\b|crude|\boil\b).{0,40}(sube|dispara|alza|r[eé]cord|rise|surge|jump)|"
+    Regla(r"(petr[oó]leo|brent|crudo|\bopep\b|\bopec\b|crude|\boil\b)(?:(?!mientras|pero|aunque|while|but|[,;]).){0,40}(sube|dispara|alza|r[eé]cord|rise|surge|jump)|"
           r"(sube|dispara).{0,20}(petr[oó]leo|crudo)",
           "vigilar", "Petróleo más caro: ganan las petroleras (Repsol) y pierden aerolíneas (IAG) y transporte; "
           "también puede subir la inflación.",
           "Oportunidad para petroleras a corto plazo; riesgo para aerolíneas.", ("Transporte",),
           suben=("Petróleo",)),
-    Regla(r"(petr[oó]leo|brent|crudo|\bopep\b|\bopec\b|crude|\boil\b).{0,40}(cae|baja|desploma|hunde|fall|drop|slump)|"
+    Regla(r"(petr[oó]leo|brent|crudo|\bopep\b|\bopec\b|crude|\boil\b)(?:(?!mientras|pero|aunque|while|but|[,;]).){0,40}(cae|baja|desploma|hunde|fall|drop|slump)|"
           r"(cae|baja|desploma).{0,20}(petr[oó]leo|crudo)",
           "vigilar", "Petróleo más barato: pierden las petroleras y ganan aerolíneas, transporte y consumo.",
           "Buen momento relativo para aerolíneas; malo para petroleras.", ("Petróleo",),
@@ -156,8 +156,9 @@ def concluir(titulo: str, resumen: str = "", empresas: list[str] | None = None, 
         if sentimiento > 0:
             efecto = "El titular apunta a unos buenos resultados: suele subir si superan lo esperado. " + efecto
         elif sentimiento < 0:
-            efecto = "El titular apunta a unos resultados flojos: suele bajar. " + efecto
-            tipo = "oportunidad"   # la caída puede abrir una ocasión si la empresa sigue sana
+            efecto = ("El titular apunta a unos resultados flojos: suele bajar. Si la empresa sigue sana, la caída "
+                      "puede ser una ocasión más adelante; no compres el mismo día. " + efecto)
+            tipo = "vigilar"
 
     if empresas:
         donde = ", ".join(nombre_de(t) for t in empresas[:3])

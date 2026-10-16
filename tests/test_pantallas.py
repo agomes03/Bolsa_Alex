@@ -464,3 +464,45 @@ def test_hoy_dice_que_hacer_con_cada_accion_y_puede_centrarse_en_mi_cartera():
     sin_fallos(at)
     assert any("Ideas del día" in s.value for s in at.subheader)
     assert at.session_state["_datos"]["cartera_real"]["solo_mi_cartera"] is False
+
+
+def test_el_stop_de_una_cuenta_no_aparece_en_otra_con_la_misma_accion():
+    mia, mama = cartera_de_prueba(), cartera_de_prueba()
+    mia["posiciones"]["SAN.MC"]["stop"] = 11.0
+    d = {"cuentas": {"Mi cuenta": mia, "Mamá": mama}, "cuenta_activa": "Mi cuenta"}
+    at = abrir("pagina_bankinter", datos_usuario=d)
+    sin_fallos(at)
+    assert at.number_input(key="stop_SAN.MC").value == 11.0
+    [s for s in at.sidebar.selectbox if s.label == "👤 Cuenta"][0].set_value("Mamá").run()
+    sin_fallos(at)
+    assert at.number_input(key="stop_SAN.MC").value == 0.0            # el de tu madre, no el tuyo
+
+
+def test_diagnostico_con_solo_fondos_no_se_rompe():
+    cr = cartera.nueva(None)
+    cartera.comprar(cr, "IWDA.AS", 300, 90.0, costes.Tarifa(), "2026-09-01", None, nota="prueba", fx=1.0)
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cr})
+    sin_fallos(at)
+
+
+def test_si_no_cargan_tus_datos_no_se_guarda_nada(monkeypatch):
+    from bolsa import almacen
+
+    guardados = []
+    monkeypatch.setattr(almacen.Almacen, "cargar_con_version",
+                        lambda self: (_ for _ in ()).throw(RuntimeError("GitHub caído")))
+    monkeypatch.setattr(almacen.Almacen, "guardar", lambda self, d: guardados.append(d) or "v")
+    at = abrir("pagina_seguimiento")
+    sin_fallos(at)
+    assert any("no se han podido cargar tus datos" in e.value.lower() for e in at.error)
+    assert [b for b in at.button if "Reintentar" in b.label]               # se puede reintentar
+    assert guardados == []                     # guardar ahora borraría lo que tienes en la nube
+
+
+def test_venta_parcial():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    at.number_input(key="nv_SAN.MC").set_value(1000).run()
+    at.button(key="vend_SAN.MC").click().run()
+    sin_fallos(at)
+    assert at.session_state["_datos"]["cartera_real"]["posiciones"]["SAN.MC"]["acciones"] == 1500

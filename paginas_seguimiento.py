@@ -12,8 +12,8 @@ from bolsa import agenda, alertas, aportaciones, asesor, diario, renta
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import _perfil_guardado, nombre_posicion, revisar_cartera_real
-from ui_comun import (cargar_dividendos_varios, cargar_varios, cuenta_activa, datos_usuario, enlace, eur, fx, guardar_datos,
-                      palabras_de_la_pagina, perfil, selector_valor)
+from ui_comun import (cargar_diario_real, cargar_dividendos_varios, cargar_varios, cotizaciones_ahora, cuenta_activa,
+                      datos_usuario, enlace, eur, fx, guardar_datos, palabras_de_la_pagina, perfil, selector_valor)
 
 DESTINO_CORTO = {
     "Fondo indexado mundial": "Fondo indexado mundial (MSCI World o FTSE All-World, comisión < 0,3 %)",
@@ -26,7 +26,11 @@ DESTINO_CORTO = {
 
 # --------------------------------------------------------------------------- comunes
 def _ultimo_precio(ticker: str) -> float | None:
+    """El precio de ahora (o el último cierre), sin ajustar: el que ves en tu bróker."""
     try:
+        q = cotizaciones_ahora([ticker]).get(ticker)
+        if q:
+            return float(q["precio"])
         df = cargar_varios((ticker,), "1mo").get(ticker)
     except Exception:  # noqa: BLE001
         return None
@@ -54,7 +58,9 @@ def actualizar_alertas() -> None:
     if not activas:
         return
     try:
-        hist = cargar_varios(tuple(sorted({a["ticker"] for a in activas})), "1y")
+        # Precios sin ajustar por dividendos (los de verdad): con los ajustados, tras pagar un dividendo los días
+        # anteriores «bajan» y un aviso podría saltar sin que el precio llegara nunca a tu nivel.
+        hist = {t: cargar_diario_real(t, "1y") for t in sorted({a["ticker"] for a in activas})}
     except Exception:  # noqa: BLE001 - sin datos, se comprueban la próxima vez
         return
     if alertas.revisar(d["alertas"], hist):
@@ -109,11 +115,15 @@ def tab_alertas():
     if precio_actual:
         st.caption(f"Último precio de {nombre}: **{precio_actual:,.2f}**".replace(",", "X").replace(".", ",")
                    .replace("X", "."))
+    tipo = st.radio("Avísame si…", list(alertas.TIPOS), format_func=lambda k: alertas.TIPOS[k].capitalize(),
+                    horizontal=True, key="alerta_tipo")
     with st.form("nueva_alerta", border=True):
         c = st.columns(2)
-        tipo = c[0].radio("Avísame si…", list(alertas.TIPOS), format_func=lambda k: alertas.TIPOS[k].capitalize(),
-                          horizontal=True)
-        precio = c[1].number_input("Precio", min_value=0.0, value=round((precio_actual or 0) * 0.95, 2), step=0.5)
+        sugerido = round((precio_actual or 0) * (0.95 if tipo == "baja" else 1.05), 2)
+        precio = c[0].number_input("Precio", min_value=0.0, value=sugerido, step=0.5,
+                                   key=f"alerta_precio_{t}_{tipo}",
+                                   help="Propuesta: un 5 % por debajo (si baja) o por encima (si sube) del precio de "
+                                        "ahora.")
         nota = st.text_input("Nota para ti (opcional)", placeholder="p. ej. «si baja de aquí, vendo la mitad»")
         if st.form_submit_button("➕ Crear aviso", width="stretch"):
             err = alertas.nueva(lista, t, nombre, tipo, precio, precio_actual, nota)

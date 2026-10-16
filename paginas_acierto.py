@@ -50,7 +50,7 @@ def pagina_acierto():
         lineas.append(f"📅 **En tiempo real** ({hv['evaluados']} casos con un mes de antigüedad): el grupo que más "
                       f"subió fue «{mejor['veredicto']}» ({pct(mejor['rent_media'] * 100, 1)} de media).")
     else:
-        desde = date.fromisoformat(hv.get("desde") or hi.get("desde") or inf["fecha"])
+        desde = date.fromisoformat(hv.get("desde") or hi.get("desde") or inf.get("fecha") or date.today().isoformat())
         lineas.append(f"📅 **En tiempo real**: la app guarda cada día sus ideas y sus veredictos desde el "
                       f"{fecha(desde.isoformat())}. Los primeros resultados reales, con un mes de antigüedad, llegarán "
                       f"hacia el **{fecha((desde + timedelta(days=31)).isoformat())}**.")
@@ -68,7 +68,8 @@ def pagina_acierto():
                                marker_color=["#16a34a" if i < 3 else "#f59e0b" if i < 7 else "#dc2626"
                                              for i in range(len(cal))],
                                text=[f"{c_['sube'] * 100:.0f} %" for c_ in cal], textposition="outside"))
-        fig.add_hline(y=ries["metricas"]["tasa_subidas"] * 100, line_dash="dot", annotation_text="media")
+        if ries.get("metricas", {}).get("tasa_subidas") is not None:
+            fig.add_hline(y=ries["metricas"]["tasa_subidas"] * 100, line_dash="dot", annotation_text="media")
         fig.update_layout(xaxis_title="Grupo de riesgo (1 = el menor)", yaxis_title="% que cayó más de un 10 %",
                           showlegend=False)
         mostrar_plotly(fig, alto=300)

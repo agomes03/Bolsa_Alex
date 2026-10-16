@@ -15,7 +15,7 @@ def test_resultados_proximos_y_publicados():
     assert c["tipo"] == "vigilar" and c["donde"].startswith("BBVA") and "Evita comprar justo antes" in c["oportunidad"]
     assert "Hoy la app ve BBVA así" in c["oportunidad"] and "nota 71/100" in c["oportunidad"]
     c = concluir("BBVA se hunde tras unos resultados que decepcionan")
-    assert "flojos" in c["efecto"] and c["tipo"] == "oportunidad"
+    assert "flojos" in c["efecto"] and c["tipo"] == "vigilar"          # caída tras resultados: vigilar, no comprar ya
 
 
 def test_tipos_y_conflictos_dicen_quien_gana_y_quien_pierde():

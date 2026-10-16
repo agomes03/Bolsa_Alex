@@ -23,9 +23,11 @@ def _serie(div: pd.Series | None) -> pd.Series:
 
 
 def resumen(ticker: str, dividendos: pd.Series | None, ex_dividendo: int | float | None, acciones: float,
-            precio: float, fx: float = 1.0, hoy: date | None = None, fecha_compra: str | None = None) -> dict:
+            precio: float, fx: float = 1.0, hoy: date | None = None, fecha_compra: str | None = None,
+            historial: list[dict] | None = None) -> dict:
     """`dividendos`: pagos por acción (en la divisa del valor) con su fecha ex-dividendo.
-    `ex_dividendo`: próxima fecha ex-dividendo anunciada (timestamp Unix) si la hay."""
+    `ex_dividendo`: próxima fecha ex-dividendo anunciada (timestamp Unix) si la hay.
+    `historial`: tus compras y ventas, para contar en cada dividendo solo las acciones que tenías ese día."""
     hoy = hoy or date.today()
     d = _serie(dividendos)
     hace_un_ano = pd.Timestamp(hoy) - pd.DateOffset(years=1)
@@ -56,7 +58,15 @@ def resumen(ticker: str, dividendos: pd.Series | None, ex_dividendo: int | float
         salida["proximo_importe"] = acciones * ultimo_importe * fx
     if fecha_compra:
         desde = pd.Timestamp(fecha_compra[:10])
-        salida["cobrado_desde_compra"] = float(d[d.index >= desde].sum()) * acciones * fx
+        pagos = d[d.index >= desde]
+        if historial and any(h.get("ticker") == ticker for h in historial):
+            from .renta import acciones_en
+
+            salida["cobrado_desde_compra"] = float(sum(
+                importe * acciones_en(historial, ticker, pd.Timestamp(f).normalize())
+                for f, importe in pagos.items())) * fx
+        else:
+            salida["cobrado_desde_compra"] = float(pagos.sum()) * acciones * fx
     return salida
 
 

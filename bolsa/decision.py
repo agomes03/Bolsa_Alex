@@ -151,7 +151,8 @@ def decidir(fila: dict, valor: float, total: float, limite: float, analistas: di
         n = n_acciones(valor / 2)
         clave = "vender_parte"
         texto = (f"Ya cotiza por encima del objetivo MÁS optimista de los analistas ({_pct(a['potencial_alto'])}). "
-                 f"Te recomiendo vender una parte (por ejemplo, la mitad: unas {n} acciones) y asegurar la ganancia; "
+                 "Te recomiendo vender una parte (por ejemplo, la mitad" + (f": unas {n} acciones" if n >= 1 else "")
+                 + ") y asegurar la ganancia; "
                  "al resto, súbele el stop-loss.")
     elif sin_proteccion and es_accion:
         clave = "stop"

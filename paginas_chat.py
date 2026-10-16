@@ -106,7 +106,7 @@ def contexto() -> str:
         lista_activos = cargar_activos()
     except Exception:  # noqa: BLE001 - sin datos de mercado el chat sigue funcionando
         lista_activos = []
-    texto = chat.contexto_usuario(date.today().strftime("%d/%m/%Y"), bankinter.BROKER, _perfil_guardado(), cartera,
+    texto = chat.contexto_usuario(date.today().strftime("%d/%m/%Y"), bankinter.broker(), _perfil_guardado(), cartera,
                                   dg, inf.get("mercado"), lista_activos)
     st.session_state[clave] = texto
     return texto

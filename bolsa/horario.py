@@ -23,12 +23,23 @@ SESIONES = {
     ".TW": (ZoneInfo("Asia/Taipei"), time(9, 0), time(13, 30)),
     ".NS": (ZoneInfo("Asia/Kolkata"), time(9, 15), time(15, 30)),
     ".SS": (ZoneInfo("Asia/Shanghai"), time(9, 30), time(15, 0)),
+    ".TO": (ZoneInfo("America/Toronto"), time(9, 30), time(16, 0)),
+    ".SA": (ZoneInfo("America/Sao_Paulo"), time(10, 0), time(17, 0)),
+    ".AX": (ZoneInfo("Australia/Sydney"), time(10, 0), time(16, 0)),
 }
+# Los índices cotizan con el horario de su bolsa (el S&P 500, de 15:30 a 22:00 hora peninsular; el Nikkei, de
+# madrugada), no con el de Madrid.
+INDICES = {"^GSPC": "EEUU", "^NDX": "EEUU", "^IXIC": "EEUU", "^DJI": "EEUU", "^RUT": "EEUU", "^VIX": "EEUU",
+           "^TNX": "EEUU", "^TYX": "EEUU", "^FVX": "EEUU", "^IRX": "EEUU", "^FTSE": ".L", "^N225": ".T",
+           "^HSI": ".HK", "^KS11": ".KS", "^NSEI": ".NS", "000001.SS": ".SS", "^GSPTSE": ".TO", "^BVSP": ".SA",
+           "^AXJO": ".AX"}
 SUFIJOS_EUROPA = (".MC", ".DE", ".PA", ".AS", ".MI", ".BR", ".HE", ".LS", ".SW", ".CO", ".ST", ".OL")
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
 
 def sesion(ticker: str):
+    if ticker in INDICES:
+        return SESIONES[INDICES[ticker]]
     for sufijo in (".L", ".T", ".HK", ".KS", ".TW", ".NS", ".SS"):
         if ticker.endswith(sufijo):
             return SESIONES[sufijo]

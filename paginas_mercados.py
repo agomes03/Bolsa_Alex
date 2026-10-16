@@ -26,7 +26,7 @@ def filas_grupo(tickers: tuple[str, ...]) -> list[dict]:
     """Último precio, variaciones y tendencia de un grupo (una sola descarga para todo el grupo)."""
     from bolsa import activos as act
 
-    hist = cargar_varios(tickers, "1y")
+    hist = cargar_varios(tickers, "2y")         # con "1y" a veces faltaba un día para la variación de 1 año
     filas = []
     for t in tickers:
         df = hist.get(t)
@@ -80,8 +80,8 @@ def pagina_resumen():
 def filas_al_dia(tickers: tuple[str, ...]) -> list[dict]:
     """Tendencia y variación anual del histórico (se descarga cada 10 min) con el precio de ahora encima."""
     filas = [dict(f) for f in filas_grupo(tickers)]
-    try:
-        ahora = cotizaciones_ahora(tickers)
+    try:     # sin esperar: mientras llegan los precios de ahora, se ve el último cierre
+        ahora = cotizaciones_ahora(tickers, esperar=False)
     except Exception:  # noqa: BLE001
         ahora = {}
     for f in filas:
@@ -111,7 +111,7 @@ def bloque_mercado(grupo: str) -> bool:
 
 def tarjetas_indices(filas: list[dict]):
     movil = perfil().movil
-    principales = ["^IBEX", "^STOXX50E", "^FTSE", "^N225", "^GDAXI", "^FCHI", "^NDX", "^DJI"]
+    principales = ["^IBEX", "^STOXX50E", "^GSPC", "^NDX", "^GDAXI", "^FCHI", "^FTSE", "^N225"]
     por_t = {f["ticker"]: f for f in filas}
     elegidos = [por_t[t] for t in principales if t in por_t]
     cols = st.columns(2 if movil else 4)

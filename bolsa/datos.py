@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-import threading
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -13,15 +13,12 @@ import pandas as pd
 # cambios en su web), se usan los últimos datos buenos y la app avisa de que son antiguos.
 CARPETA_RESPALDO = Path(os.environ.get("BOLSA_RESPALDO", Path(__file__).resolve().parent.parent / ".respaldo_datos"))
 RESPALDOS_USADOS: dict[str, float] = {}     # ticker -> fecha (epoch) de los datos de respaldo usados
-
-# yf.download guarda sus resultados en un diccionario global: dos descargas a la vez se mezclan. Se hacen de una
-# en una (las demás peticiones, como fundamentales o analistas, sí van en paralelo).
-_CERROJO_YF = threading.Lock()
-
+_CUANDO_RESPALDO: dict[str, float] = {}     # ticker -> cuándo se tuvo que usar el respaldo
 
 def _descargar_yf(yf, *a, **k):
-    with _CERROJO_YF:
-        return yf.download(*a, **k)
+    # yfinance 1.7 guarda cada descarga por separado (antes usaba un diccionario global y dos a la vez se
+    # mezclaban): se pueden hacer varias a la vez sin bloquearse.
+    return yf.download(*a, **k)
 
 
 def _ruta_respaldo(ticker: str, tipo: str) -> Path:
@@ -46,12 +43,16 @@ def _leer_respaldo(ticker: str, tipo: str) -> pd.DataFrame:
     except Exception:  # noqa: BLE001
         return pd.DataFrame()
     RESPALDOS_USADOS[ticker] = ruta.stat().st_mtime
+    _CUANDO_RESPALDO[ticker] = time.time()
     return df
 
 
 def respaldo_mas_antiguo() -> float | None:
-    """Fecha (epoch) del respaldo más antiguo usado en esta sesión, o None si todo es fresco."""
-    return min(RESPALDOS_USADOS.values()) if RESPALDOS_USADOS else None
+    """Fecha (epoch) del respaldo más antiguo usado en la última media hora, o None si todo es fresco. (Un valor
+    que Yahoo ha dejado de dar no deja el aviso puesto para siempre.)"""
+    reciente = time.time() - 1800
+    fechas = [f for t, f in list(RESPALDOS_USADOS.items()) if _CUANDO_RESPALDO.get(t, 0) >= reciente]
+    return min(fechas) if fechas else None
 
 
 def _sin_zona(df: pd.DataFrame) -> pd.DataFrame:

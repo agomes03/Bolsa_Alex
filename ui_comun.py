@@ -172,7 +172,10 @@ def _renovar(clave: tuple, funcion) -> None:
         e = _VIVOS.get(clave)
         if e is not None:
             e["renovando"] = False
-            if valor is not None:
+            # Una descarga vacía (Yahoo limita, un canal caído) no borra lo bueno que ya había.
+            if valor and not (isinstance(valor, tuple) and not valor[0]):
+                if isinstance(valor, dict) and isinstance(e.get("valor"), dict):
+                    valor = {**e["valor"], **valor}       # si falta algún valor, se queda su último precio
                 e.update(valor=valor, t=time.time(), hora=_hora_ahora())
 
 
@@ -182,11 +185,16 @@ def _hora_ahora() -> str:
     return datetime.now(MADRID_TZ).strftime("%H:%M:%S")
 
 
-def al_dia(clave: tuple, funcion, segundos: int):
+def al_dia(clave: tuple, funcion, segundos: int, esperar: bool = True):
     """(valor, hora): lo último descargado al instante; si tiene más de `segundos`, se renueva en segundo plano.
-    Solo la primera vez (nada guardado) se espera a la descarga."""
+    La primera vez (nada guardado) se espera a la descarga, salvo con `esperar=False`: entonces devuelve
+    (None, None) y la descarga sigue por detrás (la página enseña mientras tanto lo que ya tenga)."""
     with _CERROJO_VIVOS:
         e = _VIVOS.get(clave)
+        if e is None and not esperar:
+            _VIVOS[clave] = {"valor": None, "t": 0.0, "hora": None, "renovando": True}
+            threading.Thread(target=_renovar, args=(clave, funcion), daemon=True).start()
+            return None, None
         if e is not None and time.time() - e["t"] >= segundos and not e["renovando"]:
             e["renovando"] = True
             threading.Thread(target=_renovar, args=(clave, funcion), daemon=True).start()
@@ -197,7 +205,8 @@ def al_dia(clave: tuple, funcion, segundos: int):
                 for k in sorted(_VIVOS, key=lambda k: _VIVOS[k]["t"])[:100]:
                     _VIVOS.pop(k, None)
             e = _VIVOS[clave] = {"valor": valor, "t": time.time(), "hora": _hora_ahora(), "renovando": False}
-    _ULTIMA_HORA[clave[0]] = e["hora"]
+    if e["hora"]:
+        _ULTIMA_HORA[clave[0]] = e["hora"]
     return e["valor"], e["hora"]
 
 
@@ -216,10 +225,15 @@ def descargas_en_paralelo(*funciones):
         except Exception:  # noqa: BLE001
             pass
 
-    with ThreadPoolExecutor(max_workers=max(len(funciones), 1)) as pool:
-        for f in funciones:
-            pool.submit(lanzar, f)
+    pool = ThreadPoolExecutor(max_workers=max(len(funciones), 1))
+    for f in funciones:
+        pool.submit(lanzar, f)
+    try:
         yield
+    except BaseException:            # p. ej. st.rerun(): no se espera a las descargas
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
+    pool.shutdown(wait=True)
 
 
 def olvidar_datos_al_dia() -> None:
@@ -233,24 +247,27 @@ def linea_actualizado() -> str:
     return f"🔄 Precios de las {hora} · se actualizan solos cada minuto, sin tocar nada"
 
 
-def _precios_recientes(tickers: tuple[str, ...]) -> dict[str, dict]:
+def _precios_recientes(tickers: tuple[str, ...], esperar: bool = True) -> dict[str, dict]:
     # Un poco antes del minuto: así cada refresco automático encuentra ya los precios nuevos.
-    return al_dia(("precios", tickers), lambda: datos.precios_recientes(list(tickers)), SEGUNDOS_PRECIOS - 15)[0]
+    return al_dia(("precios", tickers), lambda: datos.precios_recientes(list(tickers)), SEGUNDOS_PRECIOS - 15,
+                  esperar)[0] or {}
 
 
 MAX_FINNHUB_TABLA = 20      # el plan gratuito permite unas 60 consultas por minuto
 
 
-def cotizaciones_ahora(tickers) -> dict[str, dict]:
+def cotizaciones_ahora(tickers, esperar: bool = True) -> dict[str, dict]:
     """Precio de ahora para una lista de valores: en directo si su bolsa está abierta (Yahoo, ~15 min de retraso;
     tiempo real para EEUU con Finnhub) y, si está cerrada, el cierre de la última sesión.
-    Cada valor: precio, anterior, variacion_pct, fecha, estado ('tiempo_real' | 'directo' | 'cierre')."""
+    Cada valor: precio, anterior, variacion_pct, fecha, estado ('tiempo_real' | 'directo' | 'cierre').
+    `esperar=False`: si aún no hay nada descargado, devuelve {} al momento (las tablas grandes no se quedan en
+    blanco esperando; el siguiente refresco ya trae los precios)."""
     from bolsa import horario
 
     tickers = tuple(sorted(set(tickers)))
     if not tickers:
         return {}
-    recientes = _precios_recientes(tickers)
+    recientes = _precios_recientes(tickers, esperar)
     hoy = pd.Timestamp.now(tz=MADRID_TZ).date()
     salida = {}
     for t in tickers:
@@ -459,13 +476,42 @@ def datos_usuario() -> dict:
     """Carteras y estrategia del usuario (se cargan una vez por sesión)."""
     if "_datos" not in st.session_state:
         try:
-            st.session_state["_datos"] = _almacen().cargar()
+            try:
+                d, version = _almacen().cargar_con_version()
+            except Exception:  # noqa: BLE001 - un fallo pasajero de GitHub: se reintenta una vez
+                d, version = _almacen().cargar_con_version()
+            st.session_state["_datos"], st.session_state["_version_datos"] = d, version
+            st.session_state.pop("_carga_fallida", None)
         except Exception as e:  # noqa: BLE001
-            st.warning(f"No se pudieron cargar tus datos guardados ({e}). Empiezas con datos vacíos.")
+            # Sin tus datos NO se guarda nada: guardar ahora borraría lo que tienes en la nube.
             st.session_state["_datos"] = {}
+            st.session_state["_carga_fallida"] = str(e)
     d = st.session_state["_datos"]
     cuentas.asegurar(d)              # `cartera_real` apunta siempre a la cuenta activa
     return d
+
+
+def aviso_carga_fallida() -> None:
+    """Arriba de todas las páginas, mientras tus datos no hayan podido cargarse."""
+    datos_usuario()
+    if st.session_state.get("_carga_fallida"):
+        st.error("⚠️ No se han podido cargar tus datos guardados (GitHub no responde). Para no borrarlos, **la app no "
+                 "guardará nada** hasta que vuelvan a cargarse.")
+        if st.button("🔄 Reintentar cargar mis datos"):
+            st.session_state.pop("_datos", None)
+            st.rerun()
+
+
+CAMPOS_DE_POSICION = ("stop_", "pv_", "pq_", "nv_", "ss_", "alarma_", "perfil_diag")
+
+
+def olvidar_campos_de_cuenta() -> None:
+    """Al cambiar de cuenta, los campos de cada posición (stop, venta, vigilar...) se rellenan con los de la cuenta
+    nueva: si tu madre también tiene Santander, no se le pone tu stop-loss."""
+    for k in [k for k in st.session_state if isinstance(k, str) and k.startswith(CAMPOS_DE_POSICION)]:
+        del st.session_state[k]
+    st.session_state.pop("_ss_resincronizar", None)
+    st.session_state.pop("cta_seguro", None)
 
 
 def cuenta_activa() -> dict:
@@ -478,8 +524,22 @@ def guardar_datos() -> None:
     from datetime import datetime
 
     d = datos_usuario()
+    if st.session_state.get("_carga_fallida"):
+        st.session_state["_guardado"] = (False, datetime.now(MADRID_TZ).strftime("%H:%M"),
+                                         "tus datos no se cargaron; no se guarda para no borrarlos")
+        return
     try:
-        _almacen().guardar(cuentas.para_guardar(d))
+        alm = _almacen()
+        a_guardar = cuentas.para_guardar(d)
+        if alm.en_la_nube:
+            # Si otro dispositivo ha guardado desde que abriste la app, se junta con lo suyo en vez de pisarlo.
+            remotos, version = alm.cargar_con_version()
+            if version and version != st.session_state.get("_version_datos"):
+                a_guardar = cuentas.combinar(d, remotos, d.get("cuenta_activa"))
+                for nombre, c in a_guardar.get("cuentas", {}).items():
+                    if nombre != d.get("cuenta_activa"):
+                        d["cuentas"][nombre] = c
+        st.session_state["_version_datos"] = alm.guardar(a_guardar)
         st.session_state["_guardado"] = (True, datetime.now(MADRID_TZ).strftime("%H:%M"), "")
     except Exception as e:  # noqa: BLE001
         st.session_state["_guardado"] = (False, datetime.now(MADRID_TZ).strftime("%H:%M"), str(e))

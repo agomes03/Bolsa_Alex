@@ -3,8 +3,9 @@ name: Laboratorio de experimentos
 on:
   workflow_dispatch:
   schedule:
-    # Primer domingo de cada mes: revisar con datos nuevos qué funciona y qué no.
-    - cron: "0 6 1-7 * 0"
+    # Primer domingo de cada mes: revisar con datos nuevos qué funciona y qué no. (En cron, «1-7 * 0» significaría
+    # «del 1 al 7 O cualquier domingo»: se lanza cada domingo y el primer paso para si no es el primero del mes.)
+    - cron: "0 6 * * 0"
 
 permissions:
   contents: write
@@ -18,16 +19,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: ¿Es el primer domingo del mes?
+        id: toca
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(date -u +%-d)" -le 7 ]; then
+            echo "si=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "No es el primer domingo del mes: no se hace nada."; echo "si=0" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.toca.outputs.si == '1'
       - uses: actions/setup-python@v5
+        if: steps.toca.outputs.si == '1'
         with:
           python-version: "3.12"
           cache: pip
       - name: Instalar dependencias
+        if: steps.toca.outputs.si == '1'
         run: pip install -r requirements.txt
       - name: Ejecutar experimentos
+        if: steps.toca.outputs.si == '1'
         run: python scripts/experimentos.py
       - name: Guardar resultados
+        if: steps.toca.outputs.si == '1'
         run: |
           git config user.name "actualizacion-bolsa[bot]"
           git config user.email "actualizacion-bolsa@users.noreply.github.com"

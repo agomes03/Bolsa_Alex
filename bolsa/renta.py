@@ -26,19 +26,42 @@ def _fecha(s: str) -> date:
     return date.fromisoformat(s[:10])
 
 
+def _es_compra_real(h: dict) -> bool:
+    """Las compras «Importadas» llevan la fecha del día en que importaste el extracto, no la de la compra: no
+    sirven para la regla de los dos meses."""
+    return h.get("tipo") == "Compra" and not str(h.get("motivo") or "").startswith("Importada")
+
+
+def _recompra_en_dos_meses(historial: list[dict], i: int) -> bool:
+    """Regla de los dos meses (art. 33.5 de la Ley del IRPF): la pérdida no se puede restar si compraste el mismo
+    valor en los dos meses anteriores o posteriores a la venta. Las compras de antes solo cuentan si siguen en tu
+    poder después de vender (si vendiste todo, son las mismas acciones que vendes)."""
+    venta = historial[i]
+    fv = _fecha(venta["fecha"])
+    t = venta["ticker"]
+    quedan = sum(h["acciones"] if h.get("tipo") == "Compra" else -h["acciones"] if h.get("tipo") == "Venta" else 0
+                 for h in historial[:i + 1] if h.get("ticker") == t)
+    for j, c in enumerate(historial):
+        if j == i or c.get("ticker") != t or not _es_compra_real(c):
+            continue
+        dias = (_fecha(c["fecha"]) - fv).days
+        if j > i and 0 <= dias <= DIAS_REGLA_DOS_MESES:
+            return True
+        if j < i and 0 <= -dias <= DIAS_REGLA_DOS_MESES and quedan > 1e-9:
+            return True
+    return False
+
+
 def ventas_del_ano(historial: list[dict], anio: int, nombres: dict[str, str] | None = None) -> list[dict]:
     """Ventas de ese año con su resultado (ya descontados los gastos de compra y venta) y si la pérdida queda
     aplazada por la regla de los dos meses (recompra del mismo valor dos meses antes o después)."""
     nombres = nombres or {}
-    compras = [h for h in historial if h.get("tipo") == "Compra"]
     salida = []
-    for h in historial:
+    for i, h in enumerate(historial):
         if h.get("tipo") != "Venta" or _fecha(h["fecha"]).year != anio or h.get("resultado") is None:
             continue
         fv = _fecha(h["fecha"])
-        aplazada = h["resultado"] < 0 and any(
-            c["ticker"] == h["ticker"] and 0 < abs((_fecha(c["fecha"]) - fv).days) <= DIAS_REGLA_DOS_MESES
-            for c in compras)
+        aplazada = h["resultado"] < 0 and _recompra_en_dos_meses(historial, i)
         fx = h.get("fx", 1.0)
         venta = h["acciones"] * h["precio"] * fx - h.get("gastos", 0.0)
         salida.append({"fecha": fv.isoformat(), "ticker": h["ticker"], "nombre": nombres.get(h["ticker"], h["ticker"]),

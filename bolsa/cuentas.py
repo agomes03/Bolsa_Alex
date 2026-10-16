@@ -57,6 +57,21 @@ def para_guardar(d: dict) -> dict:
     return {k: v for k, v in d.items() if k != "cartera_real"}
 
 
+def combinar(nuestros: dict, remotos: dict, cuenta: str) -> dict:
+    """Si otro dispositivo ha guardado mientras tanto: lo nuestro manda en la cuenta que estamos usando (y en lo
+    general de la app), y de las demás cuentas se toma lo guardado por el otro. Así, si tu madre apunta algo en su
+    móvil mientras tú tocas tu cuenta en el ordenador, no se pierde lo de ninguno de los dos."""
+    salida = copy.deepcopy(para_guardar(nuestros))
+    remotos = copy.deepcopy(remotos or {})
+    if not remotos.get("cuentas"):
+        return salida
+    asegurar(remotos)
+    for nombre, c in remotos["cuentas"].items():
+        if nombre != cuenta:
+            salida.setdefault("cuentas", {})[nombre] = c
+    return salida
+
+
 def nueva_cuenta(d: dict, nombre: str) -> str | None:
     nombre = nombre.strip()
     cuentas = asegurar(d)

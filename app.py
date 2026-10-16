@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ui_comun import aviso_datos_antiguos, control_acceso, estilos
+from ui_comun import aviso_carga_fallida, aviso_datos_antiguos, control_acceso, estilos
 
 st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide",
                    initial_sidebar_state="collapsed")
@@ -30,6 +30,7 @@ from paginas_noticias import pagina_noticias  # noqa: E402
 from paginas_plan import pagina_plan  # noqa: E402
 from paginas_seguimiento import pagina_seguimiento  # noqa: E402
 
+aviso_carga_fallida()
 st.session_state["_perfil"] = barra_lateral()
 
 PAGINAS = {

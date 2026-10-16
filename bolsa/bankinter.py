@@ -155,16 +155,29 @@ def _precio(x: float, ticker: str) -> str:
     return f"{_num(x)} {simbolo(ticker)}"
 
 
-# Bróker del usuario (lo fija la app al arrancar). Los textos de Bankinter cambian si usa otro.
+# Bróker por defecto (scripts). En la app, cada sesión tiene el suyo (la cuenta de tu madre puede ser de otro
+# banco): se guarda en la sesión, no aquí, para que dos móviles a la vez no se lo cambien el uno al otro.
 BROKER = "Bankinter"
 
 
+def broker() -> str:
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+        ctx = get_script_run_ctx(suppress_warning=True)
+        if ctx is not None:
+            return ctx.session_state["_broker"] if "_broker" in ctx.session_state else BROKER
+    except Exception:  # noqa: BLE001 - fuera de la app (scripts, pruebas)
+        pass
+    return BROKER
+
+
 def es_bankinter() -> bool:
-    return BROKER == "Bankinter"
+    return broker() == "Bankinter"
 
 
 def _cabecera(ticker: str, titulo: str) -> list[str]:
-    donde = BROKER if BROKER != "Otro" else "tu bróker"
+    donde = _donde()
     return [f"{titulo} · {nombre_de(ticker)}",
             f"Buscar en {donde}: «{nombre_de(ticker).split(' (')[0]}» · {mercado_de(ticker)}"]
 
@@ -225,7 +238,8 @@ def ticket_stop_relacionadas(ticker: str, acciones: int, stop: float, objetivo: 
 
 
 def _donde() -> str:
-    return BROKER if BROKER != "Otro" else "tu bróker"
+    b = broker()
+    return b if b != "Otro" else "tu bróker"
 
 
 def ticket_venta(ticker: str, acciones: int, precio_ref: float) -> str:

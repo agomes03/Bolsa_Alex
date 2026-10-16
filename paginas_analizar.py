@@ -143,6 +143,7 @@ def pagina_analizar():
     otro = st.text_input("¿No está en la lista? Escribe su código de Yahoo Finance (ej. KO, SAP.DE)", "").strip().upper()
     if otro:
         ticker = otro
+        st.caption("Estás viendo el código que has escrito: bórralo para volver a elegir de la lista.")
 
     with st.spinner(f"Analizando {nombre_de(ticker)}..."):
         df = cargar_historico(ticker, "10y")
@@ -173,14 +174,21 @@ def pagina_analizar():
     except Exception:  # noqa: BLE001 - sin precio reciente, se queda el del histórico
         q = None
     precio_hoy = q["precio"] if q else ev.precio
-    precio_txt = eur(precio_hoy, m) + (f" (≈ {eur(precio_hoy * f_eur)})" if f_eur and m != "€" else "")
+    es_indice = ticker.startswith("^")
+
+    def valor_txt(x: float) -> str:     # los índices se miden en puntos, no en dinero
+        return f"{num(x, 2)} puntos" if es_indice else eur(x, m)
+
+    precio_txt = valor_txt(precio_hoy) + (f" (≈ {eur(precio_hoy * f_eur)})" if f_eur and m != "€" and not es_indice
+                                          else "")
     st.header(f"{titulo} · {precio_txt}")
-    st.caption(f"{sector_de(ticker)} · {bankinter.mercado_de(ticker)} · hoy {pct(ev.datos['var_1d'])} · "
+    var_hoy = q["variacion_pct"] if q and q.get("variacion_pct") is not None else ev.datos["var_1d"]
+    st.caption(f"{sector_de(ticker)} · {bankinter.mercado_de(ticker)} · hoy {pct(var_hoy)} · "
                f"último año {pct(ev.datos['var_1a'], 0)}")
     if q:
         cuando = {"tiempo_real": "⚡ Ahora mismo (tiempo real)", "directo": "🟢 Ahora (unos 15 min de retraso)"}.get(
             q["estado"], f"🔒 Bolsa cerrada · cierre del {q['fecha']:%d/%m}")
-        st.markdown(f"{cuando}: **{eur(q['precio'], m)}**"
+        st.markdown(f"{cuando}: **{valor_txt(q['precio'])}**"
                     + (f" ({pct(q['variacion_pct'], 2)} en la sesión)" if q.get("variacion_pct") is not None else ""))
 
     datos_v = fila or {"puntuacion": ev.puntuacion, "mercado_alcista": mercado_ok,
