@@ -15,7 +15,8 @@ from bolsa.tickers import nombre_de
 from paginas_extra import _perfil_guardado, eventos_de, nombre_posicion, revisar_cartera_real
 from ui_comun import (SEGUNDOS_REFRESCO, cargar_diario_real, cargar_dividendos_varios, cargar_varios,
                       cotizaciones_ahora, cuenta_activa, datos_usuario, enlace, eur, fecha, fila_informe, fx,
-                      guardar_datos, ir_a, palabras_de_la_pagina, perfil, selector_valor, texto_estado_precio)
+                      guardar_datos, ir_a, palabras_de_la_pagina, perfil, pestanas, selector_valor,
+                      texto_estado_precio)
 
 DESTINO_CORTO = {
     "Fondo indexado mundial": "Fondo indexado mundial (MSCI World o FTSE All-World, comisión < 0,3 %)",
@@ -94,20 +95,13 @@ def pagina_seguimiento():
                "resultados y dividendos, tu aportación de cada mes, el diario de tus decisiones y tus datos para la "
                "Renta. Lo pendiente aparece también arriba en 🧭 Hoy.")
     actualizar_alertas()
-    t0, t1, tc, t2, t3, t4 = st.tabs(["👀 Mi lista", "🔔 Avisos de precio", "📅 Calendario",
-                                      "💶 Aportación mensual", "📓 Diario", "🧾 Renta"])
-    with t0:
-        tab_lista()
-    with t1:
-        tab_alertas()
-    with tc:
-        tab_calendario()
-    with t2:
-        tab_aportacion()
-    with t3:
-        tab_diario()
-    with t4:
-        tab_renta()
+    pestanas_ = pestanas(["👀 Mi lista", "🔔 Avisos de precio", "📅 Calendario", "💶 Aportación mensual",
+                          "📓 Diario", "🧾 Renta"], "seg_pestana")
+    for pestana, contenido in zip(pestanas_, (tab_lista, tab_alertas, tab_calendario, tab_aportacion, tab_diario,
+                                              tab_renta)):
+        with pestana:
+            if pestana.open:
+                contenido()
     palabras_de_la_pagina(["Stop-loss", "Fondo indexado", "Rebalanceo", "Ganancia patrimonial", "Base del ahorro",
                            "Compensación de pérdidas", "Regla de los 2 meses", "Retención", "Dividendo"])
 

@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from bolsa import costes, libertad
-from ui_comun import alto_grafico, cuenta_activa, perfil, privado, reducir
+from ui_comun import alto_grafico, cuenta_activa, perfil, pestanas, privado, reducir
 from ui_comun import precio as eur  # importes de ejemplo: se ven también en modo privado
 
 
@@ -14,9 +14,10 @@ def pagina_calculadoras():
     pf = perfil()
     movil, tarifa = pf.movil, pf.tarifa
     st.title("🧮 Calculadoras")
-    t1, t2, t3, t4 = st.tabs(["💶 Coste", "🏛️ Impuestos", "🌱 Cada mes", "🏖️ Libertad financiera"])
+    t1, t2, t3, t4 = pestanas(["💶 Coste", "🏛️ Impuestos", "🌱 Cada mes", "🏖️ Libertad financiera"], "calc_pestana")
     with t4:
-        calculadora_libertad()
+        if t4.open:          # la única que descarga datos (tu cartera)
+            calculadora_libertad()
     with t1:
         st.caption("Cuánto te cuesta en Bankinter comprar, mantener un año y vender, según dónde cotice el valor.")
         importe = st.number_input("Importe que vas a invertir (€)", 50.0, 1_000_000.0, 1000.0, 50.0)

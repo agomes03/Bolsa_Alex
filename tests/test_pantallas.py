@@ -121,6 +121,12 @@ def abrir(pagina: str, movil: bool = False, datos_usuario: dict | None = None, s
     return at
 
 
+def abrir_pestana(at, clave: str, nombre: str):
+    """Las pestañas solo calculan la abierta: abre otra (como al tocarla)."""
+    at.session_state[clave] = nombre
+    return at.run()
+
+
 def sin_fallos(at):
     """Ningún error de programa. (Los avisos en rojo de la propia app, como «esta estrategia pierde», sí valen.)"""
     assert [e.value for e in at.exception] == []
@@ -220,6 +226,7 @@ def test_seguimiento_crear_aviso_aportacion_y_apunte():
     at = abrir("pagina_seguimiento", datos_usuario=_datos_seguimiento())
     sin_fallos(at)
     # Aviso nuevo de subida muy por encima del precio: se crea y queda vigilando.
+    abrir_pestana(at, "seg_pestana", "🔔 Avisos de precio")
     at.radio(key="alerta_origen").set_value("De mi cartera").run()
     formulario = [r for r in at.radio if r.label == "Avísame si…"][0]
     formulario.set_value("sube")
@@ -228,13 +235,16 @@ def test_seguimiento_crear_aviso_aportacion_y_apunte():
     sin_fallos(at)
     assert len(at.session_state["_datos"]["cartera_real"]["alertas"]) == 2
     # Aportación del mes: reparto y marcarla como hecha.
+    abrir_pestana(at, "seg_pestana", "💶 Aportación mensual")
     assert any("A dónde llevarla" in s.value for s in at.subheader)
     [b for b in at.button if "Ya he hecho la aportación" in b.label][0].click().run()
     assert len(at.session_state["_datos"]["cartera_real"]["aportacion"]["hechas"]) == 1
     # Diario: el apunte vencido se puede revisar.
+    abrir_pestana(at, "seg_pestana", "📓 Diario")
     [b for b in at.button if b.label == "Marcar como revisado"][0].click().run()
     assert at.session_state["_datos"]["cartera_real"]["diario"][0]["revisada"]
     # Renta: la venta de Santander aparece con su resultado y se puede descargar.
+    abrir_pestana(at, "seg_pestana", "🧾 Renta")
     assert any("Ganancias y pérdidas patrimoniales" in s.value for s in at.subheader)
     sin_fallos(at)
 
@@ -423,7 +433,8 @@ def test_noticias_dicen_cuando_se_leyeron_y_hoy_usa_las_de_ahora():
 
 
 def test_diagnostico_cambia_con_el_perfil():
-    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()},
+               estado={"mc_pestana": "🩺 Diagnóstico"})
     sin_fallos(at)
     perfil_sel = [s for s in at.selectbox if s.label == "Tu perfil"][0]
 
@@ -535,7 +546,8 @@ def test_cartera_virtual_con_la_misma_tabla_que_mi_cartera():
 
 
 def test_rentabilidad_por_periodos_en_mi_cartera():
-    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()},
+               estado={"mc_pestana": "📈 Rentabilidad"})
     sin_fallos(at)
     assert any(t.label == "📈 Rentabilidad" for t in at.tabs)
     tablas = [df.value for df in at.dataframe if "Periodo" in df.value.columns]
@@ -544,7 +556,8 @@ def test_rentabilidad_por_periodos_en_mi_cartera():
 
 
 def test_dentro_de_los_fondos_avisa_si_tienes_la_misma_empresa_dos_veces():
-    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()},
+               estado={"mc_pestana": "🩺 Diagnóstico"})
     sin_fallos(at)
     assert any("Qué hay dentro de tus fondos" in e.label for e in at.expander)
     assert any("Banco Santander" in w.value and "también dentro de" in w.value for w in at.warning)
@@ -555,7 +568,8 @@ def test_calendario_en_hoy_y_en_seguimiento():
     sin_fallos(at)
     assert any("Próximos 14 días" in m.value for m in at.markdown)
     assert any("presenta resultados en 5 días" in m.value for m in at.markdown)
-    at = abrir("pagina_seguimiento", datos_usuario={"cartera_real": cartera_de_prueba()})
+    at = abrir("pagina_seguimiento", datos_usuario={"cartera_real": cartera_de_prueba()},
+               estado={"seg_pestana": "📅 Calendario"})
     sin_fallos(at)
     assert any("Presenta resultados" in str(df.value.values) for df in at.dataframe)
 
@@ -582,7 +596,8 @@ def test_ficha_de_cinco_ejes_en_analizar():
 
 
 def test_calculadora_de_libertad_financiera():
-    at = abrir("pagina_calculadoras", datos_usuario={"cartera_real": cartera_de_prueba()})
+    at = abrir("pagina_calculadoras", datos_usuario={"cartera_real": cartera_de_prueba()},
+               estado={"calc_pestana": "🏖️ Libertad financiera"})
     sin_fallos(at)
     assert any(m.label == "Te faltan" for m in at.metric)
     assert any(m.label == "Necesitas" and m.value == "600.000,00 €" for m in at.metric)    # 2.000 € x 12 / 4 %
@@ -630,3 +645,18 @@ def test_virtual_opera_aunque_falle_la_cotizacion_intradia(monkeypatch):
     sin_fallos(at)
     cv = at.session_state["_datos"]["cartera_virtual"]
     assert "TTE.PA" in cv["posiciones"] or cv.get("ordenes")
+
+
+def test_las_pestanas_solo_calculan_la_abierta():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    assert not any("Diagnóstico de tu cartera" in h.value for h in at.subheader)      # cerrada: no se calcula
+    abrir_pestana(at, "mc_pestana", "🩺 Diagnóstico")
+    sin_fallos(at)
+    assert any("Diagnóstico de tu cartera" in h.value for h in at.subheader)
+
+
+def test_ayuda_tactil_en_la_pagina():
+    from ui_comun import AYUDAS_TACTILES
+
+    assert "blur()" in AYUDAS_TACTILES and "touchstart" in AYUDAS_TACTILES and "http" not in AYUDAS_TACTILES

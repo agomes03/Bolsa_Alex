@@ -24,12 +24,14 @@ from bolsa.tickers import TODAS_LAS_ACCIONES, indice_de_referencia, nombre_de
 
 
 # --------------------------------------------------------------------------- caché de datos
-@st.cache_data(ttl=600, show_spinner=False)
+# El histórico diario y los datos de las empresas cambian poco durante el día (el precio de ahora va aparte, cada
+# minuto): se guardan más tiempo para que cambiar de página casi nunca tenga que esperar a una descarga.
+@st.cache_data(ttl=1800, show_spinner=False)
 def cargar_historico(ticker: str, periodo: str = "2y") -> pd.DataFrame:
     return datos.historico(ticker, periodo)
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)
 def _varios_corto(tickers: tuple[str, ...], periodo: str) -> dict[str, pd.DataFrame]:
     return datos.varios(list(tickers), periodo)
 
@@ -65,13 +67,13 @@ def cargar_intradia(ticker: str) -> pd.DataFrame:
     return datos.intradia(ticker, "1mo", "5m")
 
 
-@st.cache_data(ttl=900, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)
 def cargar_diario_real(ticker: str, periodo: str = "1y") -> pd.DataFrame:
     """Histórico diario sin ajustar por dividendos (como lo muestra el bróker)."""
     return datos.diario_sin_ajustar(ticker, periodo)
 
 
-@st.cache_data(ttl=900, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)
 def cargar_activos() -> list[dict]:
     """Lectura de todo tipo de activos: bolsas, fondo mundial, renta fija, monetario, oro, petróleo, bitcoin..."""
     from bolsa import activos
@@ -236,6 +238,27 @@ def descargas_en_paralelo(*funciones):
     pool.shutdown(wait=True)
 
 
+def precalentar(*funciones) -> None:
+    """Una vez por sesión, en segundo plano: descarga ya lo que suelen necesitar las demás páginas (mercados, la
+    historia larga de tu cartera, los fondos...), para que al ir a ellas no haya que esperar."""
+    if st.session_state.get("_precalentado") or os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    st.session_state["_precalentado"] = True
+    from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+
+    ctx = get_script_run_ctx()
+
+    def correr():
+        add_script_run_ctx(threading.current_thread(), ctx)
+        for f in funciones:
+            try:
+                f()
+            except Exception:  # noqa: BLE001 - si algo falla, se descargará al ir a esa página
+                pass
+
+    threading.Thread(target=correr, daemon=True).start()
+
+
 def olvidar_datos_al_dia() -> None:
     """Para «Actualizar todo ahora» (y las pruebas): la próxima vez se descarga todo de nuevo."""
     with _CERROJO_VIVOS:
@@ -307,7 +330,7 @@ def cotizacion_al_instante(ticker: str) -> dict | None:
         return None
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=6 * 3600, show_spinner=False)
 def cargar_fundamentales(ticker: str) -> dict:
     return datos.fundamentales(ticker)
 
@@ -326,7 +349,7 @@ def cargar_composiciones(tickers: tuple[str, ...]) -> dict[str, dict]:
         return dict(zip(tickers, pool.map(datos.composicion_fondo, tickers)))
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=6 * 3600, show_spinner=False)
 def cargar_fundamentales_varios(tickers: tuple[str, ...]) -> dict[str, dict]:
     with ThreadPoolExecutor(max_workers=8) as pool:
         return dict(zip(tickers, pool.map(datos.fundamentales, tickers)))
@@ -698,6 +721,12 @@ def fila_informe(ticker: str) -> dict | None:
     return next((r for r in inf.get("ranking", []) if r["ticker"] == ticker), None)
 
 
+def pestanas(nombres: list[str], clave: str):
+    """Pestañas que solo calculan la que tienes abierta (las demás, al tocarlas). Así una página con varias
+    pestañas pesadas (diagnóstico, dividendos, rentabilidad...) abre mucho más rápido."""
+    return st.tabs(nombres, key=clave, on_change="rerun")
+
+
 def mostrar_plotly(fig, alto: int | None = None, margen: dict | None = None):
     """Gráfico fluido: sin barra de herramientas y, en el móvil, sin capturar el deslizamiento ni el zoom (así la
     página se desplaza bien con el dedo). `margen`: para gráficos con etiquetas fuera (p. ej. el de araña)."""
@@ -795,6 +824,42 @@ ESTILOS = """
 """
 
 
+# En el móvil, la ayuda «?» se abre al tocarla (recibe el foco) y en el iPhone no se cerraba al tocar en otro sitio,
+# porque tocar una zona vacía no quita el foco. Este código (nuestro, sin nada externo) la cierra al tocar fuera,
+# al desplazar la página o al volver a tocar la misma «?».
+AYUDAS_TACTILES = """
+<script>
+(() => {
+  if (window.__ayudasTactiles) return;
+  window.__ayudasTactiles = true;
+  const AYUDA = '[data-testid="stTooltipHoverTarget"]';
+  const enFoco = () => {
+    const a = document.activeElement;
+    return a && a.closest && a.closest(AYUDA) ? a : null;
+  };
+  const cerrar = () => { const a = enFoco(); if (a) a.blur(); };
+  let abiertaAlTocar = null;
+  document.addEventListener('touchstart', (e) => {
+    const ayuda = e.target.closest && e.target.closest(AYUDA);
+    const a = enFoco();
+    abiertaAlTocar = ayuda && a && ayuda.contains(a) ? a : null;
+    if (!ayuda) cerrar();
+  }, {capture: true, passive: true});
+  // Segundo toque en la misma «?»: el clic del toque le devuelve el foco, así que se cierra justo después.
+  const cerrarLaTocada = () => {
+    if (!abiertaAlTocar) return;
+    const a = abiertaAlTocar; abiertaAlTocar = null;
+    setTimeout(() => a.blur(), 50);
+  };
+  document.addEventListener('click', cerrarLaTocada, {capture: true});
+  document.addEventListener('touchend', () => setTimeout(cerrarLaTocada, 400), {capture: true, passive: true});
+  window.addEventListener('scroll', cerrar, {capture: true, passive: true});
+})();
+</script>
+"""
+
+
 def estilos() -> None:
     st.html(ESTILOS)
+    st.html(AYUDAS_TACTILES, unsafe_allow_javascript=True)
 

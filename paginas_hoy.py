@@ -15,7 +15,7 @@ from paginas_extra import asesor_hoy, limite_empresa, pesos_cartera_real
 from paginas_seguimiento import bloque_pendientes
 from ui_comun import (cargar_informe, cargar_noticias, cargar_varios, conclusion_noticia, cotizaciones_ahora,
                       cuenta_activa, dias_informe, eur, fecha, guardar_datos, hora_espana, ir_a, linea_actualizado,
-                      linea_frescura, moneda_de, num, palabras_de_la_pagina, pct, perfil, precio, reducir,
+                      linea_frescura, moneda_de, num, palabras_de_la_pagina, pct, perfil, pestanas, precio, reducir,
                       SEGUNDOS_REFRESCO, texto_estado_precio)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
@@ -561,19 +561,21 @@ def pagina_carteras():
     internacional = {k: c for k, c in inf["carteras"].items() if c.get("universo", "global") == "global"}
     if espana:
         st.subheader("🇪🇸 Con acciones españolas (recomendado en Bankinter)")
-        tabs = st.tabs([c["nombre"] for c in espana.values()])
+        tabs = pestanas([c["nombre"] for c in espana.values()], "cm_es")
         for tab, (k, c) in zip(tabs, espana.items()):
             with tab:
-                mostrar_cartera(k, c, por_ticker, bool(propia and propia[0] == k))
+                if tab.open:
+                    mostrar_cartera(k, c, por_ticker, bool(propia and propia[0] == k))
     if internacional:
         with st.expander("🌍 Internacionales (España, Europa y EEUU) · solo para importes grandes"):
             st.caption("Cada operación en el extranjero cuesta 20 € en Bankinter, más un 1 % de cambio de divisa en "
                        "acciones en dólares y una custodia mínima de 24 € al año por valor. Por eso estas carteras se "
                        "simulan con unos 5.000 € por empresa.")
-            tabs = st.tabs([c["nombre"] for c in internacional.values()])
+            tabs = pestanas([c["nombre"] for c in internacional.values()], "cm_int")
             for tab, (k, c) in zip(tabs, internacional.items()):
                 with tab:
-                    mostrar_cartera(k, c, por_ticker, False)
+                    if tab.open:
+                        mostrar_cartera(k, c, por_ticker, False)
 
     st.header("🛡️ Regla de protección para tus fondos indexados")
     st.markdown("Para la parte de tu dinero en fondos indexados: **seguir invertido mientras el índice esté por encima "

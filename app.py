@@ -62,3 +62,19 @@ nav = st.navigation(GRUPOS, position="top")
 _hueco_aviso = st.empty()
 nav.run()
 aviso_datos_antiguos(_hueco_aviso)
+
+
+def _precalentar():
+    """Lo que suelen pedir las demás páginas, descargado ya en segundo plano (una vez por sesión)."""
+    from bolsa.tickers import CATALOGO
+    from paginas_mercados import filas_grupo
+    from ui_comun import cargar_activos, cargar_composiciones, cuenta_activa, historia_larga_eur, precalentar
+
+    posiciones = cuenta_activa().get("posiciones", {})
+    fondos = tuple(sorted(t for t, p in posiciones.items() if p.get("clase") == "Fondos y ETF"))
+    precalentar(lambda: filas_grupo(tuple(CATALOGO["Índices"])), cargar_activos,
+                lambda: historia_larga_eur(tuple(sorted(posiciones))) if posiciones else None,
+                lambda: cargar_composiciones(fondos) if fondos else None)
+
+
+_precalentar()

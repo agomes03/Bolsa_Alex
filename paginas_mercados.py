@@ -21,7 +21,7 @@ GRUPOS_ACCIONES = ["España (IBEX 35)", "España (Mercado Continuo)", "Europa", 
                    "Asia", "Otros mercados"]
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)
 def filas_grupo(tickers: tuple[str, ...]) -> list[dict]:
     """Último precio, variaciones y tendencia de un grupo (una sola descarga para todo el grupo)."""
     from bolsa import activos as act

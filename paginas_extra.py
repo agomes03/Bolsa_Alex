@@ -22,7 +22,8 @@ from ui_comun import (SEGUNDOS_REFRESCO, almacen_actual, cargar_activos, cargar_
                       cargar_informe, cargar_noticias, cargar_varios, cotizaciones_ahora, cuenta_activa,
                       datos_usuario, descargas_en_paralelo, enlace, estrategia_actual, eur, fecha, fx, guardar_datos,
                       historia_larga_eur, linea_actualizado, mercado_alcista_para, mostrar_plotly, num,
-                      olvidar_campos_de_cuenta, palabras_de_la_pagina, pct, perfil, privado, reducir, selector_valor)
+                      olvidar_campos_de_cuenta, palabras_de_la_pagina, pct, perfil, pestanas, privado, reducir,
+                      selector_valor)
 
 UNIVERSOS = {
     "IBEX 35": (tuple(IBEX35), "^IBEX"),
@@ -269,12 +270,14 @@ def pagina_cartera_virtual():
     st.caption("Practica sin arriesgar nada, como si fuera el bróker: precios reales, órdenes limitadas, a mercado "
                "y stop que se ejecutan cuando el precio llega de verdad, órdenes pendientes y las comisiones de "
                "tu bróker. Cuando lleves unos meses, compara: ¿has ganado más que el robot? ¿y que el IBEX?")
-    t1, t2 = st.tabs(["🙋 Mis operaciones virtuales", "🤖 Robot automático"])
+    t1, t2 = pestanas(["🙋 Mis operaciones virtuales", "🤖 Robot automático"], "cv_pestana")
     with t1:
-        from paginas_virtual import cartera_manual
-        cartera_manual()
+        if t1.open:
+            from paginas_virtual import cartera_manual
+            cartera_manual()
     with t2:
-        robot()
+        if t2.open:
+            robot()
     copia_seguridad()
 
 
@@ -761,26 +764,31 @@ def pagina_bankinter():
     filas = revisar_cartera_real()
     if filas:
         resumen_cartera(nombres, elegida)
-        p_hacer, p_diag, p_div, p_comp, p_anadir = st.tabs(["📋 Qué hacer", "🩺 Diagnóstico", "💶 Dividendos",
-                                                             "📈 Rentabilidad", "➕ Añadir"])
+        p_hacer, p_diag, p_div, p_comp, p_anadir = pestanas(["📋 Qué hacer", "🩺 Diagnóstico", "💶 Dividendos",
+                                                              "📈 Rentabilidad", "➕ Añadir"], "mc_pestana")
         with p_hacer:
-            bloque_vigilar_todas(filas)
-            for f in filas:
-                posicion_detalle(f, cr)
-            bloque_telegram()
+            if p_hacer.open:
+                bloque_vigilar_todas(filas)
+                for f in filas:
+                    posicion_detalle(f, cr)
+                bloque_telegram()
         with p_diag:
-            comparado = bloque_diagnostico(filas)
-            if not comparado:
-                st.subheader("🌦️ Qué le puede pasar a tu cartera")
-                from paginas_hoy import bloque_que_puede_pasar
-                pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
-                bloque_que_puede_pasar(pesos, sum(pesos.values()), 0.0, 0)
+            if p_diag.open:
+                comparado = bloque_diagnostico(filas)
+                if not comparado:
+                    st.subheader("🌦️ Qué le puede pasar a tu cartera")
+                    from paginas_hoy import bloque_que_puede_pasar
+                    pesos = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
+                    bloque_que_puede_pasar(pesos, sum(pesos.values()), 0.0, 0)
         with p_div:
-            bloque_dividendos(filas)
+            if p_div.open:
+                bloque_dividendos(filas)
         with p_comp:
-            bloque_comparativa(filas)
+            if p_comp.open:
+                bloque_comparativa(filas)
         with p_anadir:
-            bloque_anadir()
+            if p_anadir.open:
+                bloque_anadir()
     else:
         st.caption("Aún no has registrado posiciones en esta cuenta. Impórtalas de tu banco o añádelas a mano.")
         bloque_anadir()
