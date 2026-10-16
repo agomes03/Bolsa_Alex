@@ -506,3 +506,19 @@ def test_venta_parcial():
     at.button(key="vend_SAN.MC").click().run()
     sin_fallos(at)
     assert at.session_state["_datos"]["cartera_real"]["posiciones"]["SAN.MC"]["acciones"] == 1500
+
+
+def test_cartera_virtual_con_la_misma_tabla_que_mi_cartera():
+    cv = cartera.nueva(10_000.0)
+    cartera.comprar(cv, "SAN.MC", 300, 12.0, costes.Tarifa(), "2026-09-01", 11.0, nota="prueba", fx=1.0)
+    cartera.comprar(cv, "IDR.MC", 20, 60.0, costes.Tarifa(), "2026-09-01", None, nota="prueba", fx=1.0)
+    at = abrir("pagina_cartera_virtual", datos_usuario={"cartera_virtual": cv})
+    sin_fallos(at)
+    tabla = at.dataframe[0].value
+    for col in ("Precio actual", "Hoy (%)", "Precio compra", "Títulos", "Invertido (€)", "Valor (€)", "Ganancia (€)",
+                "Ganancia (%)", "Peso (%)", "Protección", "Precio de"):
+        assert col in tabla.columns, col
+    assert abs(tabla["Peso (%)"].sum() - 100) < 0.5
+    assert "stop 11,00" in tabla["Protección"].tolist()
+    assert any(m.label == "Hoy" for m in at.metric)
+    assert any("Qué haría el asesor" in e.label for e in at.expander)

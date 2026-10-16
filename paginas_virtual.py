@@ -12,6 +12,7 @@ import streamlit as st
 from bolsa import asesor, bankinter, cartera, costes, datos, ejercicios, horario, senales
 from bolsa.activos import clase_de
 from bolsa.tickers import nombre_de, sector_de
+from paginas_extra import ICONO_NIVEL, pintar_tabla_posiciones, revisar_cartera_real, tabla_posiciones
 from ui_comun import (cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, cotizacion_al_instante,
                       datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de,
                       mostrar_plotly, num, palabras_de_la_pagina, pct, perfil, selector_valor)
@@ -68,7 +69,7 @@ def cartera_manual():
 
     precios = {t: v["q"]["precio"] for t, v in info.items() if v["q"]}
     fx_pos = {t: v["fx"] for t, v in info.items()}
-    tabla, res = cartera.valorar(cv, precios, fx_pos)
+    _, res = cartera.valorar(cv, precios, fx_pos)
     libre = cartera.disponible(cv, pf.tarifa)
     c = st.columns(2 if pf.movil else 4)
     c[0].metric("Valor total", eur(res["total"]), pct(res["ganancia_pct"], 1))
@@ -82,8 +83,8 @@ def cartera_manual():
                "ejecución que el bróker.")
 
     bloque_evolucion(cv)
-    if len(tabla):
-        bloque_posiciones(cv, tabla, res, info)
+    if cv["posiciones"]:
+        bloque_posiciones(cv, info)
     bloque_ordenes_pendientes(cv)
     bloque_operar_virtual(cv, libre, res["total"])
     bloque_ejercicios(cv)
@@ -140,27 +141,27 @@ def bloque_evolucion(cv: dict):
 
 
 # --------------------------------------------------------------------------- posiciones
-def bloque_posiciones(cv: dict, tabla: pd.DataFrame, res: dict, info: dict):
+def bloque_posiciones(cv: dict, info: dict):
     pf = perfil()
     st.subheader("💼 Tu posición")
-    var = {t: (v["q"] or {}).get("variacion_pct") for t, v in info.items()}
-    def r(serie, dec):
-        return pd.to_numeric(serie, errors="coerce").round(dec)
-
-    vista = pd.DataFrame({
-        "Valor": tabla["ticker"].map(nombre_de), "Títulos": tabla["acciones"],
-        "Último": r(tabla["precio"], 3), "Var. día (%)": r(tabla["ticker"].map(var), 2),
-        "Precio medio": r(tabla["precio_medio"], 3), "Valoración (€)": r(tabla["valor"], 2),
-        "Rentab. (€)": r(tabla["resultado"], 2), "Rentab. (%)": r(tabla["resultado_pct"], 2),
-        "Peso (%)": r(pd.to_numeric(tabla["valor"], errors="coerce") / res["total"] * 100, 1),
-        "Stop": tabla["stop"], "Objetivo": tabla["objetivo"]})
-    if pf.movil:
-        vista = vista[["Valor", "Títulos", "Último", "Var. día (%)", "Rentab. (%)"]]
-    st.dataframe(vista, hide_index=True, width="stretch")
-    if vista["Último"].isna().any():
+    # La misma tabla y el mismo consejo que en 🏦 Mi cartera, para seguirla igual que la real.
+    filas = revisar_cartera_real(cv)
+    vista, total, ganancia, cambio_hoy = tabla_posiciones(filas)
+    c = st.columns(3 if not pf.movil else 2)
+    c[0].metric("Valor de tus posiciones", eur(total))
+    c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia),
+                pct(ganancia / (total - ganancia) * 100, 1) if total - ganancia else None)
+    c[2 % len(c)].metric("Hoy", eur(cambio_hoy),
+                         pct(cambio_hoy / (total - cambio_hoy) * 100, 2) if total - cambio_hoy else None)
+    pintar_tabla_posiciones(vista, "Parte de lo que tienes en acciones y fondos (sin contar el efectivo).")
+    if vista["Precio actual"].isna().any():
         st.warning("No hay cotización ahora mismo para algún valor: su valoración no se puede calcular.")
-    st.caption("Como la posición de tu bróker. Precios en la divisa de cada valor; importes en euros (la "
-               "rentabilidad incluye las comisiones de compra).")
+    atencion = [f for f in filas if f["nivel"] != "mantener"]
+    with st.expander(f"📌 Qué haría el asesor con cada una ({len(atencion)} necesitan atención)" if atencion
+                     else "📌 Qué haría el asesor con cada una"):
+        for f in filas:
+            st.markdown(f"{ICONO_NIVEL[f['nivel']]} **{f['nombre']}**: {f['consejo']}")
+        st.caption("Igual que con tu cartera real: con el precio de ahora, tu stop-loss y la tendencia de cada valor.")
 
     with st.expander("✏️ Cambiar stop-loss u objetivo de una posición"):
         t = st.selectbox("Posición", list(cv["posiciones"]), format_func=nombre_de, key="v_cambiar_t")

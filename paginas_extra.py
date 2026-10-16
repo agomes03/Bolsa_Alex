@@ -756,16 +756,9 @@ def pagina_bankinter():
                            "Compensación de pérdidas", "Regla de los 2 meses", "Fondo indexado", "Rebalanceo"])
 
 
-@st.fragment(run_every=SEGUNDOS_REFRESCO)
-def resumen_cartera(nombres: list[str], elegida: str):
-    """Valor, ganancia, cambio de hoy y tabla de posiciones. Se refresca solo cada minuto."""
-    pf = perfil()
-    filas = revisar_cartera_real()
-    if not filas:
-        return
-    avisos = [f for f in filas if f["nivel"] not in ("mantener",)]
-    if avisos:
-        st.warning(f"🔔 {len(avisos)} posición(es) necesitan tu atención.")
+def tabla_posiciones(filas: list[dict]) -> tuple[pd.DataFrame, float, float, float]:
+    """La tabla de posiciones como la del bróker (Mi cartera y Cartera virtual usan la misma) y los totales:
+    (tabla, valor, ganancia sin vender, cambio de hoy), en euros."""
     vista, total, ganancia, cambio_hoy = [], 0.0, 0.0, 0.0
     valores = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
     total_valor = sum(valores.values())
@@ -780,6 +773,8 @@ def resumen_cartera(nombres: list[str], elegida: str):
         proteccion = (f"stop {num(pos['stop'], 2)}" if pos.get("stop") else
                       f"alarma {num(pos['alarma'], 2)}" if pos.get("sin_stop") and pos.get("alarma") else
                       "sin stop")
+        if pos.get("objetivo"):
+            proteccion += f" · objetivo {num(pos['objetivo'], 2)}"
         vista.append({
             "": ICONO_NIVEL[f["nivel"]], "Activo": f["nombre"],
             "Precio actual": round(precio, 2) if precio else None,
@@ -795,13 +790,11 @@ def resumen_cartera(nombres: list[str], elegida: str):
             "Precio de": ({"tiempo_real": "⚡ tiempo real", "directo": "🟢 ahora (~15 min)"}.get(
                 f["cotizacion"]["estado"], f"cierre {f['cotizacion']['fecha']:%d/%m}") if f.get("cotizacion")
                 else "—")})
-    tabla = pd.DataFrame(vista)
-    c = st.columns(3 if not pf.movil else 2)
-    c[0].metric("Valor de tu cartera" if len(nombres) == 1 else f"Valor de «{elegida}»", eur(total))
-    c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia),
-                pct(ganancia / (total - ganancia) * 100, 1) if total - ganancia else None)
-    c[2 % len(c)].metric("Hoy", eur(cambio_hoy),
-                         pct(cambio_hoy / (total - cambio_hoy) * 100, 2) if total - cambio_hoy else None)
+    return pd.DataFrame(vista), total, ganancia, cambio_hoy
+
+
+def pintar_tabla_posiciones(tabla: pd.DataFrame, ayuda_peso: str) -> None:
+    pf = perfil()
     if pf.movil:
         tabla = tabla[["", "Activo", "Precio actual", "Hoy (%)", "Precio compra", "Ganancia (%)", "Ganancia (€)",
                        "Valor (€)", "Peso (%)", "Títulos", "Protección"]]
@@ -816,13 +809,34 @@ def resumen_cartera(nombres: list[str], elegida: str):
         "Valor (€)": st.column_config.NumberColumn(format="localized"),
         "Ganancia (€)": st.column_config.NumberColumn(format="localized"),
         "Ganancia (%)": st.column_config.NumberColumn(format="%+.1f %%"),
-        "Peso (%)": st.column_config.NumberColumn(
-            format="%.1f %%", help="Parte de lo que tienes invertido en esta cuenta. En 🧭 Hoy el peso cuenta también "
-                                   "el dinero en cuentas y depósitos, por eso allí puede salir algo menor."),
+        "Peso (%)": st.column_config.NumberColumn(format="%.1f %%", help=ayuda_peso),
     })
     st.caption("Precios en la moneda de cada valor, como en tu bróker; invertido, valor y ganancias en euros. La "
-               "ganancia en % es la del precio (sin comisiones ni efecto divisa)."
-               + (" En el móvil, desliza la tabla hacia la izquierda para ver más columnas." if pf.movil else ""))
+               "ganancia en % es la del precio (sin comisiones ni efecto divisa). "
+               + " · ".join(f"{i} {t}" for t, i in (("vender", "🔴"), ("vigilar", "🟠"), ("poner stop", "🟡"),
+                                                     ("subir stop", "🟢⬆️"), ("mantener", "🟢")))
+               + (". En el móvil, desliza la tabla hacia la izquierda para ver más columnas." if pf.movil else "."))
+
+
+@st.fragment(run_every=SEGUNDOS_REFRESCO)
+def resumen_cartera(nombres: list[str], elegida: str):
+    """Valor, ganancia, cambio de hoy y tabla de posiciones. Se refresca solo cada minuto."""
+    pf = perfil()
+    filas = revisar_cartera_real()
+    if not filas:
+        return
+    avisos = [f for f in filas if f["nivel"] not in ("mantener",)]
+    if avisos:
+        st.warning(f"🔔 {len(avisos)} posición(es) necesitan tu atención.")
+    tabla, total, ganancia, cambio_hoy = tabla_posiciones(filas)
+    c = st.columns(3 if not pf.movil else 2)
+    c[0].metric("Valor de tu cartera" if len(nombres) == 1 else f"Valor de «{elegida}»", eur(total))
+    c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia),
+                pct(ganancia / (total - ganancia) * 100, 1) if total - ganancia else None)
+    c[2 % len(c)].metric("Hoy", eur(cambio_hoy),
+                         pct(cambio_hoy / (total - cambio_hoy) * 100, 2) if total - cambio_hoy else None)
+    pintar_tabla_posiciones(tabla, "Parte de lo que tienes invertido en esta cuenta. En 🧭 Hoy el peso cuenta "
+                                   "también el dinero en cuentas y depósitos, por eso allí puede salir algo menor.")
     st.caption(linea_actualizado())
 
 
