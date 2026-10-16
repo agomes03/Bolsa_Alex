@@ -675,3 +675,17 @@ def test_ver_solo_un_activo_en_mi_cartera():
     at.selectbox(key="mc_activo").set_value("Toda la cartera").run()
     sin_fallos(at)
     assert any(m.label == "Valor de tu cartera" for m in at.metric)
+
+
+def test_ver_solo_un_activo_en_la_cartera_virtual():
+    cv = cartera.nueva(10_000.0)
+    cartera.comprar(cv, "IDR.MC", 20, 60.0, costes.Tarifa(), "2026-09-01", None, nota="prueba", fx=1.0)
+    cartera.comprar(cv, "SAN.MC", 300, 12.0, costes.Tarifa(), "2026-09-01", 11.0, nota="prueba", fx=1.0)
+    at = abrir("pagina_cartera_virtual", datos_usuario={"cartera_virtual": cv})
+    sin_fallos(at)
+    at.selectbox(key="cv_activo").set_value("IDR.MC").run()
+    sin_fallos(at)
+    etiquetas = {m.label: m.value for m in at.metric}
+    assert any(k.startswith("Valor de Indra") for k in etiquetas)
+    assert etiquetas["Precio de compra"].startswith("60,00") and etiquetas["Títulos"] == "20"
+    assert any("Cómo ha ido el precio" in m.value for m in at.markdown)
