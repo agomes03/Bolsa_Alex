@@ -535,6 +535,7 @@ def datos_usuario() -> dict:
             st.session_state["_carga_fallida"] = str(e)
     d = st.session_state["_datos"]
     cuentas.asegurar(d)              # `cartera_real` apunta siempre a la cuenta activa
+    _sincronizar_guardado(d)
     return d
 
 
@@ -567,30 +568,93 @@ def cuenta_activa() -> dict:
     return cuentas.activa(datos_usuario())
 
 
-def guardar_datos() -> None:
+# Guardado en la nube en segundo plano: el botón responde al momento y GitHub se actualiza por detrás (dos
+# llamadas de ~0,5 s cada una). Un trabajador por sesión; si pulsas varias cosas seguidas, se guarda solo lo último.
+_GUARDADOS: dict[str, dict] = {}
+_CERROJO_GUARDAR = threading.Lock()
+
+
+def _id_sesion() -> str:
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+    ctx = get_script_run_ctx()
+    return ctx.session_id if ctx else "sin_sesion"
+
+
+def _hora() -> str:
     from datetime import datetime
 
-    d = datos_usuario()
-    if st.session_state.get("_carga_fallida"):
-        st.session_state["_guardado"] = (False, datetime.now(MADRID_TZ).strftime("%H:%M"),
-                                         "tus datos no se cargaron; no se guarda para no borrarlos")
-        return
-    try:
-        alm = _almacen()
-        a_guardar = cuentas.para_guardar(d)
-        if alm.en_la_nube:
+    return datetime.now(MADRID_TZ).strftime("%H:%M")
+
+
+def _trabajador_guardar(alm: almacen.Almacen, reg: dict) -> None:
+    while True:
+        with _CERROJO_GUARDAR:
+            item = reg.pop("pendiente", None)
+            if item is None:
+                reg["hilo"] = None
+                return
+        a_guardar, activa = item
+        try:
             # Si otro dispositivo ha guardado desde que abriste la app, se junta con lo suyo en vez de pisarlo.
             remotos, version = alm.cargar_con_version()
-            if version and version != st.session_state.get("_version_datos"):
-                a_guardar = cuentas.combinar(d, remotos, d.get("cuenta_activa"))
-                for nombre, c in a_guardar.get("cuentas", {}).items():
-                    if nombre != d.get("cuenta_activa"):
-                        d["cuentas"][nombre] = c
-        st.session_state["_version_datos"] = alm.guardar(a_guardar)
-        st.session_state["_guardado"] = (True, datetime.now(MADRID_TZ).strftime("%H:%M"), "")
-    except Exception as e:  # noqa: BLE001
-        st.session_state["_guardado"] = (False, datetime.now(MADRID_TZ).strftime("%H:%M"), str(e))
-        st.error(f"No se han podido guardar los datos: {e}. Descarga una copia de seguridad por si acaso.")
+            if version and version != reg.get("version"):
+                a_guardar = cuentas.combinar(a_guardar, remotos, activa)
+                reg["otras_cuentas"] = {n: c for n, c in a_guardar.get("cuentas", {}).items() if n != activa}
+            reg["version"] = alm.guardar(a_guardar)
+            reg["estado"] = (True, _hora(), "")
+        except Exception as e:  # noqa: BLE001 - se reintenta con el siguiente guardado
+            with _CERROJO_GUARDAR:
+                reg.setdefault("pendiente", item)
+            reg["estado"] = (False, _hora(), str(e))
+            with _CERROJO_GUARDAR:
+                reg["hilo"] = None
+            return
+
+
+def _sincronizar_guardado(d: dict) -> None:
+    """Trae a la sesión lo que ha hecho el guardado en segundo plano (estado, versión, cambios de otras cuentas)."""
+    reg = _GUARDADOS.get(_id_sesion())
+    if not reg:
+        return
+    if "estado" in reg:
+        st.session_state["_guardado"] = reg["estado"]
+        if reg["estado"][0] is False and reg.get("avisado") != reg["estado"]:
+            reg["avisado"] = reg["estado"]
+            st.toast(f"⚠️ No se han podido guardar tus últimos cambios ({reg['estado'][2][:80]}). Se reintentará "
+                     "en el próximo cambio; si sigue, descarga una copia de seguridad.")
+    if reg.get("version"):
+        st.session_state["_version_datos"] = reg["version"]
+    otras = reg.pop("otras_cuentas", None)
+    if otras and d.get("cuentas"):
+        for nombre, c in otras.items():
+            if nombre != d.get("cuenta_activa"):
+                d["cuentas"][nombre] = c
+
+
+def guardar_datos() -> None:
+    d = datos_usuario()
+    if st.session_state.get("_carga_fallida"):
+        st.session_state["_guardado"] = (False, _hora(), "tus datos no se cargaron; no se guarda para no borrarlos")
+        return
+    alm = _almacen()
+    if not alm.en_la_nube:          # archivo local: es instantáneo
+        try:
+            st.session_state["_version_datos"] = alm.guardar(cuentas.para_guardar(d))
+            st.session_state["_guardado"] = (True, _hora(), "")
+        except Exception as e:  # noqa: BLE001
+            st.session_state["_guardado"] = (False, _hora(), str(e))
+            st.error(f"No se han podido guardar los datos: {e}. Descarga una copia de seguridad por si acaso.")
+        return
+    copia = json.loads(json.dumps(cuentas.para_guardar(d), ensure_ascii=False, default=str))
+    with _CERROJO_GUARDAR:
+        reg = _GUARDADOS.setdefault(_id_sesion(), {})
+        reg.setdefault("version", st.session_state.get("_version_datos"))
+        reg["pendiente"] = (copia, d.get("cuenta_activa"))
+        if not reg.get("hilo"):
+            reg["hilo"] = threading.Thread(target=_trabajador_guardar, args=(alm, reg), daemon=True)
+            reg["hilo"].start()
+    st.session_state["_guardado"] = (True, _hora(), "")
 
 
 def aviso_datos_antiguos(hueco) -> None:

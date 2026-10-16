@@ -1460,41 +1460,64 @@ def bloque_vigilar_todas(filas: list[dict]):
             st.rerun()
 
 
+# Los botones de cada posición hacen su trabajo ANTES de pintar la página (callbacks): así basta con una pasada y el
+# cambio se ve al momento, sin recalcular la página dos veces.
+def _al_guardar_stop(t: str) -> None:
+    pos = cuenta_activa()["posiciones"].get(t)
+    if not pos:
+        return
+    nuevo = st.session_state.get(f"stop_{t}") or None
+    pos["stop"] = nuevo
+    if nuevo:
+        dejar_de_vigilar(t)          # con stop-loss puesto ya no hace falta el nivel de alarma
+    guardar_datos()
+
+
+def _al_vender(t: str, nombre: str, fx_: float) -> None:
+    cr = cuenta_activa()
+    n, precio_v = st.session_state.get(f"nv_{t}"), st.session_state.get(f"pv_{t}") or 0.0
+    por_que = (st.session_state.get(f"pq_{t}") or "").strip()
+    err = cartera.vender(cr, t, n, precio_v, perfil().tarifa, motivo=por_que or "Venta registrada", fx=fx_)
+    if err:
+        st.session_state[f"err_{t}"] = err
+        return
+    if por_que:
+        from bolsa import diario
+        diario.nueva(cr.setdefault("diario", []), t, nombre, "Venta", precio_v, por_que)
+    for k in (f"nv_{t}", f"pv_{t}", f"pq_{t}"):
+        st.session_state.pop(k, None)
+    guardar_datos()
+
+
+def _al_quitar(t: str) -> None:
+    cuenta_activa()["posiciones"].pop(t, None)
+    guardar_datos()
+
+
+def _al_vigilar(t: str, nombre: str, precio: float) -> None:
+    err = vigilar_sin_stop(t, nombre, st.session_state.get(f"alarma_{t}") or None, precio)
+    if err:
+        st.session_state[f"err_{t}"] = err
+    else:
+        guardar_datos()
+
+
 def _editar_posicion(f: dict, cr: dict):
     """Stop-loss, venta y quitar, en la cuenta `cr`."""
-    pf = perfil()
     t, pos = f["ticker"], f["pos"]
+    if st.session_state.get(f"err_{t}"):
+        st.error(st.session_state.pop(f"err_{t}"))
     c = st.columns(3)
-    nuevo_stop = c[0].number_input("Stop-loss que tienes puesto", 0.0, value=float(pos.get("stop") or 0.0),
-                                   key=f"stop_{t}")
-    if c[0].button("Guardar stop", key=f"gstop_{t}"):
-        pos["stop"] = nuevo_stop or None
-        if nuevo_stop:
-            dejar_de_vigilar(t)      # con stop-loss puesto ya no hace falta el nivel de alarma
-        guardar_datos()
-        st.rerun()
+    c[0].number_input("Stop-loss que tienes puesto", 0.0, value=float(pos.get("stop") or 0.0), key=f"stop_{t}")
+    c[0].button("Guardar stop", key=f"gstop_{t}", on_click=_al_guardar_stop, args=(t,))
     entera = float(pos["acciones"]).is_integer()
     tiene = int(pos["acciones"]) if entera else float(pos["acciones"])
-    n_venta = c[1].number_input("Títulos vendidos", 1 if entera else 0.0001, tiene, tiene, 1 if entera else 0.0001,
-                                key=f"nv_{t}", format=None if entera else "%.4f",
-                                help="Pon menos si solo has vendido una parte.")
-    precio_v = c[1].number_input("Vendida a (precio)", 0.0, value=float(f["precio"] or 0.0), key=f"pv_{t}")
-    por_que = c[1].text_input("¿Por qué vendes? (va a tu 📓 diario)", key=f"pq_{t}")
-    if c[1].button("Registrar venta", key=f"vend_{t}"):
-        err = cartera.vender(cr, t, n_venta, precio_v, pf.tarifa, motivo=por_que.strip() or "Venta registrada",
-                             fx=f["fx"])
-        if err:
-            st.error(err)
-            return
-        if por_que.strip():
-            from bolsa import diario
-            diario.nueva(cuenta_activa().setdefault("diario", []), t, f["nombre"], "Venta", precio_v, por_que)
-        guardar_datos()
-        st.rerun()
-    if c[2].button("🗑️ Quitar sin vender", key=f"del_{t}"):
-        cr["posiciones"].pop(t, None)
-        guardar_datos()
-        st.rerun()
+    c[1].number_input("Títulos vendidos", 1 if entera else 0.0001, tiene, tiene, 1 if entera else 0.0001,
+                      key=f"nv_{t}", format=None if entera else "%.4f", help="Pon menos si solo has vendido una parte.")
+    c[1].number_input("Vendida a (precio)", 0.0, value=float(f["precio"] or 0.0), key=f"pv_{t}")
+    c[1].text_input("¿Por qué vendes? (va a tu 📓 diario)", key=f"pq_{t}")
+    c[1].button("Registrar venta", key=f"vend_{t}", on_click=_al_vender, args=(t, f["nombre"], f["fx"]))
+    c[2].button("🗑️ Quitar sin vender", key=f"del_{t}", on_click=_al_quitar, args=(t,))
 
 
 def posicion_detalle(f: dict, cr: dict):
@@ -1520,16 +1543,11 @@ def posicion_detalle(f: dict, cr: dict):
                                   "pedirte el stop y te avisa si baja de tu nivel de alarma; no vende nada.")
             if solo:
                 v = st.columns([2, 1])
-                nivel = v[0].number_input("Nivel de alarma (avisa, no vende)", 0.0,
+                v[0].number_input("Nivel de alarma (avisa, no vende)", 0.0,
                                           value=float(pos.get("alarma") or round(f["precio"] * (1 - CAIDA_ALARMA), 2)),
                                           key=f"alarma_{t}")
-                if v[1].button("Guardar", key=f"gss_{t}", width="stretch"):
-                    err = vigilar_sin_stop(t, f["nombre"], nivel or None, f["precio"])
-                    if err:
-                        st.error(err)
-                    else:
-                        guardar_datos()
-                        st.rerun()
+                v[1].button("Guardar", key=f"gss_{t}", width="stretch", on_click=_al_vigilar,
+                            args=(t, f["nombre"], f["precio"]))
 
 
 # --------------------------------------------------------------------------- operar en Bankinter (desde Analizar)

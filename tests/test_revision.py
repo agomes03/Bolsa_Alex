@@ -59,3 +59,47 @@ def test_telegram_avisa_cada_cruce_una_sola_vez_aunque_el_aviso_vaya_con_retraso
     assert alertas.cruces_nuevos(aviso, {"SAN.MC": df.iloc[:6]}, enviados, "Mi cuenta", ahora) == []
     # ...pero si vuelve a subir y cruza otra vez, sí avisa.
     assert len(alertas.cruces_nuevos(aviso, {"SAN.MC": df}, enviados, "Mi cuenta", ahora)) == 1
+
+
+def test_guardar_en_la_nube_no_hace_esperar_y_guarda_lo_ultimo(monkeypatch):
+    import time
+
+    import streamlit as st
+
+    import ui_comun
+
+    class GistLento:
+        en_la_nube = True
+
+        def __init__(self):
+            self.guardados, self.version = [], "v0"
+
+        def cargar_con_version(self):
+            time.sleep(0.3)
+            return ({"cuentas": {}}, self.version)
+
+        def guardar(self, datos):
+            time.sleep(0.3)
+            self.guardados.append(datos)
+            self.version = f"v{len(self.guardados)}"
+            return self.version
+
+    gist = GistLento()
+    monkeypatch.setattr(ui_comun, "_almacen", lambda: gist)
+    ui_comun._GUARDADOS.clear()
+    st.session_state["_datos"] = {"cartera_real": {"posiciones": {}, "historial": []}}
+    st.session_state["_version_datos"] = "v0"
+    t0 = time.time()
+    for n in range(3):                                   # tres botones seguidos
+        st.session_state["_datos"]["cartera_real"]["posiciones"] = {"SAN.MC": {"acciones": n}}
+        ui_comun.guardar_datos()
+    assert time.time() - t0 < 0.2                         # no espera a GitHub
+    for _ in range(50):
+        if not ui_comun._GUARDADOS["sin_sesion"].get("hilo"):
+            break
+        time.sleep(0.1)
+    ultimo = gist.guardados[-1]["cuentas"]["Mi cuenta"]["posiciones"]
+    assert ultimo == {"SAN.MC": {"acciones": 2}} and len(gist.guardados) <= 2   # lo último, sin repetir de más
+    ui_comun.datos_usuario()
+    assert st.session_state["_guardado"][0] is True and st.session_state["_version_datos"] == gist.version
+    st.session_state.clear()

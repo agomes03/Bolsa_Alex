@@ -106,6 +106,38 @@ def pagina_seguimiento():
                            "Compensación de pérdidas", "Regla de los 2 meses", "Retención", "Dividendo"])
 
 
+# --------------------------------------------------------------------------- botones (antes de pintar la página)
+def _anadir_a_lista(t: str) -> None:
+    lista = cuenta_activa().setdefault("lista_seguimiento", [])
+    if any(x["ticker"] == t for x in lista):
+        st.session_state["_lista_ya"] = True
+        return
+    lista.append({"ticker": t, "nombre": nombre_de(t), "anadida": date.today().isoformat(),
+                  "precio_inicial": _ultimo_precio(t)})
+    guardar_datos()
+
+
+def _quitar_de_lista(t: str) -> None:
+    d = cuenta_activa()
+    d["lista_seguimiento"] = [x for x in d.get("lista_seguimiento", []) if x["ticker"] != t]
+    st.session_state.pop("lista_elegido", None)
+    guardar_datos()
+
+
+def _accion_aviso(id_aviso: int, accion: str) -> None:
+    lista = cuenta_activa().setdefault("alertas", [])
+    a = next((x for x in lista if x["id"] == id_aviso), None)
+    if a is None:
+        return
+    if accion == "visto":
+        a["vista"] = True
+    elif accion == "reactivar":
+        a.update(disparada=None, precio_disparo=None, vista=False, creada=date.today().isoformat())
+    elif accion == "borrar":
+        lista.remove(a)
+    guardar_datos()
+
+
 # --------------------------------------------------------------------------- lista de seguimiento
 def tab_lista():
     """Valores que te interesan pero aún no tienes (como la «watchlist» de Yahoo o Investing): precio de ahora,
@@ -117,14 +149,9 @@ def tab_lista():
     c = st.columns([3, 1])
     with c[0]:
         t = selector_valor("lista")
-    if c[1].button("➕ Añadir", key="lista_anadir", width="stretch"):
-        if any(x["ticker"] == t for x in lista):
-            st.info("Ya está en tu lista.")
-        else:
-            lista.append({"ticker": t, "nombre": nombre_de(t), "anadida": date.today().isoformat(),
-                          "precio_inicial": _ultimo_precio(t)})
-            guardar_datos()
-            st.rerun()
+    c[1].button("➕ Añadir", key="lista_anadir", width="stretch", on_click=_anadir_a_lista, args=(t,))
+    if st.session_state.pop("_lista_ya", False):
+        st.info("Ya está en tu lista.")
     if not lista:
         st.caption("Tu lista está vacía. Idea: añade las ⭐ ideas del día que te gusten y míralas unas semanas "
                    "antes de decidir.")
@@ -170,10 +197,7 @@ def lista_de_seguimiento(lista: list[dict]):
         else:
             guardar_datos()
             st.success("Aviso creado: lo verás en 🔔 Avisos de precio.")
-    if b[2].button("🗑️ Quitar", key="lista_quitar", width="stretch"):
-        lista.pop(elegido)
-        guardar_datos()
-        st.rerun()
+    b[2].button("🗑️ Quitar", key="lista_quitar", width="stretch", on_click=_quitar_de_lista, args=(x["ticker"],))
 
 
 # --------------------------------------------------------------------------- calendario
@@ -241,27 +265,18 @@ def tab_alertas():
                 st.markdown(f"🔔 **{alertas.texto(a, a.get('precio_disparo'))}** · "
                             f"{date.fromisoformat(a['disparada']).strftime('%d/%m/%Y')}")
                 c = st.columns(3)
-                if not a.get("vista") and c[0].button("👍 Visto", key=f"al_v_{a['id']}"):
-                    a["vista"] = True
-                    guardar_datos()
-                    st.rerun()
-                if c[1].button("🔁 Volver a activar", key=f"al_r_{a['id']}"):
-                    a.update(disparada=None, precio_disparo=None, vista=False, creada=date.today().isoformat())
-                    guardar_datos()
-                    st.rerun()
-                if c[2].button("🗑️ Borrar", key=f"al_b_{a['id']}"):
-                    lista.remove(a)
-                    guardar_datos()
-                    st.rerun()
+                if not a.get("vista"):
+                    c[0].button("👍 Visto", key=f"al_v_{a['id']}", on_click=_accion_aviso, args=(a["id"], "visto"))
+                c[1].button("🔁 Volver a activar", key=f"al_r_{a['id']}", on_click=_accion_aviso,
+                            args=(a["id"], "reactivar"))
+                c[2].button("🗑️ Borrar", key=f"al_b_{a['id']}", on_click=_accion_aviso, args=(a["id"], "borrar"))
     if activas:
         st.markdown("**Vigilando**")
         for a in activas:
             c = st.columns([5, 1])
             c[0].markdown(f"⏳ {alertas.describir(a)}" + (f" · _{a['nota']}_" if a.get("nota") else ""))
-            if c[1].button("🗑️", key=f"al_b_{a['id']}", help="Borrar este aviso"):
-                lista.remove(a)
-                guardar_datos()
-                st.rerun()
+            c[1].button("🗑️", key=f"al_b_{a['id']}", help="Borrar este aviso", on_click=_accion_aviso,
+                        args=(a["id"], "borrar"))
 
 
 def _posiciones_valoradas() -> list[dict]:
