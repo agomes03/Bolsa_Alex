@@ -39,3 +39,18 @@ def test_opa_empresa_propia_y_sin_conclusion():
     assert "Te afecta: tienes Indra." == c["te_afecta"]
     assert concluir("Apple presenta un nuevo iPhone") is None
     assert "Riesgo" in conclusiones.resumen_corto(concluir("Trump anuncia nuevos aranceles a los coches europeos"))
+
+
+def test_frescura_de_las_noticias():
+    from datetime import datetime, timedelta, timezone
+
+    from bolsa import noticias
+
+    ahora = datetime(2026, 10, 16, 9, 0, tzinfo=timezone.utc)
+    lista = [noticias.Noticia("a", "x", "Expansión", ahora - timedelta(minutes=3)),
+             noticias.Noticia("b", "x", "CNBC", ahora - timedelta(minutes=45)),
+             noticias.Noticia("c", "x", "Expansión", ahora - timedelta(minutes=30)),
+             noticias.Noticia("d", "x", "Finnhub · Reuters", ahora - timedelta(minutes=1))]
+    f = noticias.frescura(lista, ahora)
+    assert round(f["minutos"]) == 1
+    assert list(f["por_fuente"]) == ["Finnhub", "Expansión", "CNBC"] and round(f["por_fuente"]["Expansión"]) == 3

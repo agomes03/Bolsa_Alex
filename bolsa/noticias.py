@@ -323,6 +323,20 @@ def sentimiento_medio(noticias: list[Noticia]) -> float:
     return sum(n.sentimiento * max(n.impacto, 1) for n in noticias) / peso
 
 
+def frescura(lista: list[Noticia], ahora: datetime | None = None) -> dict:
+    """Minutos desde la noticia más reciente, en total y por fuente (para comprobar que llegan al momento)."""
+    ahora = ahora or datetime.now(timezone.utc)
+    por_fuente: dict[str, float] = {}
+    for n in lista:
+        if not n.fecha:
+            continue
+        minutos = max((ahora - n.fecha).total_seconds() / 60, 0.0)
+        fuente = n.fuente.split(" · ")[0]
+        por_fuente[fuente] = min(por_fuente.get(fuente, minutos), minutos)
+    reciente = min(por_fuente.values()) if por_fuente else None
+    return {"minutos": reciente, "por_fuente": dict(sorted(por_fuente.items(), key=lambda x: x[1]))}
+
+
 def hace_cuanto(n: Noticia) -> str:
     h = n.horas
     if h is None:

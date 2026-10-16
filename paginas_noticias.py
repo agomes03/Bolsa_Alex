@@ -7,7 +7,8 @@ import streamlit as st
 
 from bolsa import noticias
 from bolsa.tickers import nombre_de
-from ui_comun import cargar_noticias, conclusion_noticia, mostrar_conclusion, perfil
+from ui_comun import (SEGUNDOS_NOTICIAS, cargar_noticias, conclusion_noticia, linea_frescura,
+                      mostrar_conclusion, perfil)
 
 
 def tarjeta_noticia(n: noticias.Noticia, expandida: bool = False):
@@ -30,19 +31,33 @@ def tarjeta_noticia(n: noticias.Noticia, expandida: bool = False):
 
 
 def pagina_noticias():
-    movil = perfil().movil
     st.title("📰 Noticias que mueven el mercado")
     st.caption(f"Se leen **{len(noticias.FUENTES_RSS)} fuentes** (prensa española, Google News, CNBC, MarketWatch, "
                "Yahoo Finance...) y se ordenan por **impacto estimado** (0-10): temas que históricamente mueven las "
                "bolsas, cuántos medios publican la misma noticia y lo reciente que es. Despliega cada una para ver "
                "**por qué importa**.")
+    lista_de_noticias()
+
+
+@st.fragment(run_every=SEGUNDOS_NOTICIAS)
+def lista_de_noticias():
+    """Se vuelve a dibujar sola cada minuto con lo que hayan publicado las fuentes (sin recargar la página)."""
+    movil = perfil().movil
     with st.spinner("Leyendo todas las fuentes..."):
         lista, fallos = cargar_noticias()
+    st.markdown(linea_frescura(lista))
     st.caption(f"{len(lista)} noticias únicas de las últimas 72 h."
                + (f" Fuentes no disponibles ahora: {', '.join(fallos)}." if fallos else ""))
     if not lista:
         st.error("No se han podido descargar noticias.")
         return
+    with st.expander("⏱️ ¿Cómo de al día está cada fuente?"):
+        f = noticias.frescura(lista)
+        st.dataframe(pd.DataFrame([{"Fuente": k, "Última noticia": f"hace {v:.0f} min" if v < 120 else
+                                    f"hace {v / 60:.0f} h"} for k, v in f["por_fuente"].items()]),
+                     hide_index=True, width="stretch")
+        st.caption("La app lee todas las fuentes cada minuto. Cada medio tarda unos minutos en publicar en su canal "
+                   "(RSS) lo que sale en su web, y algunos solo publican cada cierto tiempo.")
 
     c1, c2, c3 = st.columns(3)
     minimo = c1.slider("Impacto mínimo", 0, 10, 3)

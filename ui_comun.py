@@ -109,8 +109,14 @@ def _a_noticias(items: list[dict]) -> list[noticias.Noticia]:
     return [noticias.Noticia(n["titulo"], n["enlace"], n["fuente"], n["fecha"], n["resumen"]) for n in items]
 
 
-@st.cache_data(ttl=120, show_spinner=False)
-def cargar_noticias() -> tuple[list[noticias.Noticia], list[str]]:
+SEGUNDOS_NOTICIAS = 60      # cada cuánto se vuelven a leer todas las fuentes (y se refrescan solas las páginas)
+
+
+# La caché dura un poco menos que el refresco automático: así, cuando la página se refresca, ya ha caducado.
+@st.cache_data(ttl=SEGUNDOS_NOTICIAS - 10, show_spinner=False)
+def _descargar_noticias() -> tuple[list[noticias.Noticia], list[str], str]:
+    from datetime import datetime
+
     extra = []
     clave = clave_finnhub()
     if clave:
@@ -118,7 +124,29 @@ def cargar_noticias() -> tuple[list[noticias.Noticia], list[str]]:
             extra = _a_noticias(finnhub.noticias_mercado(clave))
         except Exception:  # noqa: BLE001 - si Finnhub falla, quedan las demás fuentes
             extra = []
-    return noticias.descargar(extra=extra)
+    lista, fallos = noticias.descargar(extra=extra)
+    return lista, fallos, datetime.now(MADRID_TZ).strftime("%H:%M:%S")
+
+
+def cargar_noticias() -> tuple[list[noticias.Noticia], list[str]]:
+    """Noticias de todas las fuentes, leídas de nuevo como mucho cada minuto."""
+    lista, fallos, _ = _descargar_noticias()
+    return lista, fallos
+
+
+def hora_noticias() -> str:
+    """Hora (Madrid) de la última lectura de las fuentes."""
+    return _descargar_noticias()[2]
+
+
+def linea_frescura(lista: list[noticias.Noticia]) -> str:
+    """«🔄 Leídas a las 10:42:05 · la más reciente, de hace 3 min (Expansión)»."""
+    f = noticias.frescura(lista)
+    texto = f"🔄 Fuentes leídas a las **{hora_noticias()}** (se vuelven a leer cada minuto)"
+    if f["minutos"] is not None:
+        fuente = next(iter(f["por_fuente"]))
+        texto += f" · la noticia más reciente es de hace **{f['minutos']:.0f} min** ({fuente})"
+    return texto
 
 
 @st.cache_data(ttl=60, show_spinner=False)

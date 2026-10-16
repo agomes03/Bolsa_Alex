@@ -394,3 +394,12 @@ def test_radar_con_precio_de_ahora_o_de_cierre():
     assert {"Precio", "Hoy (%)", "Cotización"} <= set(tabla.columns)
     assert tabla["Precio"].str.endswith("€").all()
     assert tabla["Cotización"].str.contains("ahora|cierre|tiempo real").all()
+
+
+def test_noticias_dicen_cuando_se_leyeron_y_hoy_usa_las_de_ahora():
+    at = abrir("pagina_noticias")
+    sin_fallos(at)
+    assert any("Fuentes leídas a las" in m.value for m in at.markdown)
+    at = abrir("pagina_hoy")
+    sin_fallos(at)
+    assert any("El BCE baja los tipos" in m.value for m in at.markdown)     # la noticia de ahora, no la del informe

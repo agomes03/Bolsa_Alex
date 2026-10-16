@@ -8,14 +8,14 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from bolsa import asesor, bankinter, costes, diagnostico, estrategias, patrones
+from bolsa import asesor, bankinter, costes, diagnostico, estrategias, noticias, patrones
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import asesor_hoy, pesos_cartera_real
 from paginas_seguimiento import bloque_pendientes
-from ui_comun import (cargar_informe, cargar_varios, conclusion_noticia, cotizaciones_ahora, cuenta_activa,
-                      dias_informe, eur, fecha, hora_espana, ir_a, moneda_de, num, palabras_de_la_pagina, pct, perfil,
-                      reducir, texto_estado_precio)
+from ui_comun import (cargar_informe, cargar_noticias, cargar_varios, conclusion_noticia, cotizaciones_ahora,
+                      cuenta_activa, dias_informe, eur, fecha, hora_espana, ir_a, linea_frescura, moneda_de, num,
+                      palabras_de_la_pagina, pct, perfil, reducir, SEGUNDOS_NOTICIAS, texto_estado_precio)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
                   "ambar": ("warning", "🟡 Mercado mixto"),
@@ -172,13 +172,32 @@ def pagina_hoy():
 
     palabras_de_la_pagina(["Semáforo", "Regla de protección", "Veredicto", "Nota global", "Riesgo de caída",
                            "Cartera modelo", "Momentum", "Diversificación"])
+    noticias_importantes(inf)
+
+
+@st.fragment(run_every=SEGUNDOS_NOTICIAS)
+def noticias_importantes(inf: dict):
+    """Las 3 noticias de más impacto ahora mismo (si no se pueden leer, las del informe de la noche)."""
     st.subheader("📰 Lo más importante")
-    st.caption("Con la conclusión sencilla de cada una: dónde repercute y qué oportunidad o riesgo genera. Todas en "
-               "📰 Noticias.")
+    try:
+        lista, _ = cargar_noticias()
+    except Exception:  # noqa: BLE001
+        lista = []
+    if lista:
+        recientes = [n for n in lista if n.horas is None or n.horas <= 24] or lista
+        top = [{"titulo": n.titulo, "enlace": n.enlace, "sentimiento": n.sentimiento, "resumen": n.resumen,
+                "empresas": n.empresas, "explicaciones": n.explicaciones,
+                "cuando": f"{n.fuente.split(' · ')[0]} · {noticias.hace_cuanto(n)}"} for n in recientes[:3]]
+        st.caption(linea_frescura(lista) + ". Todas en 📰 Noticias.")
+    else:
+        top = (inf.get("noticias") or {}).get("top", [])[:3]
+        st.caption("Ahora no se pueden leer las fuentes: estas son las del informe de esta noche.")
     vistas = set()
-    for n in inf["noticias"]["top"][:3]:
+    for n in top:
         icono = {1: "🟢", -1: "🔴", 0: "⚪"}[n["sentimiento"]]
-        st.markdown(f"{icono} [{n['titulo']}]({n['enlace']})")
+        st.markdown(f"{icono} [{n['titulo']}]({n['enlace']})" + (f"  \n<small>{n['cuando']}</small>"
+                                                                 if n.get("cuando") else ""),
+                    unsafe_allow_html=True)
         c = conclusion_noticia(n["titulo"], n.get("resumen", ""), n.get("empresas", []), n["sentimiento"])
         if c and (c["titulo"], c["oportunidad"]) in vistas:
             st.caption("↑ Misma lectura que la noticia anterior.")
@@ -188,7 +207,7 @@ def pagina_hoy():
             st.markdown(f"<small>{c['icono']} **{c['titulo']}** · {donde}: {c['oportunidad']}"
                         + (f" 📌 **{c['te_afecta']}**" if c["te_afecta"] else "") + "</small>",
                         unsafe_allow_html=True)
-        elif n["explicaciones"]:
+        elif n.get("explicaciones"):
             st.caption("💡 " + n["explicaciones"][0])
 
 
