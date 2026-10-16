@@ -22,7 +22,22 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
-from bolsa import agenda, almacen, avisos, cuentas, informe  # noqa: E402
+from bolsa import agenda, almacen, avisos, cuentas, datos, informe  # noqa: E402
+
+
+def _citas(cuenta: dict) -> str:
+    """Resultados y dividendos de hoy y mañana de tus valores y de tu lista de seguimiento."""
+    from bolsa import eventos
+    from bolsa.tickers import nombre_de
+
+    nombres = {t: p.get("nombre") or nombre_de(t) for t, p in cuenta.get("posiciones", {}).items()}
+    for x in cuenta.get("lista_seguimiento", []):
+        nombres.setdefault(x["ticker"], x["nombre"])
+    try:
+        funds = {t: datos.fundamentales(t) for t in nombres}
+    except Exception:  # noqa: BLE001
+        return ""
+    return eventos.texto_telegram(eventos.proximos(nombres, funds, dias=1))
 
 
 def main() -> int:
@@ -59,6 +74,8 @@ def main() -> int:
                     if av:
                         propios += titulo + av
                     pend = agenda.texto_telegram(cuenta)
+                    citas = _citas(cuenta)
+                    pend = "\n\n".join(x for x in (pend, citas) if x)
                     if pend:
                         bloques_pend.append((f"👤 {nombre} · " if varias else "") + pend)
                     if viernes:

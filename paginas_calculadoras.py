@@ -5,15 +5,18 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from bolsa import costes
-from ui_comun import alto_grafico, eur, perfil, reducir
+from bolsa import costes, libertad
+from ui_comun import alto_grafico, cuenta_activa, perfil, privado, reducir
+from ui_comun import precio as eur  # importes de ejemplo: se ven también en modo privado
 
 
 def pagina_calculadoras():
     pf = perfil()
     movil, tarifa = pf.movil, pf.tarifa
     st.title("🧮 Calculadoras")
-    t1, t2, t3 = st.tabs(["💶 Coste", "🏛️ Impuestos", "🌱 Cada mes"])
+    t1, t2, t3, t4 = st.tabs(["💶 Coste", "🏛️ Impuestos", "🌱 Cada mes", "🏖️ Libertad financiera"])
+    with t4:
+        calculadora_libertad()
     with t1:
         st.caption("Cuánto te cuesta en Bankinter comprar, mantener un año y vender, según dónde cotice el valor.")
         importe = st.number_input("Importe que vas a invertir (€)", 50.0, 1_000_000.0, 1000.0, 50.0)
@@ -72,3 +75,62 @@ def pagina_calculadoras():
         f = filas[-1]
         st.success(f"Aportando {eur(mensual)} al mes durante {anos} años habrías puesto **{eur(f['Aportado'])}** "
                    f"y tendrías unos **{eur(f['Valor'])}**. El interés compuesto hace el resto.")
+
+
+def calculadora_libertad():
+    """¿Cuándo podrías vivir de tus inversiones? Con tu cartera y tu aportación (como el «FIRE» de Ghostfolio)."""
+    from paginas_extra import _perfil_guardado, revisar_cartera_real
+
+    pf = perfil()
+    st.write("Cuánto dinero necesitas para vivir de tus inversiones y cuántos años te faltan con lo que tienes y lo "
+             "que aportas cada mes. Todo en **euros de hoy** (las rentabilidades ya descuentan la inflación).")
+    cta = cuenta_activa()
+    try:
+        filas = revisar_cartera_real()
+        tu_capital = sum(f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"])
+    except Exception:  # noqa: BLE001
+        tu_capital = 0.0
+    tu_capital += max(cta.get("otros_ahorros", 0.0), 0.0)
+    if privado():
+        tu_capital = 0.0
+        st.caption("🙈 Modo privado: no se rellena con tu cartera; pon la cifra que quieras.")
+    perfil_nombre = _perfil_guardado() or "Moderado"
+    c = st.columns(2 if pf.movil else 4)
+    gasto = c[0].number_input("Gasto que quieres cubrir (€ al mes)", 100.0, 50_000.0, 2_000.0, 100.0,
+                              help="Lo que necesitarías al mes para vivir (o la parte que quieres que paguen tus "
+                                   "inversiones).")
+    capital = c[1].number_input("Lo que tienes invertido hoy (€)", 0.0, 100_000_000.0, float(round(tu_capital, -2)),
+                                1_000.0, help="Relleno con tu cartera y tus ahorros apuntados de esta cuenta.")
+    aporte = c[2 % len(c)].number_input("Lo que aportas al mes (€)", 0.0, 100_000.0,
+                                        float((cta.get("aportacion") or {}).get("importe", 300.0) or 0.0), 50.0)
+    rent = c[3 % len(c)].slider("Rentabilidad real al año (%)", 0.0, 8.0,
+                                libertad.RENTABILIDAD_REAL.get(perfil_nombre, 0.04) * 100, 0.5,
+                                help=f"Propuesta para un perfil {perfil_nombre.lower()}, ya descontada la inflación. "
+                                     "Bolsa mundial: ~5 % real a largo plazo; mixta: ~4 %; conservadora: ~2,5 %.")
+    tasa = st.select_slider("Cuánto sacarías cada año", [0.03, 0.035, 0.04], 0.04,
+                            format_func=lambda x: f"{x * 100:.1f} %".replace(".", ","),
+                            help="La «regla del 4 %»: sacando un 4 % al año (subiéndolo con la inflación), una "
+                                 "cartera diversificada ha durado históricamente 30 años o más. Para más años o más "
+                                 "prudencia, 3-3,5 %.")
+    r = libertad.calcular(gasto, capital, aporte, rent / 100, tasa)
+    m = st.columns(3)
+    m[0].metric("Necesitas", eur(r["objetivo"]), help="Gasto anual dividido entre lo que sacas cada año.")
+    m[1].metric("Llevas", f"{min(r['avance'], 9.99) * 100:.0f} %".replace(".", ","))
+    m[2].metric("Te faltan", "¡ya lo tienes!" if r["anos"] == 0 else f"{r['anos']} años" if r["anos"]
+                else "más de 60 años")
+    if r["anos"] == 0:
+        st.success(f"Con lo que tienes ya podrías sacar unos {eur(r['renta_hoy'])} al mes.")
+    elif r["anos"]:
+        peor = r["escenarios"]["Pesimista"]["anos"] or "más de 60"
+        mejor = r["escenarios"]["Optimista"]["anos"] or "más de 60"
+        st.info(f"Hoy tu dinero podría pagarte unos **{eur(r['renta_hoy'])} al mes**. Aportando {eur(aporte)} al mes "
+                f"llegarías en **{r['anos']} años** ({peor} si va peor y {mejor} si va mejor).")
+    else:
+        st.warning("Con esa aportación no llegas en 60 años: sube la aportación, baja el gasto o acepta sacar menos.")
+    anos_max = max((e["anos"] or 40) for e in r["escenarios"].values()) + 3
+    tabla = pd.DataFrame({n: e["valores"][:anos_max + 1] for n, e in r["escenarios"].items()})
+    tabla["Objetivo"] = r["objetivo"]
+    tabla.index.name = "Años"
+    st.line_chart(tabla, height=alto_grafico() - 150)
+    st.caption("Escenarios con 2 puntos menos y 2 más de rentabilidad al año. La bolsa no sube en línea recta: habrá "
+               "años de -30 % por el camino. Es una guía para planificar, no una promesa.")

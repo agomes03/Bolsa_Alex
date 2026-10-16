@@ -296,7 +296,8 @@ CAMPOS_FUNDAMENTALES = [
     "trailingAnnualDividendYield", "payoutRatio", "returnOnEquity", "profitMargins",
     "revenueGrowth", "earningsGrowth", "debtToEquity", "beta", "targetMeanPrice", "targetLowPrice",
     "targetHighPrice", "numberOfAnalystOpinions", "recommendationKey", "recommendationMean",
-    "earningsTimestamp", "earningsTimestampStart", "exDividendDate",
+    "earningsTimestamp", "earningsTimestampStart", "exDividendDate", "dividendDate", "dividendYield",
+    "fiveYearAvgDividendYield", "currentRatio", "quoteType",
 ]
 
 
@@ -341,6 +342,26 @@ def fundamentales(ticker: str) -> dict:
     except Exception:  # noqa: BLE001
         return {}
     return {k: info.get(k) for k in CAMPOS_FUNDAMENTALES if info.get(k) is not None}
+
+
+def composicion_fondo(ticker: str) -> dict:
+    """Qué hay dentro de un ETF o fondo (Yahoo Finance): sus 10 mayores posiciones con su peso y el reparto por
+    sectores. Vacío si Yahoo no lo da (acciones, algunos fondos)."""
+    import yfinance as yf
+
+    salida: dict = {}
+    try:
+        fd = yf.Ticker(ticker).funds_data
+        top = fd.top_holdings
+        if top is not None and not top.empty:
+            salida["top"] = [{"simbolo": str(s), "nombre": str(f.get("Name") or s),
+                              "peso": float(f.get("Holding Percent") or 0)} for s, f in top.iterrows()]
+        sectores = fd.sector_weightings
+        if sectores:
+            salida["sectores"] = {k: float(v) for k, v in sectores.items() if v}
+    except Exception:  # noqa: BLE001 - no es un fondo o Yahoo no lo da
+        pass
+    return salida
 
 
 def analistas(ticker: str) -> dict:

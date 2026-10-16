@@ -97,6 +97,9 @@ def barra_lateral() -> Perfil:
         st.title("⚙️ Tu perfil")
         movil = st.toggle("📱 Vista para móvil", value=es_movil(),
                           help="Gráficos más bajos y tablas con menos columnas. Se activa sola en el móvil.")
+        st.toggle("🙈 Ocultar importes", key="_privado",
+                  help="Modo privado: tus euros salen como «•••» y las tablas solo enseñan precios y porcentajes. "
+                       "Para enseñar la app sin que se vea cuánto tienes.")
         capital = st.number_input("Dinero para acciones sueltas (€)", min_value=100.0,
                                   value=float(round(_capital_por_defecto(), -1)), step=100.0,
                                   help="La parte de tu dinero para comprar acciones concretas (en 🎯 Mi plan se "

@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from bolsa import asesor, bankinter, costes, noticias, senales
+from bolsa import asesor, bankinter, costes, ficha, noticias, senales
 from bolsa.activos import clase_de
 from bolsa.indicadores import calcular_todo
 from bolsa.tickers import NO_INVERTIBLES, nombre_de, sector_de, TODOS_LOS_VALORES
@@ -19,7 +19,7 @@ from paginas_noticias import tarjeta_noticia
 from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, cargar_informe, cotizaciones_ahora, eur,
                       fila_informe, fx,
                       mercado_alcista_para, moneda_de, mostrar_plotly, noticias_empresa, num, palabras_de_la_pagina,
-                      pct, perfil, selector_valor)
+                      pct, perfil, precio, selector_valor)
 
 
 def grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None = None) -> go.Figure:
@@ -61,7 +61,7 @@ def bloque_fundamentales(ticker: str, f: dict):
             return f"{v:.1f}"
         if tipo == "cap":
             return f"{v / 1e9:,.1f} mil M".replace(",", ".")
-        return eur(v, m)
+        return precio(v, m)
 
     filas = [
         ("Tamaño (capitalización)", fmt(f.get("marketCap"), "cap"), "Lo que vale la empresa entera en bolsa."),
@@ -109,8 +109,8 @@ def plan_de_compra(ticker, ev, fund, f_eur, m, etiqueta, color) -> float:
             c = st.columns(2 if movil else 4)
             c[0].metric("Comprar", f"{n} {'acción' if n == 1 else 'acciones'}", f"≈ {eur(importe)}",
                     delta_color="off", delta_arrow="off")
-            c[1].metric("Stop-loss (vender si baja a)", eur(p.stop, m), pct(-p.riesgo_pct), delta_color="off", delta_arrow="off")
-            c[2 % len(c)].metric("Objetivo", eur(p.objetivo, m), pct(p.beneficio_pct))
+            c[1].metric("Stop-loss (vender si baja a)", precio(p.stop, m), pct(-p.riesgo_pct), delta_color="off", delta_arrow="off")
+            c[2 % len(c)].metric("Objetivo", precio(p.objetivo, m), pct(p.beneficio_pct))
             if iv:
                 c[3 % len(c)].metric("Costes Bankinter", eur(iv["total"]), f"{pct(iv['pct'], 2, False)} del importe",
                                      delta_color="off", delta_arrow="off", help="Comprar + vender + 1 año de custodia (si es extranjera).")
@@ -177,9 +177,9 @@ def pagina_analizar():
     es_indice = ticker.startswith("^")
 
     def valor_txt(x: float) -> str:     # los índices se miden en puntos, no en dinero
-        return f"{num(x, 2)} puntos" if es_indice else eur(x, m)
+        return f"{num(x, 2)} puntos" if es_indice else precio(x, m)
 
-    precio_txt = valor_txt(precio_hoy) + (f" (≈ {eur(precio_hoy * f_eur)})" if f_eur and m != "€" and not es_indice
+    precio_txt = valor_txt(precio_hoy) + (f" (≈ {precio(precio_hoy * f_eur)})" if f_eur and m != "€" and not es_indice
                                           else "")
     st.header(f"{titulo} · {precio_txt}")
     var_hoy = q["variacion_pct"] if q and q.get("variacion_pct") is not None else ev.datos["var_1d"]
@@ -243,6 +243,7 @@ def pagina_analizar():
         bloque_que_puede_pasar_accion(ticker, df, importe_ref)
 
     if clase == "Acciones":
+        bloque_ficha(fund, precio_hoy, ev.datos.get("var_1a"))
         st.subheader("🏢 La empresa en números")
         bloque_fundamentales(ticker, fund)
 
@@ -255,6 +256,40 @@ def pagina_analizar():
     palabras_de_la_pagina(["Veredicto", "Nota global", "Riesgo de caída", "Tendencia", "Media de 200 sesiones", "RSI",
                            "Volatilidad", "Stop-loss", "Objetivo de precio", "Orden limitada", "PER", "Dividendo",
                            "Rentabilidad por dividendo", "Precio objetivo de los analistas"])
+
+
+def bloque_ficha(fund: dict, precio_hoy: float | None, var_1a: float | None):
+    """Ficha visual de 5 ejes (como el «copo de nieve» de Simply Wall St), con cada punto explicado."""
+    f = ficha.ficha(fund, precio_hoy, var_1a)
+    puntos = [f[e]["puntos"] for e in ficha.EJES]
+    if all(p is None for p in puntos):
+        return
+    st.subheader("🧭 Ficha de la empresa")
+    st.markdown(f"**{ficha.resumen(f)}**")
+    valores = [p or 0 for p in puntos]
+    media = sum(valores) / len(valores)
+    color = "#16a34a" if media >= 4 else "#f59e0b" if media >= 2.5 else "#dc2626"
+    fig = go.Figure(go.Scatterpolar(r=valores + valores[:1], theta=ficha.EJES + ficha.EJES[:1], fill="toself",
+                                    line=dict(color=color), fillcolor=color, opacity=0.55,
+                                    hovertemplate="%{theta}: %{r:.1f} de 6<extra></extra>"))
+    fig.update_layout(polar=dict(radialaxis=dict(range=[0, 6], showticklabels=False, ticks=""),
+                                 angularaxis=dict(rotation=90, direction="clockwise")),
+                      showlegend=False, height=320)
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        mostrar_plotly(fig, margen=dict(l=75, r=75, t=30, b=30))
+    with c2:
+        for eje in ficha.EJES:
+            x = f[eje]
+            titulo = (f"{eje}: {x['cumple']} de {x['total']}" if x["puntos"] is not None
+                      else f"{eje}: sin datos suficientes")
+            with st.expander(titulo):
+                for texto, ok in x["chequeos"]:
+                    st.markdown(f"{'✅' if ok else '❌' if ok is False else '⚪'} {texto}"
+                                + (" *(sin dato)*" if ok is None else ""))
+    st.caption("Cada eje suma comprobaciones sencillas con los datos de Yahoo Finance (de 0 a 6: cuanto más grande "
+               "el dibujo, mejor). Sirve para ver de un vistazo los puntos fuertes y débiles; no es una "
+               "recomendación por sí sola. En los bancos la deuda se mide distinto y Yahoo no la da.")
 
 
 def pagina_radar():

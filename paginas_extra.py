@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime, timedelta
 
 import pandas as pd
@@ -11,18 +12,17 @@ import streamlit as st
 import plotly.graph_objects as go
 
 from bolsa import (alertas, asesor, asesor_diario, avisos, bankinter, cartera, comparativa, costes, cuentas,
-                   decision, diagnostico,
-                   dividendos, estrategias, experimentos, horario, importador, patrones, reequilibrio, semanal, senales,
-                   simulador)
+                   decision, diagnostico, dividendos, estrategias, eventos, experimentos, fondos, horario, importador,
+                   patrones, reequilibrio, rentabilidad, semanal, senales, simulador)
 from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
-from ui_comun import (SEGUNDOS_REFRESCO, almacen_actual, cargar_activos, cargar_analistas, cargar_dividendos_varios,
-                      cargar_fundamentales, cargar_fundamentales_varios, cargar_historico, cargar_informe,
-                      cargar_noticias, cargar_varios, cotizaciones_ahora, cuenta_activa, datos_usuario,
-                      descargas_en_paralelo, enlace, estrategia_actual, eur, fecha, fx, guardar_datos, historia_larga_eur, linea_actualizado,
-                      mercado_alcista_para, mostrar_plotly, num, olvidar_campos_de_cuenta, palabras_de_la_pagina, pct,
-                      perfil, reducir, selector_valor)
+from ui_comun import (SEGUNDOS_REFRESCO, almacen_actual, cargar_activos, cargar_analistas, cargar_composiciones,
+                      cargar_dividendos_varios, cargar_fundamentales, cargar_fundamentales_varios, cargar_historico,
+                      cargar_informe, cargar_noticias, cargar_varios, cotizaciones_ahora, cuenta_activa,
+                      datos_usuario, descargas_en_paralelo, enlace, estrategia_actual, eur, fecha, fx, guardar_datos,
+                      historia_larga_eur, linea_actualizado, mercado_alcista_para, mostrar_plotly, num,
+                      olvidar_campos_de_cuenta, palabras_de_la_pagina, pct, perfil, privado, reducir, selector_valor)
 
 UNIVERSOS = {
     "IBEX 35": (tuple(IBEX35), "^IBEX"),
@@ -563,7 +563,7 @@ def asesor_hoy(inf: dict | None):
                      for p, f in zip(posiciones, [f for f in filas if f["precio"]]) if f.get("var_1d") is not None)
         invertido = sum(p["acciones"] * p["precio_medio"] * p["fx_medio"] for p in posiciones)
         c = st.columns(3 if not pf.movil else 2)
-        c[0].metric("Tu dinero invertido vale", eur(valor), f"{num(cambio, 0)} € en la sesión", delta_color="normal")
+        c[0].metric("Tu dinero invertido vale", eur(valor), f"{eur(cambio)} en la sesión", delta_color="normal")
         c[1 % len(c)].metric("Ganancia o pérdida total", eur(valor - invertido),
                              pct((valor / invertido - 1) * 100, 1) if invertido else None)
         if dg.get("clases"):
@@ -586,10 +586,40 @@ def asesor_hoy(inf: dict | None):
             st.markdown("**Además, hoy:**")
             for a in resto:
                 st.markdown(f"{a['icono']} **{a['titulo']}** — {a['texto']}")
+        bloque_eventos_cerca(filas)
         bloque_semana(posiciones)
         enlace("bankinter", "Ver el diagnóstico completo de tu cartera", "🩺")
         st.caption("Consejos educativos a partir de tus datos y de reglas de gestión prudente; no sustituyen a un "
                    "asesor financiero registrado en la CNMV.")
+
+
+def eventos_de(filas_o_tickers, dias: int = 30) -> list[dict]:
+    """Resultados y dividendos de los próximos `dias` días para tus valores (o una lista de tickers)."""
+    nombres = ({f["ticker"]: f["nombre"] for f in filas_o_tickers} if filas_o_tickers and
+               isinstance(filas_o_tickers[0], dict) else {t: nombre_de(t) for t in filas_o_tickers})
+    if not nombres:
+        return []
+    try:
+        funds = cargar_fundamentales_varios(tuple(sorted(nombres)))
+    except Exception:  # noqa: BLE001
+        return []
+    return eventos.proximos(nombres, funds, dias=dias)
+
+
+def bloque_eventos_cerca(filas: list[dict]) -> None:
+    """«📅 Próximos 14 días» en Hoy: resultados, fecha ex-dividendo y pagos de tus valores."""
+    lista = eventos_de(filas, 14)
+    if not lista:
+        return
+    st.markdown("**📅 Próximos 14 días:**")
+    for e in lista:
+        st.markdown(f"{e['icono']} **{e['nombre']}** — {e['titulo'].lower()} {eventos.cuando(e)}")
+    st.caption("Fechas de Yahoo Finance; las de resultados a veces son estimadas. Todo el calendario en 📒 Seguimiento.")
+
+
+def _ocultar_importes(texto: str) -> str:
+    texto = re.sub(r"\(≈ [\d.,]+ €\)", "(≈ ••• €)", texto)
+    return re.sub(r"unas [\d.,]+ acciones", "unas ••• acciones", texto)
 
 
 def decisiones_por_accion(filas: list[dict]) -> None:
@@ -614,6 +644,11 @@ def decisiones_por_accion(filas: list[dict]) -> None:
         lista.append((f, decision.decidir(f, valores[f["ticker"]], total, tope, analistas, f["precio"] * f["fx"])))
     orden = list(decision.ACCIONES)
     lista.sort(key=lambda x: orden.index(x[1]["clave"]))
+    if privado():                    # sin importes ni número de acciones
+        for _, d in lista:
+            d["situacion"] = re.sub(r"Tienes [\d.,]+ acciones", "Tienes acciones", d.get("situacion") or "")
+            d["texto"] = _ocultar_importes(d["texto"])
+            d["tambien"] = [_ocultar_importes(x) for x in d["tambien"]]
     st.markdown("**📌 Qué hacer con cada acción tuya**")
     for f, d in lista:
         with st.container(border=True):
@@ -727,7 +762,7 @@ def pagina_bankinter():
     if filas:
         resumen_cartera(nombres, elegida)
         p_hacer, p_diag, p_div, p_comp, p_anadir = st.tabs(["📋 Qué hacer", "🩺 Diagnóstico", "💶 Dividendos",
-                                                             "📊 Comparar", "➕ Añadir"])
+                                                             "📈 Rentabilidad", "➕ Añadir"])
         with p_hacer:
             bloque_vigilar_todas(filas)
             for f in filas:
@@ -795,9 +830,11 @@ def tabla_posiciones(filas: list[dict]) -> tuple[pd.DataFrame, float, float, flo
 
 def pintar_tabla_posiciones(tabla: pd.DataFrame, ayuda_peso: str) -> None:
     pf = perfil()
+    if privado():                   # sin euros: precios, porcentajes y peso sí
+        tabla = tabla.drop(columns=["Títulos", "Invertido (€)", "Valor (€)", "Ganancia (€)"])
     if pf.movil:
-        tabla = tabla[["", "Activo", "Precio actual", "Hoy (%)", "Precio compra", "Ganancia (%)", "Ganancia (€)",
-                       "Valor (€)", "Peso (%)", "Títulos", "Protección"]]
+        tabla = tabla[[c for c in ("", "Activo", "Precio actual", "Hoy (%)", "Precio compra", "Ganancia (%)",
+                                   "Ganancia (€)", "Valor (€)", "Peso (%)", "Títulos", "Protección") if c in tabla]]
     st.dataframe(tabla, hide_index=True, width="stretch", column_config={
         "": st.column_config.TextColumn(width=30, pinned=True),
         "Activo": st.column_config.TextColumn(pinned=True),
@@ -1017,8 +1054,81 @@ def bloque_dividendos(filas: list[dict]):
 
 
 @st.fragment
+def bloque_dentro_de_fondos(filas: list[dict]):
+    """«🔍 Qué hay dentro de tus fondos»: empresas y sectores que tienes de verdad sumando tus acciones y lo que
+    llevan tus fondos y ETF (las 10 mayores posiciones de cada uno), y si alguna la tienes por partida doble."""
+    valores = {f["ticker"]: f["pos"]["acciones"] * f["precio"] * f["fx"] for f in filas if f["precio"]}
+    fondos_tk = {f["ticker"]: valores[f["ticker"]] for f in filas if f["clase"] == "Fondos y ETF"
+                 and f["ticker"] in valores}
+    if not fondos_tk:
+        return
+    directas = {f["ticker"]: valores[f["ticker"]] for f in filas if f["clase"] == "Acciones" and f["ticker"] in valores}
+    try:
+        comp = cargar_composiciones(tuple(sorted(fondos_tk)))
+    except Exception:  # noqa: BLE001
+        return
+    if not any(c.get("top") for c in comp.values()):
+        return
+    nombres = {f["ticker"]: f["nombre"] for f in filas}
+    r = fondos.exposicion(directas, fondos_tk, comp, nombres)
+    with st.expander("🔍 Qué hay dentro de tus fondos y ETF", expanded=bool(r["solapes"])):
+        for e in r["solapes"]:
+            dentro = ", ".join(sorted(set(e["fondos"])))
+            st.warning(f"**{e['nombre']}**: la tienes directamente y también dentro de {dentro}. En total es el "
+                       f"{e['peso'] * 100:.1f} % de tu dinero.")
+        top = [e for e in r["empresas"] if e["via_fondos"] > 0][:15]
+        st.dataframe(pd.DataFrame([{
+            "Empresa": e["nombre"], "Directo (%)": round(e["directo"] / sum(valores.values()) * 100, 2),
+            "Dentro de fondos (%)": round(e["via_fondos"] / sum(valores.values()) * 100, 2),
+            "Total (%)": round(e["peso"] * 100, 2)} for e in top]), hide_index=True, width="stretch",
+            column_config={c: st.column_config.NumberColumn(format="%.2f %%")
+                           for c in ("Directo (%)", "Dentro de fondos (%)", "Total (%)")})
+        if r["sectores"]:
+            total_f = sum(fondos_tk.values())
+            st.markdown("**Sectores dentro de tus fondos:** " + " · ".join(
+                f"{s_} {v / total_f * 100:.0f} %" for s_, v in list(r["sectores"].items())[:6]))
+        st.caption("Con las 10 mayores posiciones de cada fondo (Yahoo Finance); el resto del fondo está muy "
+                   "repartido entre cientos de empresas. Así ves tu exposición REAL: un fondo mundial ya lleva mucha "
+                   "tecnología de EEUU (Nvidia, Apple, Microsoft...).")
+
+
+def bloque_rentabilidad_periodos(filas: list[dict]):
+    """Rentabilidad de lo que tienes hoy en cada periodo (hoy, semana, mes, año...), frente al IBEX y a un fondo
+    indexado mundial, como en Ghostfolio o en el bróker."""
+    con_precio = [f for f in filas if f["precio"]]
+    if not con_precio:
+        return
+    acciones = {f["ticker"]: f["pos"]["acciones"] for f in con_precio}
+    hist = historia_larga_eur(tuple(acciones))
+    cierres = {t: df["Close"] for t, df in hist.items() if df is not None and not df.empty}
+    serie = rentabilidad.valor_diario(acciones, cierres)
+    if len(serie) < 5:
+        return
+    _, total, _, cambio_hoy = tabla_posiciones(con_precio)
+    hoy_pct = cambio_hoy / (total - cambio_hoy) * 100 if total - cambio_hoy else None
+    try:
+        refs_hoy = cotizaciones_ahora(("^IBEX", "IWDA.AS"), esperar=False)
+    except Exception:  # noqa: BLE001
+        refs_hoy = {}
+    columnas = {"Tu cartera": rentabilidad.por_periodos(serie, hoy_pct)}
+    for t, nombre in (("^IBEX", "IBEX 35"), ("IWDA.AS", "Fondo mundial")):
+        if t in cierres:
+            columnas[nombre] = rentabilidad.por_periodos(cierres[t], (refs_hoy.get(t) or {}).get("variacion_pct"))
+    periodos = [p["periodo"] for p in columnas["Tu cartera"]]
+    tabla = pd.DataFrame({"Periodo": periodos, **{
+        nombre: [next((round(p["pct"], 2) for p in lista if p["periodo"] == per), None) for per in periodos]
+        for nombre, lista in columnas.items()}})
+    st.subheader("📈 Rentabilidad por periodos")
+    st.dataframe(tabla, hide_index=True, width="stretch", column_config={
+        n: st.column_config.NumberColumn(format="%+.2f %%") for n in columnas})
+    st.caption("Cómo le ha ido a lo que tienes **hoy** en cada periodo (títulos de hoy × precio de cada día, en "
+               "euros, con dividendos). No cuenta cuándo compraste ni lo que metiste o sacaste: es la «foto» de tu "
+               "cartera actual, comparable con el IBEX (sin dividendos) y con un fondo indexado mundial.")
+
+
 def bloque_comparativa(filas: list[dict]):
     """Tu cartera (con el reparto de hoy) frente a un fondo indexado mundial y el IBEX."""
+    bloque_rentabilidad_periodos(filas)
     st.subheader("📊 Tu cartera frente a un fondo indexado")
     anos = st.segmented_control("Periodo", [1, 3, 5], default=3, format_func=lambda a: f"{a} año{'s' if a > 1 else ''}",
                                 key="cmp_anos") or 3
@@ -1164,6 +1274,7 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     for x in dg["hallazgos"]:
         with st.expander(f"{ICONO_GRAVEDAD[x['gravedad']]} {x['titulo']}", expanded=x["gravedad"] == "alta"):
             st.write(x["texto"])
+    bloque_dentro_de_fondos(filas)
 
     if not dg["propuesta"]:
         return False

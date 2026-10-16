@@ -319,6 +319,13 @@ def cargar_analistas(tickers: tuple[str, ...]) -> dict[str, dict]:
         return dict(zip(tickers, pool.map(datos.analistas, tickers)))
 
 
+@st.cache_data(ttl=86_400, show_spinner=False)
+def cargar_composiciones(tickers: tuple[str, ...]) -> dict[str, dict]:
+    """Qué hay dentro de cada fondo o ETF (cambia poco: se pide una vez al día)."""
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        return dict(zip(tickers, pool.map(datos.composicion_fondo, tickers)))
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def cargar_fundamentales_varios(tickers: tuple[str, ...]) -> dict[str, dict]:
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -386,7 +393,24 @@ def pct(x: float | None, dec: int = 1, signo: bool = True) -> str:
     return f"{texto} %"
 
 
+def privado() -> bool:
+    """Modo privado (barra lateral): se ocultan tus importes; precios y porcentajes se siguen viendo."""
+    try:
+        return bool(st.session_state.get("_privado"))
+    except Exception:  # noqa: BLE001 - fuera de la app
+        return False
+
+
 def eur(x: float | None, moneda: str = "€") -> str:
+    """Un importe de dinero (tu cartera, una ganancia...). En modo privado sale «•••»."""
+    if x is None or pd.isna(x):
+        return "—"
+    return f"••• {moneda}" if privado() else f"{num(x, 2)} {moneda}"
+
+
+def precio(x: float | None, moneda: str = "€") -> str:
+    """El precio de un valor, o un importe de ejemplo (calculadoras, lecciones): no es tu dinero, así que se ve
+    también en modo privado."""
     return "—" if x is None or pd.isna(x) else f"{num(x, 2)} {moneda}"
 
 
@@ -674,10 +698,10 @@ def fila_informe(ticker: str) -> dict | None:
     return next((r for r in inf.get("ranking", []) if r["ticker"] == ticker), None)
 
 
-def mostrar_plotly(fig, alto: int | None = None):
+def mostrar_plotly(fig, alto: int | None = None, margen: dict | None = None):
     """Gráfico fluido: sin barra de herramientas y, en el móvil, sin capturar el deslizamiento ni el zoom (así la
-    página se desplaza bien con el dedo)."""
-    fig.update_layout(dragmode=False, margin=dict(l=0, r=0, t=30, b=0), **({"height": alto} if alto else {}))
+    página se desplaza bien con el dedo). `margen`: para gráficos con etiquetas fuera (p. ej. el de araña)."""
+    fig.update_layout(dragmode=False, margin=margen or dict(l=0, r=0, t=30, b=0), **({"height": alto} if alto else {}))
     if st.session_state.get("_perfil") and st.session_state["_perfil"].movil:
         fig.update_xaxes(fixedrange=True)
         fig.update_yaxes(fixedrange=True)

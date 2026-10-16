@@ -1,5 +1,6 @@
-"""Página Seguimiento: tus avisos de precio, tu aportación mensual, tu diario de inversiones y la ayuda para la
-Renta. Y el bloque «📌 Tus pendientes» que se ve arriba en 🧭 Hoy."""
+"""Página Seguimiento: tu lista de valores a vigilar, tus avisos de precio, el calendario de resultados y dividendos,
+tu aportación mensual, tu diario de inversiones y la ayuda para la Renta. Y el bloque «📌 Tus pendientes» que se ve
+arriba en 🧭 Hoy."""
 
 from __future__ import annotations
 
@@ -8,12 +9,13 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from bolsa import agenda, alertas, aportaciones, asesor, diario, renta
+from bolsa import agenda, alertas, aportaciones, asesor, diario, eventos, renta
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
-from paginas_extra import _perfil_guardado, nombre_posicion, revisar_cartera_real
-from ui_comun import (cargar_diario_real, cargar_dividendos_varios, cargar_varios, cotizaciones_ahora, cuenta_activa,
-                      datos_usuario, enlace, eur, fx, guardar_datos, palabras_de_la_pagina, perfil, selector_valor)
+from paginas_extra import _perfil_guardado, eventos_de, nombre_posicion, revisar_cartera_real
+from ui_comun import (SEGUNDOS_REFRESCO, cargar_diario_real, cargar_dividendos_varios, cargar_varios,
+                      cotizaciones_ahora, cuenta_activa, datos_usuario, enlace, eur, fecha, fila_informe, fx,
+                      guardar_datos, ir_a, palabras_de_la_pagina, perfil, selector_valor, texto_estado_precio)
 
 DESTINO_CORTO = {
     "Fondo indexado mundial": "Fondo indexado mundial (MSCI World o FTSE All-World, comisión < 0,3 %)",
@@ -88,12 +90,18 @@ def bloque_pendientes() -> None:
 # --------------------------------------------------------------------------- página
 def pagina_seguimiento():
     st.title("📒 Seguimiento")
-    st.caption("Lo que tú te has propuesto: avisos de precio, tu aportación de cada mes, el diario de tus decisiones "
-               "y tus datos para la Renta. Lo pendiente aparece también arriba en 🧭 Hoy.")
+    st.caption("Lo que tú te has propuesto: tu lista de valores a vigilar, avisos de precio, el calendario de "
+               "resultados y dividendos, tu aportación de cada mes, el diario de tus decisiones y tus datos para la "
+               "Renta. Lo pendiente aparece también arriba en 🧭 Hoy.")
     actualizar_alertas()
-    t1, t2, t3, t4 = st.tabs(["🔔 Avisos de precio", "💶 Aportación mensual", "📓 Diario", "🧾 Renta"])
+    t0, t1, tc, t2, t3, t4 = st.tabs(["👀 Mi lista", "🔔 Avisos de precio", "📅 Calendario",
+                                      "💶 Aportación mensual", "📓 Diario", "🧾 Renta"])
+    with t0:
+        tab_lista()
     with t1:
         tab_alertas()
+    with tc:
+        tab_calendario()
     with t2:
         tab_aportacion()
     with t3:
@@ -102,6 +110,100 @@ def pagina_seguimiento():
         tab_renta()
     palabras_de_la_pagina(["Stop-loss", "Fondo indexado", "Rebalanceo", "Ganancia patrimonial", "Base del ahorro",
                            "Compensación de pérdidas", "Regla de los 2 meses", "Retención", "Dividendo"])
+
+
+# --------------------------------------------------------------------------- lista de seguimiento
+def tab_lista():
+    """Valores que te interesan pero aún no tienes (como la «watchlist» de Yahoo o Investing): precio de ahora,
+    cuánto se han movido desde que los añadiste y qué opina la app."""
+    d = cuenta_activa()
+    lista = d.setdefault("lista_seguimiento", [])
+    st.markdown("Apunta aquí las empresas que te interesan y míralas de un vistazo: precio de ahora, cuánto se han "
+                "movido desde que las añadiste y qué opina la app. Con un toque, un aviso de precio.")
+    c = st.columns([3, 1])
+    with c[0]:
+        t = selector_valor("lista")
+    if c[1].button("➕ Añadir", key="lista_anadir", width="stretch"):
+        if any(x["ticker"] == t for x in lista):
+            st.info("Ya está en tu lista.")
+        else:
+            lista.append({"ticker": t, "nombre": nombre_de(t), "anadida": date.today().isoformat(),
+                          "precio_inicial": _ultimo_precio(t)})
+            guardar_datos()
+            st.rerun()
+    if not lista:
+        st.caption("Tu lista está vacía. Idea: añade las ⭐ ideas del día que te gusten y míralas unas semanas "
+                   "antes de decidir.")
+        return
+    lista_de_seguimiento(lista)
+
+
+@st.fragment(run_every=SEGUNDOS_REFRESCO)
+def lista_de_seguimiento(lista: list[dict]):
+    precios = cotizaciones_ahora([x["ticker"] for x in lista])
+    filas = []
+    for x in lista:
+        q = precios.get(x["ticker"]) or {}
+        inf = fila_informe(x["ticker"]) or {}
+        etiqueta = asesor.veredicto(inf)[0] if inf else "—"
+        ahora = q.get("precio")
+        desde = (ahora / x["precio_inicial"] - 1) * 100 if ahora and x.get("precio_inicial") else None
+        filas.append({"Valor": x["nombre"], "Precio": round(ahora, 2) if ahora else None,
+                      "Hoy (%)": round(q["variacion_pct"], 2) if q.get("variacion_pct") is not None else None,
+                      "Desde que la añadiste (%)": round(desde, 1) if desde is not None else None,
+                      "Nota app": inf.get("nota"), "Veredicto": etiqueta,
+                      "Cotización": texto_estado_precio(q) if q else "cargando…",
+                      "Añadida": fecha(x.get("anadida"))})
+    st.dataframe(pd.DataFrame(filas), hide_index=True, width="stretch", column_config={
+        "Valor": st.column_config.TextColumn(pinned=True),
+        "Precio": st.column_config.NumberColumn(format="localized"),
+        "Hoy (%)": st.column_config.NumberColumn(format="%+.2f %%"),
+        "Desde que la añadiste (%)": st.column_config.NumberColumn(format="%+.1f %%"),
+        "Nota app": st.column_config.NumberColumn(help="Nota global de hoy (100 = la mejor), del informe diario.")})
+    elegido = st.selectbox("Elige uno de tu lista", range(len(lista)), format_func=lambda i: lista[i]["nombre"],
+                           key="lista_elegido")
+    x = lista[elegido]
+    b = st.columns(3)
+    if b[0].button("🔍 Analizar", key="lista_analizar", width="stretch"):
+        ir_a("analizar", analizar_ticker=x["ticker"])
+    if b[1].button("🔔 Aviso −5 %", key="lista_aviso", width="stretch",
+                   help="Te avisa si baja un 5 % desde el precio de ahora (cámbialo en la pestaña Avisos)."):
+        actual = _ultimo_precio(x["ticker"])
+        err = alertas.nueva(cuenta_activa().setdefault("alertas", []), x["ticker"], x["nombre"], "baja",
+                            round(actual * 0.95, 2) if actual else 0, actual, "Desde mi lista")
+        if err:
+            st.error(err)
+        else:
+            guardar_datos()
+            st.success("Aviso creado: lo verás en 🔔 Avisos de precio.")
+    if b[2].button("🗑️ Quitar", key="lista_quitar", width="stretch"):
+        lista.pop(elegido)
+        guardar_datos()
+        st.rerun()
+
+
+# --------------------------------------------------------------------------- calendario
+def tab_calendario():
+    """Resultados, fecha ex-dividendo y pago del dividendo de tus valores y de tu lista, próximos 60 días."""
+    d = cuenta_activa()
+    mias = {t: nombre_posicion(t, p) for t, p in d.get("posiciones", {}).items()}
+    de_lista = {x["ticker"]: x["nombre"] for x in d.get("lista_seguimiento", []) if x["ticker"] not in mias}
+    if not mias and not de_lista:
+        st.caption("Cuando tengas valores en tu cartera o en 👀 Mi lista, aquí verás sus próximas citas.")
+        return
+    lista = eventos_de(list(mias) + list(de_lista), 60)
+    if not lista:
+        st.info("No hay resultados ni dividendos anunciados en los próximos 60 días para tus valores.")
+        return
+    st.dataframe(pd.DataFrame([{
+        "Fecha": e["fecha"].strftime("%d/%m"), "Cuándo": eventos.cuando(e).split(" (")[0],
+        "Valor": e["nombre"] + (" 👀" if e["ticker"] in de_lista else ""), "Qué": f"{e['icono']} {e['titulo']}"}
+        for e in lista]), hide_index=True, width="stretch")
+    with st.expander("¿Qué significa cada cosa?"):
+        for icono, titulo, consejo in eventos.TIPOS.values():
+            st.markdown(f"{icono} **{titulo}**: {consejo}")
+    st.caption("👀 = de tu lista de seguimiento. Fechas de Yahoo Finance: las de resultados a veces son estimadas "
+               "y pueden moverse unos días. La víspera te lo recuerda el mensaje diario de Telegram.")
 
 
 def tab_alertas():

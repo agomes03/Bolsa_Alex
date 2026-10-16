@@ -69,8 +69,18 @@ def sin_internet(monkeypatch, tmp_path):
     monkeypatch.setattr(datos, "varios", lambda ts, periodo="2y": {t: historico_falso(t, periodo) for t in ts})
     monkeypatch.setattr(datos, "diario_sin_ajustar", lambda t, periodo="1y": historico_falso(t, periodo))
     monkeypatch.setattr(datos, "intradia", intradia_falso)
+    en_5_dias = (datetime.now(timezone.utc) + pd.Timedelta(days=5)).timestamp()
     monkeypatch.setattr(datos, "fundamentales", lambda t: {"targetMeanPrice": 150.0, "numberOfAnalystOpinions": 12,
-                                                          "recommendationKey": "buy", "currency": "EUR"})
+                                                          "recommendationKey": "buy", "currency": "EUR",
+                                                          "trailingPE": 14.0, "forwardPE": 12.0, "priceToBook": 1.2,
+                                                          "returnOnEquity": 0.14, "profitMargins": 0.2,
+                                                          "earningsGrowth": 0.08, "revenueGrowth": 0.06,
+                                                          "dividendYield": 3.5, "payoutRatio": 0.5,
+                                                          "earningsTimestamp": en_5_dias})
+    monkeypatch.setattr(datos, "composicion_fondo", lambda t: {
+        "top": [{"simbolo": "SAN.MC", "nombre": "Banco Santander", "peso": 0.02},
+                {"simbolo": "AAPL", "nombre": "Apple Inc", "peso": 0.05}],
+        "sectores": {"technology": 0.25, "financial_services": 0.15}} if t == "IWDA.AS" else {})
     monkeypatch.setattr(datos, "noticias_yahoo", lambda t: [])
     monkeypatch.setattr(datos, "analistas", lambda t: {
         "recuento": {"strongBuy": 5, "buy": 10, "hold": 3, "sell": 1, "strongSell": 0},
@@ -522,3 +532,66 @@ def test_cartera_virtual_con_la_misma_tabla_que_mi_cartera():
     assert "stop 11,00" in tabla["Protección"].tolist()
     assert any(m.label == "Hoy" for m in at.metric)
     assert any("Qué haría el asesor" in e.label for e in at.expander)
+
+
+def test_rentabilidad_por_periodos_en_mi_cartera():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    assert any(t.label == "📈 Rentabilidad" for t in at.tabs)
+    tablas = [df.value for df in at.dataframe if "Periodo" in df.value.columns]
+    assert tablas and {"Tu cartera", "IBEX 35", "Fondo mundial"} <= set(tablas[0].columns)
+    assert {"Hoy", "1 mes", "1 año"} <= set(tablas[0]["Periodo"])
+
+
+def test_dentro_de_los_fondos_avisa_si_tienes_la_misma_empresa_dos_veces():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    assert any("Qué hay dentro de tus fondos" in e.label for e in at.expander)
+    assert any("Banco Santander" in w.value and "también dentro de" in w.value for w in at.warning)
+
+
+def test_calendario_en_hoy_y_en_seguimiento():
+    at = abrir("pagina_hoy", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    assert any("Próximos 14 días" in m.value for m in at.markdown)
+    assert any("presenta resultados en 5 días" in m.value for m in at.markdown)
+    at = abrir("pagina_seguimiento", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    assert any("Presenta resultados" in str(df.value.values) for df in at.dataframe)
+
+
+def test_lista_de_seguimiento():
+    at = abrir("pagina_seguimiento")
+    sin_fallos(at)
+    at.button(key="lista_anadir").click().run()
+    sin_fallos(at)
+    lista = at.session_state["_datos"]["cartera_real"]["lista_seguimiento"]
+    assert len(lista) == 1 and lista[0]["precio_inicial"]
+    tabla = [df.value for df in at.dataframe if "Desde que la añadiste (%)" in df.value.columns][0]
+    assert tabla["Precio"].iloc[0] > 0
+    at.button(key="lista_aviso").click().run()
+    sin_fallos(at)
+    assert at.session_state["_datos"]["cartera_real"]["alertas"][0]["tipo"] == "baja"
+
+
+def test_ficha_de_cinco_ejes_en_analizar():
+    at = abrir("pagina_analizar")
+    sin_fallos(at)
+    assert any("Ficha de la empresa" in h.value for h in at.subheader)
+    assert any(e.label.startswith("Valoración:") for e in at.expander)
+
+
+def test_calculadora_de_libertad_financiera():
+    at = abrir("pagina_calculadoras", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    assert any(m.label == "Te faltan" for m in at.metric)
+    assert any(m.label == "Necesitas" and m.value == "600.000,00 €" for m in at.metric)    # 2.000 € x 12 / 4 %
+
+
+def test_modo_privado_oculta_tus_importes():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()}, estado={"_privado": True})
+    sin_fallos(at)
+    valor = [m for m in at.metric if m.label.startswith("Valor de")][0]
+    assert "•••" in valor.value
+    tabla = at.dataframe[0].value
+    assert "Valor (€)" not in tabla.columns and "Precio actual" in tabla.columns

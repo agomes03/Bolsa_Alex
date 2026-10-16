@@ -16,6 +16,7 @@ from paginas_extra import ICONO_NIVEL, pintar_tabla_posiciones, revisar_cartera_
 from ui_comun import (cargar_diario_real, cargar_historico, cargar_informe, cargar_intradia, cotizacion_al_instante,
                       datos_usuario, estrategia_actual, eur, fecha, fx, guardar_datos, mercado_alcista_para, moneda_de,
                       mostrar_plotly, num, palabras_de_la_pagina, pct, perfil, selector_valor)
+from ui_comun import precio as txt_precio
 
 TIPOS = {"Limitada": "limitada", "A mercado": "mercado", "Stop (con límite)": "stop"}
 EXPLICA_TIPO = {
@@ -194,14 +195,14 @@ def bloque_ordenes_pendientes(cv: dict):
     for o in ordenes:
         m = moneda_de(o["ticker"])
         if o["tipo"] == "stop":
-            precio = f"activación {eur(o['activacion'], m)} · límite {eur(o['limite'], m)}"
+            precio_o = f"activación {txt_precio(o['activacion'], m)} · límite {txt_precio(o['limite'], m)}"
         elif o["tipo"] == "limitada":
-            precio = f"límite {eur(o['limite'], m)}"
+            precio_o = f"límite {txt_precio(o['limite'], m)}"
         else:
-            precio = "a mercado"
+            precio_o = "a mercado"
         c1, c2 = st.columns([4, 1])
         c1.markdown(f"**{o['sentido'].capitalize()} {o['tipo']}** · {o['acciones']} {nombre_de(o['ticker'])} · "
-                    f"{precio}  \n<small>Nº {o['id']} · enviada {_cuando(o['creada'])} · válida hasta "
+                    f"{precio_o}  \n<small>Nº {o['id']} · enviada {_cuando(o['creada'])} · válida hasta "
                     f"{fecha(o['validez'])}</small>", unsafe_allow_html=True)
         if c2.button("Anular", key=f"v_anular_{o['id']}", width="stretch"):
             cartera.cancelar_orden(cv, o["id"], fecha=f"{horario.ahora_madrid():%Y-%m-%dT%H:%M}")
@@ -219,7 +220,7 @@ def ficha_cotizacion(ticker: str, diario: pd.DataFrame, q: dict):
     estado = horario.estado_mercado(ticker)
     delta = f"{num(q['variacion'], 3)} ({pct(q['variacion_pct'], 2)})" if q.get("variacion") is not None else None
     c = st.columns([2, 3]) if not pf.movil else [st.container(), st.container()]
-    c[0].metric(f"{nombre_de(ticker).split(' (')[0]} · último", eur(q["precio"], m), delta)
+    c[0].metric(f"{nombre_de(ticker).split(' (')[0]} · último", txt_precio(q["precio"], m), delta)
     c[1].markdown(f"{'🟢' if estado['abierto'] else '🔴'} {estado['texto']}  \n"
                   f"<small>Precio de las {pd.Timestamp(q['hora']):%H:%M} del {pd.Timestamp(q['hora']):%d/%m} "
                   + ("(⚡ tiempo real, Finnhub)" if q.get("tiempo_real") else

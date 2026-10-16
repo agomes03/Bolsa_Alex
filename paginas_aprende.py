@@ -5,7 +5,8 @@ from __future__ import annotations
 import streamlit as st
 
 from bolsa import aprendizaje, costes
-from ui_comun import eur, num, perfil
+from ui_comun import num, perfil
+from ui_comun import precio as eur  # importes de ejemplo: se ven también en modo privado
 
 
 AVISO = ("⚠️ **Herramienta educativa, no es asesoramiento financiero.** Ningún sistema puede "

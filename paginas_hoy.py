@@ -15,8 +15,8 @@ from paginas_extra import asesor_hoy, limite_empresa, pesos_cartera_real
 from paginas_seguimiento import bloque_pendientes
 from ui_comun import (cargar_informe, cargar_noticias, cargar_varios, conclusion_noticia, cotizaciones_ahora,
                       cuenta_activa, dias_informe, eur, fecha, guardar_datos, hora_espana, ir_a, linea_actualizado,
-                      linea_frescura, moneda_de, num, palabras_de_la_pagina, pct, perfil, reducir, SEGUNDOS_REFRESCO,
-                      texto_estado_precio)
+                      linea_frescura, moneda_de, num, palabras_de_la_pagina, pct, perfil, precio, reducir,
+                      SEGUNDOS_REFRESCO, texto_estado_precio)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
                   "ambar": ("warning", "🟡 Mercado mixto"),
@@ -83,7 +83,7 @@ def tarjeta_idea(r: dict, clave: str, peso: float = 0.0):
         else:
             st.markdown(f":{color}[**{etiqueta}**] · nota **{r.get('nota', '—')}**/100"
                         + (f" · ya la tienes ({peso * 100:.0f} %)" if peso > 0 else ""))
-        partes = [f"{eur(r['precio'], m)}", f"último año {pct((r.get('momentum') or 0) * 100, 0)}"]
+        partes = [f"{precio(r['precio'], m)}", f"último año {pct((r.get('momentum') or 0) * 100, 0)}"]
         if r.get("riesgo_nivel"):
             partes.append(f"riesgo de caída {ICONO_RIESGO[r['riesgo_nivel']]}")
         st.caption(" · ".join(partes))
