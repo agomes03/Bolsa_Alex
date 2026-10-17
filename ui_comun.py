@@ -260,7 +260,7 @@ def precalentar(*funciones) -> None:
         for f in funciones:
             try:
                 f()
-            except Exception:  # noqa: BLE001 - si algo falla, se descargará al ir a esa página
+            except BaseException:  # noqa: BLE001 - si algo falla (o la página se recarga), se descargará al ir a ella
                 pass
 
     threading.Thread(target=correr, daemon=True).start()
@@ -571,6 +571,7 @@ def datos_usuario() -> dict:
                                                             ([cuentas.PRINCIPAL] if d else []))
             st.session_state.pop("_carga_fallida", None)
             _GUARDADOS.pop(_id_sesion(), None)       # datos recién cargados: versión y cuentas de ahora
+            cargar_nombres_buscados()
         except Exception as e:  # noqa: BLE001
             # Sin tus datos NO se guarda nada: guardar ahora borraría lo que tienes en la nube.
             st.session_state["_datos"] = {}
@@ -896,8 +897,9 @@ def reducir(datos, max_puntos: int = 400):
 
 
 def selector_valor(clave: str, solo_invertibles: bool = False, defecto: str | None = None,
-                   etiqueta: str = "Valor") -> str:
-    """Elige grupo (España, EEUU, Asia, Fondos, Cripto, Divisas...) y valor. Devuelve el ticker."""
+                   etiqueta: str = "Valor", buscar: bool = True) -> str:
+    """Elige grupo (España, EEUU, Asia, Fondos, Cripto, Divisas...) y valor. Devuelve el ticker.
+    Con `buscar`, debajo se puede buscar cualquier otro valor de Yahoo por nombre, ticker o ISIN."""
     from bolsa.tickers import CATALOGO, NO_INVERTIBLES, grupo_de
 
     grupos = [g for g, d in CATALOGO.items() if not solo_invertibles or any(t not in NO_INVERTIBLES for t in d)]
@@ -906,12 +908,99 @@ def selector_valor(clave: str, solo_invertibles: bool = False, defecto: str | No
     if defecto and grupo_de(defecto) in grupos:
         st.session_state[f"{clave}_grupo"] = grupo_de(defecto)
         st.session_state[f"{clave}_valor"] = defecto
+        st.session_state[f"{clave}_buscar"] = ""
+    elif defecto and buscar:        # algo de fuera del catálogo (encontrado antes con el buscador)
+        st.session_state[f"{clave}_buscar"] = defecto
     c = st.columns([1, 2])
     grupo = c[0].selectbox("Mercado o tipo", grupos, key=f"{clave}_grupo")
     opciones = [t for t in CATALOGO[grupo] if not solo_invertibles or t not in NO_INVERTIBLES]
     if st.session_state.get(f"{clave}_valor") not in opciones:
         st.session_state.pop(f"{clave}_valor", None)
-    return c[1].selectbox(etiqueta, opciones, key=f"{clave}_valor", format_func=nombre_de)
+    elegido = c[1].selectbox(etiqueta, opciones, key=f"{clave}_valor", format_func=nombre_de)
+    if not buscar:
+        return elegido
+    hallado = buscador_valores(clave, solo_invertibles)
+    return hallado or elegido
+
+
+@st.cache_data(ttl=86_400, show_spinner=False)
+def _buscar_en_yahoo(consulta: str) -> list[dict]:
+    return datos.buscar_simbolos(consulta)
+
+
+def buscador_valores(clave: str, solo_invertibles: bool = False) -> str | None:
+    """«¿No está en la lista?»: busca en Yahoo por nombre, ticker o ISIN. Devuelve el ticker elegido o None."""
+    from bolsa import tickers
+
+    texto = st.text_input("🔎 ¿No está en la lista? Búscalo por nombre, ticker o ISIN", key=f"{clave}_buscar",
+                          placeholder="Ej.: Ferrari, PLTR, IE00B4L5Y983, Cobas...").strip()
+    if not texto:
+        return None
+    with st.spinner("Buscando..."):
+        resultados = [r for r in _buscar_en_yahoo(texto)
+                      if not solo_invertibles or r["type"] not in ("INDEX",)]
+    if not resultados:
+        st.caption("No encuentro nada con ese texto. Prueba con el nombre en inglés, el ticker o el ISIN (lo tienes "
+                   "en la ficha del valor en tu banco).")
+        return None
+    por_simbolo = {r["symbol"]: r for r in resultados}
+    simbolo = st.selectbox(
+        "Resultados", list(por_simbolo), key=f"{clave}_hallado",
+        format_func=lambda s: f"{por_simbolo[s]['name']} · {s} · "
+                              f"{datos.TIPOS_BUSCABLES.get(por_simbolo[s]['type'], '')} {por_simbolo[s]['exchange']}")
+    if simbolo not in tickers.TODOS_LOS_VALORES:
+        registrar_nombre(simbolo, por_simbolo[simbolo]["name"])
+    if re.search(r"\b(\d(\.\d)?x|bull|bear|short|leveraged|inverse|ultra|daily)\b", por_simbolo[simbolo]["name"], re.I):
+        st.warning("⚠️ Esto parece un producto **apalancado o inverso** (multiplica las subidas y las bajadas, y "
+                   "pierde valor con el tiempo). No es para mantener: mejor la acción o un ETF normal.")
+    st.caption("Estás usando el resultado de la búsqueda: borra el texto para volver a la lista.")
+    return simbolo
+
+
+_NOMBRES = {"cargados": False, "cerrojo": threading.Lock()}
+NOMBRES_EXTRA = "nombres_buscados.json"
+
+
+def cargar_nombres_buscados() -> None:
+    """Una vez por proceso, en segundo plano: los nombres de lo que se encontró con el buscador (para que tu
+    cartera virtual o tu lista no enseñen solo el código)."""
+    from bolsa import tickers
+
+    if _NOMBRES["cargados"] or os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    _NOMBRES["cargados"] = True
+    alm = _almacen()
+
+    def leer():
+        try:
+            tickers.NOMBRES_BUSCADOS.update({**alm.leer_extra(NOMBRES_EXTRA), **tickers.NOMBRES_BUSCADOS})
+        except Exception:  # noqa: BLE001 - sin nombres se ve el código, nada más
+            _NOMBRES["cargados"] = False
+
+    threading.Thread(target=leer, daemon=True).start()
+
+
+def registrar_nombre(ticker: str, nombre: str) -> None:
+    """Apunta el nombre de un valor encontrado con el buscador y lo guarda en la nube (sin esperar)."""
+    from bolsa import tickers
+
+    if not nombre or tickers.NOMBRES_BUSCADOS.get(ticker) == nombre:
+        return
+    tickers.NOMBRES_BUSCADOS[ticker] = nombre
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    alm = _almacen()
+
+    def guardar():
+        with _NOMBRES["cerrojo"]:
+            try:
+                guardados = alm.leer_extra(NOMBRES_EXTRA)
+                if guardados.get(ticker) != nombre:
+                    alm.guardar_extra(NOMBRES_EXTRA, {**guardados, ticker: nombre})
+            except Exception:  # noqa: BLE001
+                pass
+
+    threading.Thread(target=guardar, daemon=True).start()
 
 
 def enlace(pagina: str, texto: str, icono: str | None = None):

@@ -767,3 +767,48 @@ def test_volver_a_abrir_el_mismo_valor_en_analizar():
     at.session_state["analizar_ticker"] = "IDR.MC"                    # vuelves a Analizar desde otra página
     at.run()
     assert at.selectbox(key="an_valor").value == "IDR.MC"
+
+
+def test_buscar_cualquier_valor_fuera_del_catalogo(monkeypatch):
+    from bolsa import tickers
+
+    monkeypatch.setattr(datos, "buscar_simbolos", lambda q, maximo=8: [
+        {"symbol": "ZZZ.MI", "name": "Empresa Buscada SpA", "type": "EQUITY", "exchange": "Milan"}] if q else [])
+    at = abrir("pagina_analizar")
+    at.text_input(key="an_buscar").set_value("empresa buscada").run()
+    sin_fallos(at)
+    assert at.selectbox(key="an_hallado").value == "ZZZ.MI"
+    assert tickers.nombre_de("ZZZ.MI") == "Empresa Buscada SpA"
+    assert any("Empresa Buscada SpA" in t.value for t in [*at.title, *at.header, *at.subheader, *at.markdown])
+    tickers.NOMBRES_BUSCADOS.pop("ZZZ.MI", None)
+
+
+def test_comprar_en_virtual_algo_encontrado_con_el_buscador(monkeypatch):
+    from bolsa import tickers
+
+    monkeypatch.setattr(datos, "buscar_simbolos", lambda q, maximo=8: [
+        {"symbol": "ZZZ.MC", "name": "Pyme Española SA", "type": "EQUITY", "exchange": "Madrid"}])
+    at = abrir("pagina_cartera_virtual")
+    at.text_input(key="v_compra_buscar").set_value("pyme").run()
+    sin_fallos(at)
+    assert any("PYME ESPAÑOLA SA" in m.value for m in at.markdown)          # en el ticket de la orden
+    tickers.NOMBRES_BUSCADOS.pop("ZZZ.MC", None)
+
+
+def test_calculadora_de_letras_del_tesoro():
+    at = abrir_pestana(abrir("pagina_calculadoras"), "calc_pestana", "📜 Letras del Tesoro")
+    sin_fallos(at)
+    assert any(m.label == "Letras que compras" and m.value == "10" for m in at.metric)
+
+
+@pytest.mark.parametrize("pestana", ["Renta fija", "Fondos de gestión activa", "ETF temáticos y sectoriales"])
+def test_mercados_pestanas_nuevas(pestana):
+    at = abrir_pestana(abrir("pagina_resumen"), "mk_pestana", pestana)
+    sin_fallos(at)
+    assert at.dataframe
+
+
+def test_mercados_acciones_mas_empresas():
+    at = abrir("pagina_resumen", estado={"mk_pestana": "Acciones", "mk_acciones": "SOCIMIs e inmobiliarias"})
+    sin_fallos(at)
+    assert at.dataframe

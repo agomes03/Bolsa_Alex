@@ -294,16 +294,156 @@ INDICADORES_MACRO = {
     "EURUSD=X": ("Euro / dólar (EUR/USD)", "Divisas", []),
 }
 
+
+# --------------------------------------------------------------------------- catálogo grande (octubre 2026)
+# Más empresas y productos, todos comprobados con datos de Yahoo. Lo que no esté aquí se encuentra con el
+# buscador (nombre, ticker o ISIN) en Analizar, la cartera virtual y la lista de seguimiento.
+def _g(sector: str, pares: str) -> dict:
+    """«TICKER=Nombre; TICKER=Nombre» -> {ticker: (nombre, sector, [palabras de noticias])}."""
+    salida = {}
+    for par in pares.split(";"):
+        t, n = (x.strip() for x in par.split("=", 1))
+        salida[t] = (n, sector, [n.split(" (")[0].lower()])
+    return salida
+
+
+MAS_CONTINUO = {
+    **_g("Transporte", "TLGO.MC=Talgo; EDR.MC=eDreams ODIGEO; HBX.MC=HBX Group (Hotelbeds)"),
+    **_g("Inmobiliaria", "HOME.MC=Neinor Homes; AEDAS.MC=Aedas Homes; MVC.MC=Metrovacesa; RLIA.MC=Realia; "
+                         "ISUR.MC=Inmobiliaria del Sur; MTB.MC=Montebalito; NYE.MC=Nyesa; LIB.MC=Libertas 7"),
+    **_g("Seguros", "LDA.MC=Línea Directa Aseguradora"),
+    **_g("Financiero", "R4.MC=Renta 4 Banco; ALNT.MC=Alantra"),
+    **_g("Salud", "ATRY.MC=Atrys Health; CBAV.MC=Clínica Baviera; RJF.MC=Reig Jofre; ORY.MC=Oryzon Genomics; "
+                  "GRF-P.MC=Grifols (acciones B); PRM.MC=Prim"),
+    **_g("Materiales", "MCM.MC=Miquel y Costas; CMO.MC=Cementos Molins; IBG.MC=Iberpapel; LGT.MC=Lingotes Especiales"),
+    **_g("Tecnología", "DOM.MC=Global Dominion; IZER.MC=Izertis; AMP.MC=Amper; AI.MC=Airtificial; EZE.MC=Ezentis"),
+    **_g("Energía", "ADX.MC=Audax Renovables; SOL.MC=Soltec; ENER.MC=Ecoener; BKY.MC=Berkeley Energia"),
+    **_g("Industria", "MDF.MC=Duro Felguera; TRE.MC=Técnicas Reunidas; NEA.MC=Nicolás Correa; AZK.MC=Azkoyen; "
+                      "ART.MC=Arteche"),
+    **_g("Construcción", "OHLA.MC=OHLA; FCC.MC=FCC; GSJ.MC=Grupo San José"),
+    **_g("Consumo", "NTH.MC=Naturhouse; RIO.MC=Bodegas Riojanas; PVA.MC=Pescanova; OLE.MC=Deoleo; "
+                    "CCEP.MC=Coca-Cola Europacific Partners; ADZ.MC=Adolfo Domínguez; DIA.MC=DIA; "
+                    "EAT.MC=AmRest; NXT.MC=Nextil; CIRSA.MC=Cirsa"),
+    **_g("Medios", "SQRL.MC=Squirrel Media; VOC.MC=Vocento; PRS.MC=Prisa"),
+    **_g("Servicios", "CASH.MC=Prosegur Cash"),
+}
+
+MAS_EEUU = {
+    **_g("Banca", "WFC=Wells Fargo; MS=Morgan Stanley; C=Citigroup; SCHW=Charles Schwab"),
+    **_g("Financiero", "BLK=BlackRock; AXP=American Express; SPGI=S&P Global; COIN=Coinbase; HOOD=Robinhood; "
+                       "MSTR=Strategy (MicroStrategy)"),
+    **_g("Consumo", "LOW=Lowe's; TGT=Target; SBUX=Starbucks; PM=Philip Morris; MO=Altria; MDLZ=Mondelez; "
+                    "CL=Colgate-Palmolive; KHC=Kraft Heinz; F=Ford; GM=General Motors"),
+    **_g("Turismo", "BKNG=Booking; ABNB=Airbnb"),
+    **_g("Tecnología", "TXN=Texas Instruments; QCOM=Qualcomm; AMAT=Applied Materials; MU=Micron; LRCX=Lam Research; "
+                       "KLAC=KLA; ADI=Analog Devices; MRVL=Marvell; ARM=Arm Holdings; INTU=Intuit; NOW=ServiceNow; "
+                       "IBM=IBM; ACN=Accenture; CRWD=CrowdStrike; PANW=Palo Alto Networks; SNOW=Snowflake; "
+                       "ANET=Arista Networks; DELL=Dell; SMCI=Super Micro Computer; APP=AppLovin"),
+    **_g("Telecomunicaciones", "T=AT&T; VZ=Verizon; TMUS=T-Mobile US; CMCSA=Comcast; ASTS=AST SpaceMobile"),
+    **_g("Salud", "ABT=Abbott; TMO=Thermo Fisher; DHR=Danaher; AMGN=Amgen; GILD=Gilead; BMY=Bristol-Myers Squibb; "
+                  "CVS=CVS Health; MDT=Medtronic; ISRG=Intuitive Surgical; VRTX=Vertex; REGN=Regeneron; MRNA=Moderna"),
+    **_g("Defensa", "LMT=Lockheed Martin; RTX=RTX (Raytheon); NOC=Northrop Grumman; GD=General Dynamics"),
+    **_g("Industria", "GE=GE Aerospace; HON=Honeywell; UPS=UPS; FDX=FedEx; DE=John Deere; MMM=3M; UNP=Union Pacific; "
+                      "LIN=Linde"),
+    **_g("Eléctricas", "NEE=NextEra Energy; DUK=Duke Energy; SO=Southern Company"),
+    **_g("Petróleo", "COP=ConocoPhillips"),
+}
+
+MAS_EUROPA = {
+    **_g("Automoción", "RACE.MI=Ferrari; STLAM.MI=Stellantis; P911.DE=Porsche; RNO.PA=Renault; CON.DE=Continental; "
+                       "ML.PA=Michelin"),
+    **_g("Defensa", "RHM.DE=Rheinmetall; HO.PA=Thales; LDO.MI=Leonardo; HAG.DE=Hensoldt; R3NK.DE=Renk; "
+                    "SAAB-B.ST=Saab; BA.L=BAE Systems; RR.L=Rolls-Royce"),
+    **_g("Tecnología", "IFX.DE=Infineon; CAP.PA=Capgemini; DSY.PA=Dassault Systèmes; PRX.AS=Prosus; ADYEN.AS=Adyen; "
+                       "ASM.AS=ASM International; ERIC-B.ST=Ericsson; PHIA.AS=Philips"),
+    **_g("Banca", "DBK.DE=Deutsche Bank; CBK.DE=Commerzbank; GLE.PA=Société Générale; KBC.BR=KBC"),
+    **_g("Seguros", "G.MI=Generali; HNR1.DE=Hannover Re"),
+    **_g("Consumo", "BN.PA=Danone; RI.PA=Pernod Ricard; CA.PA=Carrefour; HEIA.AS=Heineken; AD.AS=Ahold Delhaize; "
+                    "ZAL.DE=Zalando; PUM.DE=Puma; HEN3.DE=Henkel; JMT.LS=Jerónimo Martins"),
+    **_g("Lujo", "KER.PA=Kering; MONC.MI=Moncler"),
+    **_g("Salud", "UCB.BR=UCB; MRK.DE=Merck KGaA; FRE.DE=Fresenius"),
+    **_g("Industria", "PRY.MI=Prysmian; VOLV-B.ST=Volvo; ATCO-A.ST=Atlas Copco; DSV.CO=DSV; MAERSK-B.CO=Maersk; "
+                      "DHL.DE=DHL Group; SGO.PA=Saint-Gobain; BFSA.DE=Befesa"),
+    **_g("Energía", "EQNR.OL=Equinor; VWS.CO=Vestas; ENR.DE=Siemens Energy; GALP.LS=Galp"),
+    **_g("Eléctricas", "EOAN.DE=E.ON; RWE.DE=RWE; ENGI.PA=Engie; VIE.PA=Veolia; EDP.LS=EDP"),
+    **_g("Telecomunicaciones", "ORA.PA=Orange"),
+}
+
+SOCIMIS_INMOBILIARIAS = {
+    **_g("SOCIMI", "MRL.MC=Merlin Properties; COL.MC=Inmobiliaria Colonial"),
+    **_g("Inmobiliaria Europa", "VNA.DE=Vonovia; URW.PA=Unibail-Rodamco-Westfield; SGRO.L=Segro"),
+    **_g("REIT EEUU", "O=Realty Income; PLD=Prologis; AMT=American Tower; SPG=Simon Property; EQIX=Equinix"),
+    **_g("ETF inmobiliario", "IPRP.AS=iShares European Property Yield (€); "
+                             "IWDP.AS=iShares Developed Markets Property Yield"),
+}
+
+FONDOS_GESTION_ACTIVA = {
+    **_g("Fondo de autor", "0P00019W2R.F=Cobas Internacional FI; 0P00019W2Q.F=Cobas Iberia FI; "
+                           "0P0001572X.F=Magallanes European Equity M FI; 0P0001572U.F=Magallanes Iberian Equity M FI; "
+                           "0P00016YQ5.F=azValor Internacional FI; 0P00016YQ4.F=azValor Iberia FI; "
+                           "0P00000P2M.F=Bestinver Internacional FI; 0P00000P2N.F=Bestinver Bolsa FI; "
+                           "0P0001DFE8.F=Horos Value Internacional FI; 0P00011MD7.F=True Value FI; "
+                           "0P0001JGVI.F=True Value Small Caps A FI; 0P000125T9.F=Valentum FI; 0P0001HVBJ.F=Muza FI; "
+                           "0P00000J48.F=Metavalor FI; 0P0001NMUD.F=MyInvestor Value A FI; "
+                           "0P0001CTGR.F=Baelo Patrimonio FI; 0P00000TJ8.F=Cartesio X FI"),
+    **_g("Fondo internacional", "0P0000RU81.L=Fundsmith Equity I Acc (£)"),
+    **_g("Fondo mixto", "0P0001H7WN.F=Indexa RV Mixta Internacional 75 FI"),
+    **_g("Fondo Bankinter", "0P00000PIG.F=Bankinter Índice IBEX R FI; "
+                            "0P00000PI7.F=Bankinter Renta Fija Largo Plazo R FI"),
+}
+
+RENTA_FIJA = {
+    **_g("Bonos España", "IS0P.DE=iShares Bonos del Estado español (distribución, €); "
+                         "SPGA.MI=iShares Bonos del Estado español (acumulación, €)"),
+    **_g("Monetario y Letras", "0P00000DNX.F=Renta 4 Fondtesoro Corto Plazo FI (Letras y deuda corta); "
+                               "0P00000PI2.F=Bankinter Ahorro Activos Euro R FI (monetario); "
+                               "0P00000CNF.F=Sabadell Fondtesoro Largo Plazo FI; "
+                               "XEON.DE=Xtrackers EUR Overnight Rate (monetario, €); "
+                               "ERNE.AS=iShares € Ultrashort Bond (muy corto plazo, €)"),
+    **_g("Bonos zona euro", "EUNH.DE=iShares Core € Govt Bond (€); XGLE.DE=Xtrackers Eurozone Government Bond (€); "
+                            "VGEA.DE=Vanguard Eurozone Government Bond (€); IBGS.AS=iShares € Govt Bond 1-3 años; "
+                            "IBGM.AS=iShares € Govt Bond 7-10 años; "
+                            "IBCI.AS=iShares € Inflation Linked Govt Bond (ligados a la inflación)"),
+    **_g("Bonos de empresa", "IEAC.AS=iShares Core € Corp Bond (empresas, €); 0P00000M9H.F=Evli Short Corporate Bond B; "
+                             "EUNA.DE=iShares Core Global Aggregate Bond (€)"),
+}
+
+ETF_TEMATICOS = {
+    **_g("ETF sector", "QDVE.DE=iShares S&P 500 Tecnología; QDVG.DE=iShares S&P 500 Salud; "
+                       "QDVF.DE=iShares S&P 500 Energía; QDVH.DE=iShares S&P 500 Financiero; "
+                       "XDWT.DE=Xtrackers MSCI World Tecnología; XDWH.DE=Xtrackers MSCI World Salud; "
+                       "EXV1.DE=iShares STOXX Europe 600 Bancos; EXH1.DE=iShares STOXX Europe 600 Petróleo y gas; "
+                       "EXV6.DE=iShares STOXX Europe 600 Materias primas"),
+    **_g("ETF temático", "VVSM.DE=VanEck Semiconductores; XAIX.DE=Xtrackers Inteligencia Artificial y Big Data; "
+                         "DFEN.DE=VanEck Defensa; USPY.DE=L&G Ciberseguridad; 2B76.DE=iShares Automatización y Robótica; "
+                         "IQQH.DE=iShares Energía Limpia; IQQQ.DE=iShares Agua"),
+    **_g("ETF dividendos", "VHYL.AS=Vanguard FTSE All-World High Dividend Yield; "
+                           "ZPRG.DE=SPDR S&P Global Dividend Aristocrats; ISPA.DE=iShares STOXX Global Select Dividend 100; "
+                           "SPYD.DE=SPDR S&P US Dividend Aristocrats; TDIV.AS=VanEck Dividend Leaders"),
+    **_g("ETF región y estilo", "SXRT.DE=iShares Core EURO STOXX 50 (€); MEUD.PA=Amundi STOXX Europe 600 (€); "
+                                "CW8.PA=Amundi MSCI World (€); CSPX.AS=iShares Core S&P 500 (Ámsterdam); "
+                                "IJPA.AS=iShares Core MSCI Japan; XCS6.DE=Xtrackers MSCI China; "
+                                "IUSN.DE=iShares MSCI World Small Cap; ZPRV.DE=SPDR USA Small Cap Value; "
+                                "ZPRX.DE=SPDR Europe Small Cap Value; IS3R.DE=iShares MSCI World Momentum"),
+    **_g("Metales y cripto", "PHAG.AS=WisdomTree Plata física; BTCE.DE=Bitwise Bitcoin físico (ETC, €)"),
+}
+
 CATALOGO = {
-    "España (IBEX 35)": IBEX35, "España (Mercado Continuo)": CONTINUO, "Europa": EUROPA, "EEUU": EEUU,
+    "España (IBEX 35)": IBEX35, "España (Mercado Continuo)": {**CONTINUO, **MAS_CONTINUO}, "Europa": EUROPA,
+    "Europa (más empresas)": MAS_EUROPA, "EEUU": EEUU, "EEUU (más empresas)": MAS_EEUU,
     "Reino Unido, Suiza y Nórdicos": REINO_UNIDO_SUIZA, "Asia": ASIA, "Otros mercados": OTROS_MERCADOS,
-    "Fondos indexados": FONDOS_INDEXADOS, "ETF y oro": {**ETFS, **MAS_ETFS}, "Criptomonedas": CRIPTOMONEDAS,
+    "SOCIMIs e inmobiliarias": SOCIMIS_INMOBILIARIAS,
+    "Fondos indexados": FONDOS_INDEXADOS, "Fondos de gestión activa": FONDOS_GESTION_ACTIVA,
+    "ETF y oro": {**ETFS, **MAS_ETFS}, "ETF temáticos y sectoriales": ETF_TEMATICOS, "Renta fija": RENTA_FIJA,
+    "Criptomonedas": CRIPTOMONEDAS,
     "Divisas": DIVISAS, "Materias primas": MATERIAS_PRIMAS, "Índices": INDICES_TODOS,
     "Tipos de interés y macro": INDICADORES_MACRO,
 }
 TODOS_LOS_VALORES = {t: v for grupo in CATALOGO.values() for t, v in grupo.items()}
 # Lo que no se puede comprar directamente (son referencias): índices y tipos/indicadores.
 NO_INVERTIBLES = set(INDICES_TODOS) | set(INDICADORES_MACRO)
+# Nombres de lo que se ha encontrado con el buscador (fuera del catálogo): ticker -> nombre.
+NOMBRES_BUSCADOS: dict[str, str] = {}
 
 
 def nombre_de(ticker: str) -> str:
@@ -325,7 +465,7 @@ def nombre_de(ticker: str) -> str:
         return ACTIVOS[ticker]["nombre"]
     if es_cripto(ticker):
         return CRIPTO[ticker.split("-")[0].upper()]
-    return ticker
+    return NOMBRES_BUSCADOS.get(ticker, ticker)
 
 
 def sector_de(ticker: str) -> str:

@@ -291,6 +291,32 @@ def buscar_simbolo(consulta: str) -> dict | None:
             "type": r.get("quoteType")}
 
 
+# Lo que tiene sentido buscar (fuera quedan opciones, futuros sueltos de empresas, etc.).
+TIPOS_BUSCABLES = {"EQUITY": "Acción", "ETF": "ETF", "MUTUALFUND": "Fondo", "CRYPTOCURRENCY": "Cripto",
+                   "INDEX": "Índice", "CURRENCY": "Divisa"}
+
+
+def buscar_simbolos(consulta: str, maximo: int = 8) -> list[dict]:
+    """Resultados de Yahoo para un nombre, ticker o ISIN: [{'symbol', 'name', 'type', 'exchange'}], primero las
+    bolsas europeas en euros y EEUU (más fáciles de comprar desde España)."""
+    import yfinance as yf
+
+    consulta = consulta.strip()
+    if len(consulta) < 2:
+        return []
+    try:
+        resultados = yf.Search(consulta, max_results=15, news_count=0).quotes or []
+    except Exception:  # noqa: BLE001
+        return []
+    salida = [{"symbol": r["symbol"], "name": r.get("longname") or r.get("shortname") or r["symbol"],
+               "type": r.get("quoteType"), "exchange": r.get("exchDisp") or r.get("exchange") or ""}
+              for r in resultados if r.get("symbol") and r.get("quoteType") in TIPOS_BUSCABLES]
+    exacto = consulta.upper()
+    salida.sort(key=lambda r: (r["symbol"] != exacto, _PREFERENCIA_BOLSA.get(
+        next((x.get("exchange") for x in resultados if x.get("symbol") == r["symbol"]), ""), 6)))
+    return salida[:maximo]
+
+
 CAMPOS_FUNDAMENTALES = [
     "longName", "currency", "marketCap", "trailingPE", "forwardPE", "priceToBook",
     "trailingAnnualDividendYield", "payoutRatio", "returnOnEquity", "profitMargins",

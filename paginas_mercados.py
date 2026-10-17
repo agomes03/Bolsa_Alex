@@ -19,10 +19,14 @@ BANDERAS = {"^IBEX": "🇪🇸", "^STOXX50E": "🇪🇺", "^GDAXI": "🇩🇪", 
             "^FTSE": "🇬🇧", "^SSMI": "🇨🇭", "^GSPC": "🇺🇸", "^NDX": "🇺🇸", "^IXIC": "🇺🇸", "^DJI": "🇺🇸", "^RUT": "🇺🇸",
             "^GSPTSE": "🇨🇦", "^BVSP": "🇧🇷", "^N225": "🇯🇵", "^HSI": "🇭🇰", "000001.SS": "🇨🇳", "^KS11": "🇰🇷",
             "^NSEI": "🇮🇳", "^AXJO": "🇦🇺"}
-PESTANAS = ["Índices", "Divisas", "Materias primas", "Criptomonedas", "Tipos de interés y macro", "Fondos indexados",
-            "ETF y oro", "Acciones"]
-GRUPOS_ACCIONES = ["España (IBEX 35)", "España (Mercado Continuo)", "Europa", "EEUU", "Reino Unido, Suiza y Nórdicos",
-                   "Asia", "Otros mercados"]
+PESTANAS = ["Índices", "Acciones", "Fondos indexados", "Fondos de gestión activa", "ETF y oro",
+            "ETF temáticos y sectoriales", "Renta fija", "Divisas", "Materias primas", "Criptomonedas",
+            "Tipos de interés y macro"]
+CORTOS = {"Fondos de gestión activa": "Fondos activos", "ETF temáticos y sectoriales": "ETF temáticos",
+          "Tipos de interés y macro": "Tipos y macro"}
+GRUPOS_ACCIONES = ["España (IBEX 35)", "España (Mercado Continuo)", "Europa", "Europa (más empresas)", "EEUU",
+                   "EEUU (más empresas)", "Reino Unido, Suiza y Nórdicos", "Asia", "Otros mercados",
+                   "SOCIMIs e inmobiliarias"]
 
 
 def filas_grupo(tickers: tuple[str, ...]) -> list[dict]:
@@ -56,7 +60,7 @@ def _decimales(t: str) -> int:
 def pagina_resumen():
     st.title("🌍 Mercados")
     pestana = st.segmented_control("Ver", PESTANAS, default="Índices", key="mk_pestana",
-                                   label_visibility="collapsed") or "Índices"
+                                   format_func=lambda p: CORTOS.get(p, p), label_visibility="collapsed") or "Índices"
     if pestana == "Acciones":
         grupo = st.selectbox("Mercado", GRUPOS_ACCIONES, key="mk_acciones")
     else:
@@ -74,6 +78,19 @@ def pagina_resumen():
         "Fondos indexados": "Fondos que copian un índice, con su valor liquidativo (se calcula una vez al día). Se "
                             "contratan en la sección de fondos de tu banco y permiten traspasos sin impuestos.",
         "Criptomonedas": "Precios en euros. Muy volátiles: solo una parte pequeña de tu dinero.",
+        "Fondos de gestión activa": "Fondos españoles y de autor (Cobas, Magallanes, azValor, Bestinver...): un gestor "
+                                    "elige las empresas. Cobran más que los indexados (1-2 % al año) y la mayoría no "
+                                    "bate a su índice a largo plazo. Se pueden traspasar sin pagar impuestos.",
+        "ETF temáticos y sectoriales": "Apuestas por un sector o una idea (semiconductores, defensa, IA, dividendos...). "
+                                       "Útiles como complemento pequeño; para el núcleo de la cartera, mejor un ETF "
+                                       "mundial.",
+        "Renta fija": "Bonos y monetarios: menos subidas y bajadas que la bolsa. Las Letras del Tesoro se compran "
+                      "directamente en tesoro.es o en tu banco (calcula lo que te darían en Calculadoras → "
+                      "Letras del Tesoro); aquí tienes fondos y ETF que las llevan dentro.",
+        "SOCIMIs e inmobiliarias": "Empresas que viven de alquilar inmuebles. Reparten buena parte del beneficio en "
+                                   "dividendos y sufren cuando suben los tipos de interés.",
+        "EEUU (más empresas)": "Más empresas de EEUU (cotizan en dólares: lo que ganes o pierdas también depende del "
+                               "cambio euro/dólar).",
     }.get(grupo)
     if texto_ayuda:
         st.caption(texto_ayuda)
@@ -122,7 +139,7 @@ def precargar_grupos(actual: str) -> None:
             tickers = tuple(CATALOGO[g])
             filas_grupo(tickers)
             cotizaciones_ahora(tickers)
-        except Exception:  # noqa: BLE001 - si falla, se descargará al abrir ese grupo
+        except BaseException:  # noqa: BLE001 - si falla (o la página se recarga), se descargará al abrir ese grupo
             pass
 
     def todos() -> None:

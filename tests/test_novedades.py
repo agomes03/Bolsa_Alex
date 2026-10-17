@@ -55,3 +55,34 @@ def test_libertad_financiera():
     esc = r["escenarios"]
     assert esc["Optimista"]["anos"] < r["anos"] < esc["Pesimista"]["anos"]
     assert libertad.calcular(1000, 400_000, 0, 0.04)["anos"] == 0
+
+
+def test_letras_del_tesoro():
+    from bolsa import letras
+
+    assert round(letras.precio(2.0, 364), 2) == 980.18           # 1.000 / (1 + 0,02·364/360)
+    r = letras.calcular(10_000, 2.0, 364)
+    assert r["letras"] == 10 and round(r["intereses"], 2) == 198.21
+    assert round(r["impuesto"], 2) == round(r["intereses"] * 0.19, 2)
+    assert letras.calcular(500, 2.0, 91)["letras"] == 0
+
+
+def test_catalogo_grande_sin_grupos_vacios_y_mercados_completo():
+    from bolsa import tickers
+    from paginas_mercados import GRUPOS_ACCIONES, PESTANAS
+
+    assert all(tickers.CATALOGO.values())
+    assert set(GRUPOS_ACCIONES) | (set(PESTANAS) - {"Acciones"}) == set(tickers.CATALOGO)
+    assert len(tickers.TODOS_LOS_VALORES) > 450
+    assert tickers.nombre_de("TLGO.MC") == "Talgo"
+
+
+def test_nombre_de_lo_encontrado_con_el_buscador():
+    from bolsa import tickers
+
+    assert tickers.nombre_de("QQQ1.XX") == "QQQ1.XX"
+    tickers.NOMBRES_BUSCADOS["QQQ1.XX"] = "Algo Raro"
+    try:
+        assert tickers.nombre_de("QQQ1.XX") == "Algo Raro"
+    finally:
+        tickers.NOMBRES_BUSCADOS.pop("QQQ1.XX")

@@ -12,7 +12,7 @@ from plotly.subplots import make_subplots
 from bolsa import asesor, bankinter, costes, ficha, noticias, senales
 from bolsa.activos import clase_de
 from bolsa.indicadores import calcular_todo
-from bolsa.tickers import NO_INVERTIBLES, nombre_de, sector_de, TODOS_LOS_VALORES
+from bolsa.tickers import NO_INVERTIBLES, nombre_de, sector_de
 from paginas_extra import bloque_operar, limite_empresa, pesos_cartera_real
 from paginas_hoy import bloque_que_puede_pasar_accion, pagina_radar_global
 from paginas_noticias import tarjeta_noticia
@@ -143,10 +143,6 @@ def pagina_analizar():
     st.title("🔍 Analizar")
     pre = st.session_state.pop("analizar_ticker", None)
     ticker = selector_valor("an", defecto=pre)
-    otro = st.text_input("¿No está en la lista? Escribe su código de Yahoo Finance (ej. KO, SAP.DE)", "").strip().upper()
-    if otro:
-        ticker = otro
-        st.caption("Estás viendo el código que has escrito: bórralo para volver a elegir de la lista.")
 
     with st.spinner(f"Analizando {nombre_de(ticker)}..."):
         df = cargar_historico(ticker, "10y")
@@ -173,7 +169,7 @@ def pagina_analizar():
 
     m = moneda_de(ticker, fund)
     f_eur = fx(ticker, fund)
-    titulo = nombre_de(ticker) if ticker in TODOS_LOS_VALORES else fund.get("longName", ticker)
+    titulo = nombre_de(ticker) if nombre_de(ticker) != ticker else fund.get("longName", ticker)
     try:
         q = cotizaciones_ahora([ticker]).get(ticker)
     except Exception:  # noqa: BLE001 - sin precio reciente, se queda el del histórico

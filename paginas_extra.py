@@ -1035,7 +1035,7 @@ def bloque_anadir():
         if texto.strip():
             revisar_e_importar(importador.leer_texto(texto, resolver=buscar_simbolo), "pegado", cuenta)
     with t1:
-        ticker = selector_valor("alta", solo_invertibles=True)
+        ticker = selector_valor("alta", solo_invertibles=True, buscar=False)
         with st.form("alta_real"):
             otro = st.text_input("¿Otro activo? Escribe su ISIN, su código (BTC-EUR, 4GLD.DE...) o su nombre",
                                  "").strip()

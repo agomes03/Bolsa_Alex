@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from bolsa import costes, libertad
+from bolsa import costes, letras, libertad
 from ui_comun import alto_grafico, cuenta_activa, perfil, pestanas, privado, reducir
 from ui_comun import precio as eur  # importes de ejemplo: se ven también en modo privado
 
@@ -14,7 +14,10 @@ def pagina_calculadoras():
     pf = perfil()
     movil, tarifa = pf.movil, pf.tarifa
     st.title("🧮 Calculadoras")
-    t1, t2, t3, t4 = pestanas(["💶 Coste", "🏛️ Impuestos", "🌱 Cada mes", "🏖️ Libertad financiera"], "calc_pestana")
+    t1, t2, t3, t4, t5 = pestanas(["💶 Coste", "🏛️ Impuestos", "🌱 Cada mes", "🏖️ Libertad financiera",
+                                   "📜 Letras del Tesoro"], "calc_pestana")
+    with t5:
+        calculadora_letras(movil)
     with t4:
         if t4.open:          # la única que descarga datos (tu cartera)
             calculadora_libertad()
@@ -76,6 +79,35 @@ def pagina_calculadoras():
         f = filas[-1]
         st.success(f"Aportando {eur(mensual)} al mes durante {anos} años habrías puesto **{eur(f['Aportado'])}** "
                    f"y tendrías unos **{eur(f['Valor'])}**. El interés compuesto hace el resto.")
+
+
+def calculadora_letras(movil: bool):
+    st.caption("Las Letras del Tesoro son préstamos al Estado español a 3, 6, 9 o 12 meses. Pagas menos de 1.000 € "
+               "por cada Letra y al vencer cobras 1.000 €: la diferencia es tu interés. Riesgo muy bajo.")
+    c = st.columns(1 if movil else 3)
+    importe = c[0].number_input("Dinero que quieres poner (€)", 1000.0, 10_000_000.0, 10_000.0, 1000.0,
+                                key="letras_importe")
+    plazo = c[1 % len(c)].selectbox("Plazo", list(letras.PLAZOS), index=3, key="letras_plazo")
+    tipo = c[2 % len(c)].number_input(
+        "Tipo de interés de la última subasta (%)", 0.0, 15.0, 2.0, 0.05, format="%.3f", key="letras_tipo",
+        help="El «tipo medio» de la última subasta de ese plazo. Lo publica el Tesoro en tesoro.es → Subastas → "
+             "Resultados (y sale en las noticias el día de la subasta).")
+    r = letras.calcular(importe, tipo, letras.PLAZOS[plazo])
+    if r["letras"] == 0:
+        st.warning("Con ese importe no llega para una Letra (cada una cuesta casi 1.000 €).")
+        return
+    m = st.columns(2 if movil else 4)
+    m[0].metric("Letras que compras", f"{r['letras']}", help=f"Cada una cuesta {eur(r['precio'])} hoy.")
+    m[1].metric("Pagas hoy", eur(r["pagas"]))
+    m[2 % len(m)].metric(f"Cobras dentro de {plazo}", eur(r["cobras"]))
+    m[3 % len(m)].metric("Intereses (antes de impuestos)", eur(r["intereses"]),
+                         f"{r['tae']:.2f} % TAE".replace(".", ","), delta_color="off")
+    st.markdown(f"Después de Hacienda (19 % en la base del ahorro hasta 6.000 €) te quedan **{eur(r['neto'])}** "
+                f"limpios. Las Letras no tienen retención: el interés se declara en la Renta del año en que vencen.")
+    st.info("**Cómo se compran:** en la web del Tesoro (tesoro.es, con certificado digital o Cl@ve; sin comisiones, "
+            "el dinero va a tu cuenta) o desde tu banco (Bankinter las vende en su sección de renta fija; pregunta "
+            "su comisión). Se pide en las subastas, que son cada dos semanas aprox. Si no quieres esperar a una "
+            "subasta, hay fondos que invierten en Letras (🌍 Mercados → Renta fija).")
 
 
 def calculadora_libertad():
