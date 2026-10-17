@@ -593,7 +593,7 @@ def aviso_carga_fallida() -> None:
             st.rerun()
 
 
-CAMPOS_DE_POSICION = ("stop_", "pv_", "pq_", "nv_", "ss_", "alarma_", "perfil_diag")
+CAMPOS_DE_POSICION = ("stop_", "pv_", "pq_", "nv_", "ss_", "alarma_", "perfil_diag", "co_")
 
 
 def olvidar_campos_de_cuenta() -> None:

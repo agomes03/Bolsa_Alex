@@ -857,3 +857,34 @@ def test_apuntar_un_fondo_con_participaciones_y_aportaciones(monkeypatch):
     assert pos["acciones"] == 1.25803 and round(pos["precio_medio"], 2) == 2548.29
     assert any("pagaste 2.548,29 € por cada una" in s.value for s in at.success)
     tickers.NOMBRES_BUSCADOS.pop("0P00000PGI.F", None)
+
+
+def test_corregir_una_posicion_desde_mi_cartera():
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cartera_de_prueba()})
+    sin_fallos(at)
+    clave = next(n.key for n in at.number_input if n.key and n.key.startswith("co_n_IDR.MC_"))
+    v = clave.removeprefix("co_n_IDR.MC_")
+    at.number_input(key=clave).set_value(1600)
+    at.number_input(key=f"co_p_IDR.MC_{v}").set_value(58.25)
+    at.button(key="cog_IDR.MC").click().run()
+    sin_fallos(at)
+    pos = at.session_state["_datos"]["cartera_real"]["posiciones"]["IDR.MC"]
+    assert (pos["acciones"], pos["precio_medio"]) == (1600, 58.25)
+    assert any("Corregido" in s.value for s in at.success)
+    # los fondos se corrigen con lo que pusiste en total
+    clave = next(n.key for n in at.number_input if n.key and n.key.startswith("co_n_IWDA.AS_"))
+    assert at.number_input(key=clave.replace("co_n_", "co_p_")).label == "Precio medio de compra"   # ETF: por título
+
+
+def test_corregir_un_fondo_con_lo_que_pusiste():
+    cr = cartera_de_prueba()
+    cartera.comprar(cr, "0P00000WLG.F", 27.25, 2528.86, costes.Tarifa(), "2026-09-01", None, nota="a mano")
+    at = abrir("pagina_bankinter", datos_usuario={"cartera_real": cr})
+    clave = next(n.key for n in at.number_input if n.key and n.key.startswith("co_n_0P00000WLG.F_"))
+    assert at.number_input(key=clave.replace("co_n_", "co_p_")).label == "Lo que pusiste en total (€)"
+    at.number_input(key=clave).set_value(1.25803)
+    at.number_input(key=clave.replace("co_n_", "co_p_")).set_value(3205.82)
+    at.button(key="cog_0P00000WLG.F").click().run()
+    sin_fallos(at)
+    pos = at.session_state["_datos"]["cartera_real"]["posiciones"]["0P00000WLG.F"]
+    assert pos["acciones"] == 1.25803 and round(pos["precio_medio"], 2) == 2548.29

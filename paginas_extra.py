@@ -1620,6 +1620,22 @@ def _al_vender(t: str, nombre: str, fx_: float) -> None:
     guardar_datos()
 
 
+def _al_corregir(t: str, es_fondo: bool, v: str) -> None:
+    cr = cuenta_activa()
+    n = st.session_state.get(f"co_n_{t}_{v}") or 0.0
+    segundo = st.session_state.get(f"co_p_{t}_{v}") or 0.0
+    # En los fondos se escribe lo que pusiste en total (como lo enseña el banco); la app saca el precio medio.
+    precio_medio = segundo / n if es_fondo and n else segundo
+    fecha_compra = st.session_state.get(f"co_f_{t}_{v}")
+    err = cartera.corregir(cr, t, _cantidad(n), precio_medio, fecha_compra.isoformat() if fecha_compra else None)
+    if err:
+        st.session_state[f"err_{t}"] = err
+        return
+    st.session_state.pop(f"nv_{t}", None)
+    st.session_state["_alta_hecha"] = f"✏️ Corregido: {nombre_posicion(t, cr['posiciones'][t])}."
+    guardar_datos()
+
+
 def _al_quitar(t: str) -> None:
     cuenta_activa()["posiciones"].pop(t, None)
     guardar_datos()
@@ -1649,6 +1665,34 @@ def _editar_posicion(f: dict, cr: dict):
     c[1].text_input("¿Por qué vendes? (va a tu 📓 diario)", key=f"pq_{t}")
     c[1].button("Registrar venta", key=f"vend_{t}", on_click=_al_vender, args=(t, f["nombre"], f["fx"]))
     c[2].button("🗑️ Quitar sin vender", key=f"del_{t}", on_click=_al_quitar, args=(t,))
+    _corregir_posicion(t, pos, f["clase"])
+
+
+def _corregir_posicion(t: str, pos: dict, clase: str):
+    """«Me equivoqué al apuntarla»: cambiar títulos, precio medio (o lo que pusiste, en fondos) y fecha."""
+    es_fondo = t.startswith("0P") or (clase in ("Fondos y ETF", "Renta fija") and "." not in t)
+    with st.popover("✏️ Corregir datos", width="stretch"):
+        st.caption("Para arreglar lo que apuntaste mal. Si lo que ha pasado es que has comprado más o vendido una "
+                   "parte, mejor apúntalo como compra o venta (así tu Renta y tu rentabilidad salen bien).")
+        acciones = float(pos["acciones"])
+        # Las claves llevan los datos de ahora: si la posición cambia (compra, venta), el formulario se rellena
+        # con lo nuevo en vez de quedarse con lo que había.
+        v = f"{acciones:g}_{float(pos['precio_medio']):g}_{pos.get('fecha', '')}"
+        st.number_input("Participaciones" if es_fondo else "Títulos", 0.0, 1e9, acciones,
+                        format="%.6f" if es_fondo or not acciones.is_integer() else "%.0f", key=f"co_n_{t}_{v}")
+        if es_fondo:
+            st.number_input("Lo que pusiste en total (€)", 0.0, 1e10,
+                            round(acciones * float(pos["precio_medio"]), 2), 100.0, format="%.2f", key=f"co_p_{t}_{v}",
+                            help="Las «Aportaciones» de la ficha del fondo en tu banco.")
+        else:
+            st.number_input("Precio medio de compra", 0.0, 1e9, float(pos["precio_medio"]), format="%.4f",
+                            key=f"co_p_{t}_{v}")
+        try:
+            inicial = date.fromisoformat(str(pos.get("fecha") or "")[:10])
+        except ValueError:
+            inicial = date.today()
+        st.date_input("Fecha de compra", inicial, format="DD/MM/YYYY", key=f"co_f_{t}_{v}")
+        st.button("Guardar corrección", key=f"cog_{t}", type="primary", on_click=_al_corregir, args=(t, es_fondo, v))
 
 
 def posicion_detalle(f: dict, cr: dict):

@@ -151,3 +151,21 @@ def test_buscar_con_el_nombre_del_banco(monkeypatch):
     monkeypatch.setattr(yfinance, "Search", falso)
     assert datos.buscar_simbolos("BANKINTER BOLSA ESPAÑA FI - R")[0]["symbol"] == "0P00000PGI.F"
     assert datos.buscar_simbolo("Bankinter Bolsa España FI - C")["symbol"] == "0P0001DEY6.F"
+
+
+def test_corregir_una_posicion_mal_apuntada():
+    from bolsa import cartera, costes, renta
+
+    cr = cartera.nueva(None)
+    cartera.comprar(cr, "SAN.MC", 100, 12.0, costes.Tarifa(), "2026-09-01", None, nota="a mano")
+    assert cartera.corregir(cr, "SAN.MC", 150, 11.5, "2026-08-20") is None
+    pos = cr["posiciones"]["SAN.MC"]
+    assert (pos["acciones"], pos["precio_medio"], pos["fecha"]) == (150, 11.5, "2026-08-20")
+    compras = [h for h in cr["historial"] if h["ticker"] == "SAN.MC"]
+    assert len(compras) == 1 and compras[0]["acciones"] == 150         # una sola compra, la buena
+    assert renta.acciones_en(cr["historial"], "SAN.MC", pd.Timestamp("2026-09-01")) == 150
+    # con ventas ya registradas, no se tocan (son tu Renta)
+    cartera.vender(cr, "SAN.MC", 50, 13.0, costes.Tarifa(), "2026-10-01")
+    assert cartera.corregir(cr, "SAN.MC", 90, 11.5) is None
+    assert [h["tipo"] for h in cr["historial"]] == ["Compra", "Venta", "Corrección"]
+    assert cartera.corregir(cr, "XXX", 1, 1) and cartera.corregir(cr, "SAN.MC", 0, 1)

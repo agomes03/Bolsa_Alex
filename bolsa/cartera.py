@@ -68,6 +68,32 @@ def comprar(c: dict, ticker: str, acciones: int, precio: float, tarifa: Tarifa, 
     return None
 
 
+def corregir(c: dict, ticker: str, acciones: float, precio_medio: float, fecha: str | None = None) -> str | None:
+    """Corrige una posición apuntada mal (títulos, precio medio, fecha). Si no se ha vendido nada de ella, sus
+    compras del historial se cambian por una sola con los datos buenos (así cuadran dividendos y rentabilidad);
+    si ya hay ventas, estas no se tocan (son tu Renta) y se deja apuntada la corrección."""
+    pos = c["posiciones"].get(ticker)
+    if not pos:
+        return "Esa posición ya no está en la cartera."
+    if acciones <= 0 or precio_medio <= 0:
+        return "Los títulos y el precio deben ser mayores que cero."
+    antes = (pos["acciones"], pos["precio_medio"])
+    pos.update(acciones=acciones, precio_medio=precio_medio)
+    if fecha:
+        pos["fecha"], pos["desde"] = fecha[:10], fecha
+    historial = c.setdefault("historial", [])
+    if not any(h.get("ticker") == ticker and h.get("tipo") == "Venta" for h in historial):
+        historial[:] = [h for h in historial if not (h.get("ticker") == ticker and h.get("tipo") == "Compra")]
+        historial.append({"fecha": pos.get("desde") or pos["fecha"], "tipo": "Compra", "ticker": ticker,
+                          "acciones": acciones, "precio": precio_medio, "gastos": pos.get("gastos", 0.0),
+                          "resultado": None, "motivo": "Corregida a mano", "fx": pos.get("fx_medio", 1.0)})
+    else:
+        historial.append({"fecha": hoy(), "tipo": "Corrección", "ticker": ticker, "acciones": acciones,
+                          "precio": precio_medio, "gastos": 0.0, "resultado": None,
+                          "motivo": f"Antes: {antes[0]:g} títulos a {antes[1]:g}"})
+    return None
+
+
 def vender(c: dict, ticker: str, acciones: int, precio: float, tarifa: Tarifa, fecha: str | None = None,
            motivo: str = "Venta manual", fx: float = 1.0, orden: str | None = None) -> str | None:
     pos = c["posiciones"].get(ticker)
