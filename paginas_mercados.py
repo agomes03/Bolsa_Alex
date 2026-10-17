@@ -11,8 +11,8 @@ import streamlit as st
 
 from bolsa.tickers import CATALOGO, nombre_de
 from paginas_hoy import bloque_fases
-from ui_comun import (SEGUNDOS_REFRESCO, cargar_activos, cargar_informe, cargar_varios, cotizaciones_ahora, ir_a,
-                      linea_actualizado, num, palabras_de_la_pagina, pct, perfil)
+from ui_comun import (SEGUNDOS_REFRESCO, al_dia, cargar_activos, cargar_informe, cargar_varios, cotizaciones_ahora,
+                      ir_a, linea_actualizado, num, palabras_de_la_pagina, pct, perfil)
 
 
 BANDERAS = {"^IBEX": "🇪🇸", "^STOXX50E": "🇪🇺", "^GDAXI": "🇩🇪", "^FCHI": "🇫🇷", "FTSEMIB.MI": "🇮🇹", "^AEX": "🇳🇱",
@@ -25,9 +25,14 @@ GRUPOS_ACCIONES = ["España (IBEX 35)", "España (Mercado Continuo)", "Europa", 
                    "Asia", "Otros mercados"]
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
 def filas_grupo(tickers: tuple[str, ...]) -> list[dict]:
-    """Último precio, variaciones y tendencia de un grupo (una sola descarga para todo el grupo)."""
+    """Último precio, variaciones y tendencia de un grupo. Si lo guardado tiene más de 30 min se enseña igual, al
+    momento, y se renueva por detrás: solo se espera la primera vez que se abre el grupo."""
+    return al_dia(("filas", tickers), lambda: _descargar_filas(tickers), 1800)[0] or []
+
+
+def _descargar_filas(tickers: tuple[str, ...]) -> list[dict]:
+    """Una sola descarga para todo el grupo."""
     from bolsa import activos as act
 
     hist = cargar_varios(tickers, "2y")         # con "1y" a veces faltaba un día para la variación de 1 año
