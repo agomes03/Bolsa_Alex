@@ -28,11 +28,13 @@ TASA_TOBIN = {".MC": (0.2, 1e9), ".PA": (0.4, 1e9), ".MI": (0.1, 5e8)}
 
 SUFIJOS_EURO = (".MC", ".AS", ".PA", ".DE", ".MI", ".BR", ".HE", ".LS", ".VI", ".IR", ".F")
 SUFIJOS_DIVISA = {".L": "GBp", ".SW": "CHF", ".T": "JPY", ".TO": "CAD", ".HK": "HKD", ".ST": "SEK", ".CO": "DKK",
-                  ".OL": "NOK", ".KS": "KRW", ".TW": "TWD", ".NS": "INR", ".SS": "CNY"}
+                  ".OL": "NOK", ".KS": "KRW", ".TW": "TWD", ".NS": "INR", ".SS": "CNY", ".AX": "AUD",
+                  ".SA": "BRL", ".MX": "MXN"}
 # Excepciones comprobadas: cotizan en otra divisa que la habitual de su bolsa (p. ej. ETF de Londres en dólares).
 DIVISA_CONOCIDA = {"SGLD.L": "USD", "IGLN.L": "USD"}
 SIMBOLOS = {"EUR": "€", "USD": "$", "GBp": "p", "GBP": "£", "CHF": "CHF", "JPY": "¥", "CAD": "C$", "HKD": "HK$",
-            "KRW": "₩", "TWD": "NT$", "INR": "₹", "DKK": "DKK", "CNY": "¥"}
+            "KRW": "₩", "TWD": "NT$", "INR": "₹", "DKK": "DKK", "CNY": "¥", "AUD": "A$", "BRL": "R$",
+            "MXN": "MX$", "SEK": "SEK", "NOK": "NOK"}
 
 
 def divisa(ticker: str, info: dict | None = None) -> str:
@@ -274,7 +276,8 @@ def simular_aportaciones(mensual: float, anos: int, rent_anual_pct: float, inici
 # --------------------------------------------------------------------------- divisas
 TICKER_CAMBIO = {"USD": "EURUSD=X", "GBp": "EURGBP=X", "GBP": "EURGBP=X", "CHF": "EURCHF=X", "JPY": "EURJPY=X",
                  "CAD": "EURCAD=X", "HKD": "EURHKD=X", "SEK": "EURSEK=X", "DKK": "EURDKK=X", "NOK": "EURNOK=X",
-                 "KRW": "EURKRW=X", "TWD": "EURTWD=X", "INR": "EURINR=X", "CNY": "EURCNY=X"}
+                 "KRW": "EURKRW=X", "TWD": "EURTWD=X", "INR": "EURINR=X", "CNY": "EURCNY=X",
+                 "AUD": "EURAUD=X", "BRL": "EURBRL=X", "MXN": "EURMXN=X"}
 
 
 def euros_por_unidad(div: str, tipos: dict[str, float]) -> float | None:

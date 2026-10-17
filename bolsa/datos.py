@@ -191,11 +191,68 @@ def combinar_precio(diario: pd.Series | None, intradia: pd.Series | None) -> dic
             "variacion_pct": (precio / anterior - 1) * 100 if anterior else None}
 
 
+_URL_COTIZACIONES = "https://query1.finance.yahoo.com/v7/finance/quote"
+_POR_PETICION = 150
+
+
+def cotizaciones_bloque(tickers: list[str]) -> dict[str, dict]:
+    """Cotización de muchos valores en muy pocas peticiones (150 por petición, ~0,3 s cada una), con lo que piden
+    las tablas: precio, cierre anterior, variación del día y del año, media de 200 sesiones y máximo del año.
+    Lo que Yahoo no devuelva no sale (quien llama lo completa con las descargas de siempre)."""
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from yfinance.data import YfData
+
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {}
+    yfd = YfData()
+
+    def lote(trozo: list[str]) -> list[dict]:
+        try:
+            r = yfd.get_raw_json(_URL_COTIZACIONES, params={"symbols": ",".join(trozo)}, timeout=15)
+            return (r.get("quoteResponse") or {}).get("result") or []
+        except Exception:  # noqa: BLE001 - sin esto, se descarga como siempre
+            return []
+
+    trozos = [tickers[i:i + _POR_PETICION] for i in range(0, len(tickers), _POR_PETICION)]
+    with ThreadPoolExecutor(max_workers=min(4, len(trozos))) as pool:
+        resultados = [q for r in pool.map(lote, trozos) for q in r]
+    salida = {}
+    pedidos = set(tickers)
+    for q in resultados:
+        t, precio = q.get("symbol"), q.get("regularMarketPrice")
+        if t not in pedidos or not precio or not q.get("regularMarketTime"):
+            continue
+        try:
+            zona = ZoneInfo(q.get("exchangeTimezoneName") or "Europe/Madrid")
+        except Exception:  # noqa: BLE001
+            zona = ZoneInfo("Europe/Madrid")
+        anterior = q.get("regularMarketPreviousClose")
+        media200, maximo = q.get("twoHundredDayAverage"), q.get("fiftyTwoWeekHigh")
+        salida[t] = {"precio": float(precio), "anterior": float(anterior) if anterior else None,
+                     "fecha": datetime.fromtimestamp(q["regularMarketTime"], zona).date(),
+                     "variacion_pct": q.get("regularMarketChangePercent"),
+                     "var_1a": q.get("fiftyTwoWeekChangePercent"),
+                     "alcista": precio > media200 if media200 else None,
+                     "desde_maximo": (precio / maximo - 1) * 100 if maximo else None}
+    return salida
+
+
 def precios_recientes(tickers: list[str]) -> dict[str, dict]:
-    """Último precio de muchos valores a la vez (dos descargas en bloque: diaria e intradía de 15 minutos)."""
+    """Último precio de muchos valores a la vez: primero en bloque (muy rápido) y, lo que falte, con dos
+    descargas (diaria e intradía de 15 minutos)."""
     import yfinance as yf
 
     salida = {}
+    if not tickers:
+        return salida
+    rapidas = cotizaciones_bloque(tickers)
+    for t, q in rapidas.items():
+        salida[t] = {k: q[k] for k in ("precio", "anterior", "fecha", "variacion_pct")}
+    tickers = [t for t in tickers if t not in salida]
     if not tickers:
         return salida
 

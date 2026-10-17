@@ -89,6 +89,7 @@ def sin_internet(monkeypatch, tmp_path):
     monkeypatch.setattr(datos, "dividendos", lambda t: pd.Series(dtype=float))
     monkeypatch.setattr(datos, "dividendos_varios", lambda ts, periodo="5y": {})
     monkeypatch.setattr(datos, "buscar_simbolo", lambda q: None)
+    monkeypatch.setattr(datos, "cotizaciones_bloque", lambda ts: {})     # sin Internet: se usa el plan B
     monkeypatch.setattr(datos, "precios_recientes",
                         lambda ts: {t: datos.ultimo_precio(historico_falso(t, "5d")) for t in ts})
     titular = noticias.Noticia("El BCE baja los tipos de interés", "x", "Prueba", datetime.now(timezone.utc))
@@ -809,6 +810,6 @@ def test_mercados_pestanas_nuevas(pestana):
 
 
 def test_mercados_acciones_mas_empresas():
-    at = abrir("pagina_resumen", estado={"mk_pestana": "Acciones", "mk_acciones": "SOCIMIs e inmobiliarias"})
+    at = abrir("pagina_resumen", estado={"mk_pestana": "Acciones", "mk_zona": "SOCIMIs e inmobiliarias"})
     sin_fallos(at)
     assert at.dataframe

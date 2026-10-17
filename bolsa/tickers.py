@@ -425,18 +425,111 @@ ETF_TEMATICOS = {
                                 "IJPA.AS=iShares Core MSCI Japan; XCS6.DE=Xtrackers MSCI China; "
                                 "IUSN.DE=iShares MSCI World Small Cap; ZPRV.DE=SPDR USA Small Cap Value; "
                                 "ZPRX.DE=SPDR Europe Small Cap Value; IS3R.DE=iShares MSCI World Momentum"),
-    **_g("Metales y cripto", "PHAG.AS=WisdomTree Plata física; BTCE.DE=Bitwise Bitcoin físico (ETC, €)"),
+    **_g("Metales y cripto", "PHAG.AS=WisdomTree Plata física; BTCE.DE=Bitwise Bitcoin físico (ETC, €); "
+                             "G2X.DE=VanEck Mineras de oro; URNU.DE=Global X Uranio"),
+    **_g("ETF temático", "WTI2.DE=WisdomTree Inteligencia Artificial; CBUX.DE=iShares Infraestructuras globales"),
+    **_g("ETF dividendos", "VGWE.DE=Vanguard FTSE All-World High Dividend (acumulación); "
+                           "IQQA.DE=iShares Euro Dividend"),
+    **_g("ETF región y estilo", "XDEQ.DE=Xtrackers MSCI World Calidad; XDEM.DE=Xtrackers MSCI World Momentum; "
+                                "SXR0.DE=iShares MSCI World Mínima volatilidad; IWVE.AS=iShares MSCI World Value; "
+                                "QDV5.DE=iShares MSCI India; IUSD.DE=iShares MSCI World Islamic"),
+}
+
+# Los ETF más usados para el núcleo de la cartera (además de los de arriba).
+ETF_NUCLEO = {
+    **_g("ETF Mundial", "SPYL.DE=SPDR S&P 500 (acumulación); VGVF.DE=Vanguard FTSE Developed World; "
+                        "F50A.DE=Amundi Prime Global; V3AA.DE=Vanguard ESG Global All Cap"),
+    **_g("ETF EEUU", "D5BM.DE=Xtrackers S&P 500 Swap; XD9U.DE=Xtrackers MSCI USA; EQQQ.DE=Invesco Nasdaq-100"),
+    **_g("ETF Europa", "EUNK.DE=iShares Core MSCI Europe; SXRW.DE=iShares Core FTSE 100"),
+    **_g("ETF España", "LYXIB.MC=Amundi IBEX 35"),
+    **_g("ETF Emergentes", "VFEA.DE=Vanguard FTSE Emerging Markets; XMME.DE=Xtrackers MSCI Emerging Markets; "
+                           "AMEM.DE=Amundi MSCI Emerging Markets"),
+    **_g("Renta fija", "DBZB.DE=Xtrackers Global Government Bond (€ cubierto)"),
+}
+
+def _cargar_mundial() -> dict[str, dict]:
+    """Catálogo generado con `scripts/generar_catalogo.py`: toda la bolsa española y los índices principales de
+    cada país, S&P 500 entero por sectores."""
+    import json
+    from pathlib import Path
+
+    ruta = Path(__file__).with_name("catalogo_mundial.json")
+    try:
+        bruto = json.loads(ruta.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {g: {t: (v[0], v[1], []) for t, v in vs.items()} for g, vs in bruto.items()}
+
+
+MUNDIAL = _cargar_mundial()
+# Los nombres escritos a mano (más cortos y conocidos) mandan sobre los generados.
+_A_MANO = {**IBEX35, **CONTINUO, **MAS_CONTINUO, **EUROPA, **MAS_EUROPA, **EEUU, **MAS_EEUU, **REINO_UNIDO_SUIZA,
+           **ASIA, **OTROS_MERCADOS}
+
+
+def _grupo(*fuentes: dict) -> dict:
+    salida = {}
+    for f in fuentes:
+        for t, v in f.items():
+            salida.setdefault(t, _A_MANO.get(t, v))
+    return salida
+
+
+# Bolsa de cada sufijo, para colocar lo escrito a mano que el catálogo generado no tenga.
+_SUFIJO_GRUPO = {".MC": "España (Mercado Continuo)", ".DE": "Alemania", ".PA": "Francia", ".MI": "Italia",
+                 ".AS": "Países Bajos y Bélgica", ".BR": "Países Bajos y Bélgica",
+                 ".LS": "Portugal, Irlanda, Austria y Finlandia", ".IR": "Portugal, Irlanda, Austria y Finlandia",
+                 ".VI": "Portugal, Irlanda, Austria y Finlandia", ".HE": "Portugal, Irlanda, Austria y Finlandia",
+                 ".L": "Reino Unido", ".SW": "Suiza", ".ST": "Suecia", ".CO": "Dinamarca y Noruega",
+                 ".OL": "Dinamarca y Noruega", ".T": "Japón", ".HK": "China y Hong Kong",
+                 ".KS": "Corea del Sur y Taiwán", ".TW": "Corea del Sur y Taiwán", ".NS": "India", ".AX": "Australia",
+                 ".TO": "Canadá", ".SA": "Brasil y México", ".MX": "Brasil y México"}
+
+ACCIONES_ESPANA = {"España (IBEX 35)": IBEX35,
+                   "España (Mercado Continuo)": _grupo(CONTINUO, MAS_CONTINUO,
+                                                       MUNDIAL.get("España (Mercado Continuo)", {})),
+                   "España (BME Growth y SOCIMIs pequeñas)": MUNDIAL.get("España (BME Growth y SOCIMIs pequeñas)", {}),
+                   "Latibex (Latinoamérica en euros)": MUNDIAL.get("Latibex (Latinoamérica en euros)", {})}
+ACCIONES_EUROPA = {"Europa (las 50 más grandes)": EUROPA,
+                   **{g: _grupo(MUNDIAL.get(g, {})) for g in (
+                       "Alemania", "Francia", "Italia", "Países Bajos y Bélgica",
+                       "Portugal, Irlanda, Austria y Finlandia", "Reino Unido", "Suiza", "Suecia",
+                       "Dinamarca y Noruega")}}
+ACCIONES_EEUU = {"EEUU (las 40 más grandes)": EEUU,
+                 **{g: _grupo(v) for g, v in MUNDIAL.items() if g.startswith("EEUU ·")}}
+ACCIONES_MUNDO = {g: _grupo(MUNDIAL.get(g, {})) for g in (
+    "Japón", "China y Hong Kong", "Corea del Sur y Taiwán", "India", "Australia", "Canadá", "Brasil y México")}
+
+# Lo escrito a mano que no esté en el catálogo generado se coloca en el grupo de su bolsa (no se pierde nada).
+_TODOS_GRUPOS_ACCIONES = {**ACCIONES_ESPANA, **ACCIONES_EUROPA, **ACCIONES_EEUU, **ACCIONES_MUNDO}
+_ya = {t for d in _TODOS_GRUPOS_ACCIONES.values() for t in d}
+for _t, _v in {**MAS_EUROPA, **MAS_EEUU, **REINO_UNIDO_SUIZA, **ASIA, **OTROS_MERCADOS, **MAS_CONTINUO}.items():
+    if _t not in _ya:
+        _destino = next((g for suf, g in _SUFIJO_GRUPO.items() if _t.endswith(suf)), "EEUU · Otras grandes (Nasdaq, ADR...)")
+        _TODOS_GRUPOS_ACCIONES.setdefault(_destino, {})[_t] = _v
+        _ya.add(_t)
+for _g, _d in _TODOS_GRUPOS_ACCIONES.items():
+    for _bloque in (ACCIONES_ESPANA, ACCIONES_EUROPA, ACCIONES_EEUU, ACCIONES_MUNDO):
+        if _g in _bloque:
+            _bloque[_g] = _d
+
+# Primer nivel del selector (tipo de activo) -> grupos del segundo nivel.
+CATEGORIAS = {
+    "Acciones de España": list(ACCIONES_ESPANA), "Acciones de Europa": list(ACCIONES_EUROPA),
+    "Acciones de EEUU": list(ACCIONES_EEUU), "Acciones del resto del mundo": list(ACCIONES_MUNDO),
+    "SOCIMIs e inmobiliarias": ["SOCIMIs e inmobiliarias"], "Fondos indexados": ["Fondos indexados"],
+    "Fondos de gestión activa": ["Fondos de gestión activa"], "ETF y oro": ["ETF y oro"],
+    "ETF temáticos y sectoriales": ["ETF temáticos y sectoriales"], "Renta fija": ["Renta fija"],
+    "Criptomonedas": ["Criptomonedas"], "Divisas": ["Divisas"], "Materias primas": ["Materias primas"],
+    "Índices": ["Índices"], "Tipos de interés y macro": ["Tipos de interés y macro"],
 }
 
 CATALOGO = {
-    "España (IBEX 35)": IBEX35, "España (Mercado Continuo)": {**CONTINUO, **MAS_CONTINUO}, "Europa": EUROPA,
-    "Europa (más empresas)": MAS_EUROPA, "EEUU": EEUU, "EEUU (más empresas)": MAS_EEUU,
-    "Reino Unido, Suiza y Nórdicos": REINO_UNIDO_SUIZA, "Asia": ASIA, "Otros mercados": OTROS_MERCADOS,
+    **ACCIONES_ESPANA, **ACCIONES_EUROPA, **ACCIONES_EEUU, **ACCIONES_MUNDO,
     "SOCIMIs e inmobiliarias": SOCIMIS_INMOBILIARIAS,
     "Fondos indexados": FONDOS_INDEXADOS, "Fondos de gestión activa": FONDOS_GESTION_ACTIVA,
-    "ETF y oro": {**ETFS, **MAS_ETFS}, "ETF temáticos y sectoriales": ETF_TEMATICOS, "Renta fija": RENTA_FIJA,
-    "Criptomonedas": CRIPTOMONEDAS,
-    "Divisas": DIVISAS, "Materias primas": MATERIAS_PRIMAS, "Índices": INDICES_TODOS,
+    "ETF y oro": {**ETFS, **MAS_ETFS, **ETF_NUCLEO}, "ETF temáticos y sectoriales": ETF_TEMATICOS,
+    "Renta fija": RENTA_FIJA, "Criptomonedas": CRIPTOMONEDAS, "Divisas": DIVISAS, "Materias primas": MATERIAS_PRIMAS, "Índices": INDICES_TODOS,
     "Tipos de interés y macro": INDICADORES_MACRO,
 }
 TODOS_LOS_VALORES = {t: v for grupo in CATALOGO.values() for t, v in grupo.items()}
@@ -472,9 +565,21 @@ def sector_de(ticker: str) -> str:
     return TODOS_LOS_VALORES.get(ticker, ("", "—", []))[1]
 
 
+_GRUPO_DE = {}
+for _g, _d in CATALOGO.items():
+    for _t in _d:
+        _GRUPO_DE.setdefault(_t, _g)
+_CATEGORIA_DE = {g: c for c, gs in CATEGORIAS.items() for g in gs}
+
+
 def grupo_de(ticker: str) -> str | None:
-    """Grupo del catálogo (p. ej. 'Asia', 'Divisas')."""
-    return next((g for g, d in CATALOGO.items() if ticker in d), None)
+    """Grupo del catálogo (p. ej. 'Japón', 'Divisas')."""
+    return _GRUPO_DE.get(ticker)
+
+
+def categoria_de(grupo: str | None) -> str | None:
+    """Primer nivel del selector para un grupo (p. ej. 'Japón' -> 'Acciones del resto del mundo')."""
+    return _CATEGORIA_DE.get(grupo)
 
 
 def es_invertible(ticker: str) -> bool:

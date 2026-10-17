@@ -86,3 +86,43 @@ def test_nombre_de_lo_encontrado_con_el_buscador():
         assert tickers.nombre_de("QQQ1.XX") == "Algo Raro"
     finally:
         tickers.NOMBRES_BUSCADOS.pop("QQQ1.XX")
+
+
+def test_cotizaciones_en_bloque_en_trozos_de_150(monkeypatch):
+    from yfinance.data import YfData
+
+    from bolsa import datos
+
+    pedidas = []
+
+    def falso(self, url, params=None, timeout=None):
+        simbolos = params["symbols"].split(",")
+        pedidas.append(len(simbolos))
+        return {"quoteResponse": {"result": [
+            {"symbol": s, "regularMarketPrice": 110.0, "regularMarketPreviousClose": 100.0,
+             "regularMarketChangePercent": 10.0, "regularMarketTime": 1_792_165_352,
+             "exchangeTimezoneName": "Europe/Madrid", "fiftyTwoWeekChangePercent": 25.0,
+             "twoHundredDayAverage": 90.0, "fiftyTwoWeekHigh": 120.0} for s in simbolos if s != "MAL"]}}
+
+    monkeypatch.setattr(YfData, "get_raw_json", falso)
+    tickers = [f"T{i}" for i in range(320)] + ["MAL"]
+    r = datos.cotizaciones_bloque(tickers)
+    assert sorted(pedidas) == [21, 150, 150] and len(r) == 320 and "MAL" not in r
+    q = r["T0"]
+    assert q["precio"] == 110 and q["anterior"] == 100 and q["alcista"] and round(q["desde_maximo"], 2) == -8.33
+    assert q["var_1a"] == 25 and str(q["fecha"]) == "2026-10-16"
+    # precios_recientes usa lo rápido y no descarga nada más si está todo
+    assert datos.precios_recientes(["T1", "T2"])["T2"]["variacion_pct"] == 10
+
+
+def test_catalogo_mundial_por_niveles():
+    from bolsa import tickers
+
+    assert len(tickers.TODOS_LOS_VALORES) > 2000
+    assert {"Acciones de España", "Acciones de Europa", "Acciones de EEUU",
+            "Acciones del resto del mundo"} <= set(tickers.CATEGORIAS)
+    assert all(g in tickers.CATALOGO for gs in tickers.CATEGORIAS.values() for g in gs)
+    assert tickers.grupo_de("RHM.DE") == "Alemania" and tickers.categoria_de("Alemania") == "Acciones de Europa"
+    assert tickers.nombre_de("ITX.MC") == "Inditex"              # el nombre escrito a mano manda
+    assert "NVD.DE" not in tickers.CATALOGO["Alemania"]          # Nvidia en Fráncfort no es una empresa alemana
+    assert max(len(d) for d in tickers.CATALOGO.values()) <= 200  # listas cortas para el móvil

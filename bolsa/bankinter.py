@@ -125,7 +125,9 @@ MERCADOS_BANKINTER = {".MC": "Mercado Continuo (España)", ".DE": "Xetra (Aleman
                       ".HE": "Nasdaq Helsinki", ".L": "Bolsa de Londres", ".SW": "SIX (Suiza)",
                       ".CO": "Nasdaq Copenhague", ".T": "Bolsa de Tokio", ".HK": "Bolsa de Hong Kong",
                       ".KS": "Bolsa de Corea", ".TW": "Bolsa de Taiwán", ".NS": "Bolsa de India (NSE)",
-                      ".TO": "Bolsa de Toronto", ".LS": "Euronext Lisboa"}
+                      ".TO": "Bolsa de Toronto", ".LS": "Euronext Lisboa", ".IR": "Euronext Dublín",
+                      ".VI": "Bolsa de Viena", ".ST": "Nasdaq Estocolmo", ".OL": "Bolsa de Oslo",
+                      ".AX": "Bolsa de Australia (ASX)", ".SA": "B3 (Bolsa de São Paulo)", ".MX": "Bolsa Mexicana"}
 
 
 def mercado_de(ticker: str) -> str:

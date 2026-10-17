@@ -9,10 +9,10 @@ import time
 import pandas as pd
 import streamlit as st
 
-from bolsa.tickers import CATALOGO, nombre_de
+from bolsa.tickers import CATALOGO, CATEGORIAS, nombre_de
 from paginas_hoy import bloque_fases
-from ui_comun import (SEGUNDOS_REFRESCO, al_dia, cargar_activos, cargar_informe, cargar_varios, cotizaciones_ahora,
-                      ir_a, linea_actualizado, num, palabras_de_la_pagina, pct, perfil)
+from ui_comun import (SEGUNDOS_PRECIOS, SEGUNDOS_REFRESCO, al_dia, cargar_activos, cargar_informe, cargar_varios,
+                      cotizaciones_ahora, ir_a, linea_actualizado, num, palabras_de_la_pagina, pct, perfil)
 
 
 BANDERAS = {"^IBEX": "🇪🇸", "^STOXX50E": "🇪🇺", "^GDAXI": "🇩🇪", "^FCHI": "🇫🇷", "FTSEMIB.MI": "🇮🇹", "^AEX": "🇳🇱",
@@ -24,22 +24,49 @@ PESTANAS = ["Índices", "Acciones", "Fondos indexados", "Fondos de gestión acti
             "Tipos de interés y macro"]
 CORTOS = {"Fondos de gestión activa": "Fondos activos", "ETF temáticos y sectoriales": "ETF temáticos",
           "Tipos de interés y macro": "Tipos y macro"}
-GRUPOS_ACCIONES = ["España (IBEX 35)", "España (Mercado Continuo)", "Europa", "Europa (más empresas)", "EEUU",
-                   "EEUU (más empresas)", "Reino Unido, Suiza y Nórdicos", "Asia", "Otros mercados",
-                   "SOCIMIs e inmobiliarias"]
+ZONAS = {"España": CATEGORIAS["Acciones de España"], "Europa": CATEGORIAS["Acciones de Europa"],
+         "EEUU": CATEGORIAS["Acciones de EEUU"], "Resto del mundo": CATEGORIAS["Acciones del resto del mundo"],
+         "SOCIMIs e inmobiliarias": CATEGORIAS["SOCIMIs e inmobiliarias"]}
+GRUPOS_ACCIONES = [g for gs in ZONAS.values() for g in gs]
 
 
-def filas_grupo(tickers: tuple[str, ...]) -> list[dict]:
-    """Último precio, variaciones y tendencia de un grupo. Si lo guardado tiene más de 30 min se enseña igual, al
-    momento, y se renueva por detrás: solo se espera la primera vez que se abre el grupo."""
-    return al_dia(("filas", tickers), lambda: _descargar_filas(tickers), 1800)[0] or []
+def filas_grupo(tickers: tuple[str, ...], completar: bool = True) -> list[dict]:
+    """Precio, variaciones y tendencia de un grupo, al día (se renueva solo cada minuto, por detrás: al volver a
+    un grupo ya visto sale al momento)."""
+    return al_dia(("precios", "tabla", tickers), lambda: _descargar_filas(tickers, completar),
+                  SEGUNDOS_PRECIOS - 15)[0] or []
 
 
-def _descargar_filas(tickers: tuple[str, ...]) -> list[dict]:
-    """Una sola descarga para todo el grupo."""
+def _descargar_filas(tickers: tuple[str, ...], completar: bool = True) -> list[dict]:
+    """Todo el grupo con las cotizaciones en bloque (150 valores por petición, menos de un segundo). Lo que Yahoo
+    no dé así se calcula con el histórico (más lento), salvo con `completar=False` (precarga en segundo plano)."""
+    from bolsa import datos
+
+    try:
+        rapidas = datos.cotizaciones_bloque(list(tickers))
+    except Exception:  # noqa: BLE001
+        rapidas = {}
+    por_ticker = {}
+    for t, q in rapidas.items():
+        por_ticker[t] = {"ticker": t, "precio": q["precio"],
+                         "var_abs": q["precio"] - q["anterior"] if q.get("anterior") else None,
+                         "var_1d": q.get("variacion_pct"), "var_1a": q.get("var_1a"), "alcista": q.get("alcista"),
+                         "desde_maximo": q.get("desde_maximo"), "fecha": q["fecha"].strftime("%d/%m")}
+    faltan = tuple(t for t in tickers if t not in por_ticker)
+    if faltan and completar:
+        por_ticker.update({f["ticker"]: f for f in _filas_del_historico(faltan)})
+    return [por_ticker[t] for t in tickers if t in por_ticker]
+
+
+def _filas_del_historico(tickers: tuple[str, ...]) -> list[dict]:
+    """Plan B: una descarga de 2 años para el grupo, con el precio de ahora encima."""
     from bolsa import activos as act
 
     hist = cargar_varios(tickers, "2y")         # con "1y" a veces faltaba un día para la variación de 1 año
+    try:
+        ahora = cotizaciones_ahora(tickers, esperar=False)
+    except Exception:  # noqa: BLE001
+        ahora = {}
     filas = []
     for t in tickers:
         df = hist.get(t)
@@ -47,9 +74,14 @@ def _descargar_filas(tickers: tuple[str, ...]) -> list[dict]:
         if not e:
             continue
         c = df["Close"].dropna()
-        filas.append({"ticker": t, "precio": e["precio"], "var_abs": float(c.iloc[-1] - c.iloc[-2]) if len(c) > 1 else None,
-                      "var_1d": e["var_1d"], "var_1a": e["var_1a"], "alcista": e["alcista"],
-                      "desde_maximo": e["desde_maximo"], "fecha": c.index[-1].strftime("%d/%m")})
+        f = {"ticker": t, "precio": e["precio"], "var_abs": float(c.iloc[-1] - c.iloc[-2]) if len(c) > 1 else None,
+             "var_1d": e["var_1d"], "var_1a": e["var_1a"], "alcista": e["alcista"],
+             "desde_maximo": e["desde_maximo"], "fecha": c.index[-1].strftime("%d/%m")}
+        q = ahora.get(t)
+        if q:
+            f.update(precio=q["precio"], var_1d=q.get("variacion_pct"), fecha=q["fecha"].strftime("%d/%m"),
+                     var_abs=q["precio"] - q["anterior"] if q.get("anterior") else f["var_abs"])
+        filas.append(f)
     return filas
 
 
@@ -62,7 +94,12 @@ def pagina_resumen():
     pestana = st.segmented_control("Ver", PESTANAS, default="Índices", key="mk_pestana",
                                    format_func=lambda p: CORTOS.get(p, p), label_visibility="collapsed") or "Índices"
     if pestana == "Acciones":
-        grupo = st.selectbox("Mercado", GRUPOS_ACCIONES, key="mk_acciones")
+        c = st.columns(2)
+        zona = c[0].selectbox("Zona", list(ZONAS), key="mk_zona")
+        if st.session_state.get("mk_acciones") not in ZONAS[zona]:
+            st.session_state.pop("mk_acciones", None)
+        grupo = c[1].selectbox("Mercado o sector", ZONAS[zona], key="mk_acciones",
+                               disabled=len(ZONAS[zona]) == 1)
     else:
         grupo = pestana
     precargar_grupos(grupo)
@@ -89,9 +126,12 @@ def pagina_resumen():
                       "Letras del Tesoro); aquí tienes fondos y ETF que las llevan dentro.",
         "SOCIMIs e inmobiliarias": "Empresas que viven de alquilar inmuebles. Reparten buena parte del beneficio en "
                                    "dividendos y sufren cuando suben los tipos de interés.",
-        "EEUU (más empresas)": "Más empresas de EEUU (cotizan en dólares: lo que ganes o pierdas también depende del "
-                               "cambio euro/dólar).",
-    }.get(grupo)
+        "España (BME Growth y SOCIMIs pequeñas)": "Empresas pequeñas y SOCIMIs del mercado BME Growth: se negocian "
+                                                  "poco, así que el precio puede saltar mucho y costar vender.",
+        "Latibex (Latinoamérica en euros)": "Empresas de Latinoamérica (Petrobras, Vale, bancos de Brasil...) que se "
+                                            "compran en euros en la bolsa de Madrid.",
+    }.get(grupo) or ("Cotizan en dólares: lo que ganes o pierdas también depende del cambio euro/dólar."
+                     if grupo.startswith("EEUU") else None)
     if texto_ayuda:
         st.caption(texto_ayuda)
 
@@ -105,25 +145,12 @@ def pagina_resumen():
 
 
 def filas_al_dia(tickers: tuple[str, ...]) -> list[dict]:
-    """Tendencia y variación anual del histórico (se descarga cada 10 min) con el precio de ahora encima."""
-    filas = [dict(f) for f in filas_grupo(tickers)]
-    try:     # sin esperar: mientras llegan los precios de ahora, se ve el último cierre
-        ahora = cotizaciones_ahora(tickers, esperar=False)
-    except Exception:  # noqa: BLE001
-        ahora = {}
-    for f in filas:
-        q = ahora.get(f["ticker"])
-        if q:
-            f["precio"] = q["precio"]
-            f["var_1d"] = q.get("variacion_pct")
-            f["var_abs"] = q["precio"] - q["anterior"] if q.get("anterior") else f["var_abs"]
-            f["fecha"] = q["fecha"].strftime("%d/%m")
-    return filas
+    return [dict(f) for f in filas_grupo(tickers)]
 
 
 def precargar_grupos(actual: str) -> None:
     """Al entrar en Mercados, descarga en segundo plano los demás grupos (unos pocos a la vez), para que al
-    cambiar de pestaña la tabla salga al momento. Se repite cada 25 min, antes de que caduque la caché."""
+    cambiar de pestaña la tabla salga al momento. Se repite cada 25 min."""
     if os.environ.get("PYTEST_CURRENT_TEST") or time.time() - st.session_state.get("_mk_precarga", 0) < 1500:
         return
     st.session_state["_mk_precarga"] = time.time()
@@ -131,14 +158,13 @@ def precargar_grupos(actual: str) -> None:
     from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
 
     ctx = get_script_run_ctx()
+    # Con las cotizaciones en bloque cada grupo es una o dos peticiones: se precargan todos (unos 3 s en total).
     grupos = [g for g in [*PESTANAS, *GRUPOS_ACCIONES] if g != actual and g in CATALOGO]
 
     def uno(g: str) -> None:
         add_script_run_ctx(threading.current_thread(), ctx)
         try:
-            tickers = tuple(CATALOGO[g])
-            filas_grupo(tickers)
-            cotizaciones_ahora(tickers)
+            filas_grupo(tuple(CATALOGO[g]), completar=False)
         except BaseException:  # noqa: BLE001 - si falla (o la página se recarga), se descargará al abrir ese grupo
             pass
 

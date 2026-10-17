@@ -896,31 +896,80 @@ def reducir(datos, max_puntos: int = 400):
     return salida if salida.index[-1] == datos.index[-1] else pd.concat([salida, datos.iloc[[-1]]])
 
 
+def _categorias_selector(solo_invertibles: bool) -> dict[str, list[str]]:
+    from bolsa.tickers import CATALOGO, CATEGORIAS, NO_INVERTIBLES
+
+    def vale(g: str) -> bool:
+        return not solo_invertibles or any(t not in NO_INVERTIBLES for t in CATALOGO[g])
+
+    categorias = {c: [g for g in gs if vale(g)] for c, gs in CATEGORIAS.items()}
+    return {c: gs for c, gs in categorias.items() if gs}
+
+
+def _opciones_grupo(grupo: str, solo_invertibles: bool) -> list[str]:
+    from bolsa.tickers import CATALOGO, NO_INVERTIBLES
+
+    return [t for t in CATALOGO[grupo] if not solo_invertibles or t not in NO_INVERTIBLES]
+
+
 def selector_valor(clave: str, solo_invertibles: bool = False, defecto: str | None = None,
                    etiqueta: str = "Valor", buscar: bool = True) -> str:
-    """Elige grupo (España, EEUU, Asia, Fondos, Cripto, Divisas...) y valor. Devuelve el ticker.
-    Con `buscar`, debajo se puede buscar cualquier otro valor de Yahoo por nombre, ticker o ISIN."""
-    from bolsa.tickers import CATALOGO, NO_INVERTIBLES, grupo_de
+    """Elige tipo (acciones de España, de EEUU, fondos, cripto...), mercado o sector y valor. Devuelve el ticker.
+    Con `buscar`, debajo se puede buscar cualquier otro valor de Yahoo por nombre, ticker o ISIN.
+    En tres pasos para que cada lista sea corta (el catálogo tiene unos 2.500 valores). Cambiar el tipo o el
+    mercado solo recarga los desplegables (al momento); la página se recalcula cuando eliges el valor."""
+    from bolsa.tickers import categoria_de, grupo_de
 
-    grupos = [g for g, d in CATALOGO.items() if not solo_invertibles or any(t not in NO_INVERTIBLES for t in d)]
+    categorias = _categorias_selector(solo_invertibles)
     # `defecto` llega una sola vez (quien llama lo saca de la sesión al usarlo): se aplica siempre, también si ya
     # habías abierto ese mismo valor antes (al volver a la página, Streamlit olvida lo que estaba elegido).
-    if defecto and grupo_de(defecto) in grupos:
+    if defecto and categoria_de(grupo_de(defecto)) in categorias:
+        st.session_state[f"{clave}_cat"] = categoria_de(grupo_de(defecto))
         st.session_state[f"{clave}_grupo"] = grupo_de(defecto)
-        st.session_state[f"{clave}_valor"] = defecto
+        st.session_state[f"{clave}_valor"] = st.session_state[f"{clave}_usado"] = defecto
         st.session_state[f"{clave}_buscar"] = ""
     elif defecto and buscar:        # algo de fuera del catálogo (encontrado antes con el buscador)
         st.session_state[f"{clave}_buscar"] = defecto
-    c = st.columns([1, 2])
-    grupo = c[0].selectbox("Mercado o tipo", grupos, key=f"{clave}_grupo")
-    opciones = [t for t in CATALOGO[grupo] if not solo_invertibles or t not in NO_INVERTIBLES]
-    if st.session_state.get(f"{clave}_valor") not in opciones:
-        st.session_state.pop(f"{clave}_valor", None)
-    elegido = c[1].selectbox(etiqueta, opciones, key=f"{clave}_valor", format_func=nombre_de)
+    if not st.session_state.get(f"{clave}_usado"):       # la primera vez: el primero de la lista
+        primera = next(iter(categorias))
+        st.session_state[f"{clave}_usado"] = st.session_state.get(f"{clave}_valor") or \
+            _opciones_grupo(categorias[primera][0], solo_invertibles)[0]
+    _desplegables_valor(clave, solo_invertibles, etiqueta)
+    elegido = st.session_state[f"{clave}_usado"]
     if not buscar:
         return elegido
     hallado = buscador_valores(clave, solo_invertibles)
     return hallado or elegido
+
+
+@st.fragment
+def _desplegables_valor(clave: str, solo_invertibles: bool, etiqueta: str) -> None:
+    """Los tres desplegables. Es un fragmento: al cambiar el tipo o el mercado solo se recargan ellos (la página
+    no recalcula el análisis de un valor que no has elegido); al elegir el valor, se recarga la página entera."""
+    from bolsa.tickers import categoria_de, grupo_de
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+    categorias = _categorias_selector(solo_invertibles)
+    usado = st.session_state[f"{clave}_usado"]
+    if st.session_state.get(f"{clave}_cat") not in categorias:          # lo primero: donde está lo que ves
+        st.session_state[f"{clave}_cat"] = categoria_de(grupo_de(usado)) if categoria_de(grupo_de(usado)) in \
+            categorias else next(iter(categorias))
+    c = st.columns([1, 1, 2])
+    categoria = c[0].selectbox("Tipo", list(categorias), key=f"{clave}_cat")
+    grupos = categorias[categoria]
+    if st.session_state.get(f"{clave}_grupo") not in grupos:
+        st.session_state[f"{clave}_grupo"] = grupo_de(usado) if grupo_de(usado) in grupos else grupos[0]
+    grupo = c[1].selectbox("Mercado o sector", grupos, key=f"{clave}_grupo", disabled=len(grupos) == 1)
+    opciones = _opciones_grupo(grupo, solo_invertibles)
+    if st.session_state.get(f"{clave}_valor") not in opciones:
+        st.session_state[f"{clave}_valor"] = usado if usado in opciones else None
+    valor = c[2].selectbox(etiqueta, opciones, key=f"{clave}_valor", format_func=nombre_de, index=None,
+                           placeholder=f"Elige uno de {len(opciones)}...")
+    if valor and valor != usado:
+        st.session_state[f"{clave}_usado"] = valor
+        ctx = get_script_run_ctx()
+        if ctx is not None and ctx.fragment_ids_this_run:      # cambio dentro del fragmento: página entera
+            st.rerun()
 
 
 @st.cache_data(ttl=86_400, show_spinner=False)

@@ -9,7 +9,7 @@ from bolsa.tickers import (CATALOGO, NO_INVERTIBLES, TODAS_LAS_ACCIONES, TODOS_L
 def test_catalogo_amplia_sin_tocar_el_universo_del_informe():
     assert len(TODAS_LAS_ACCIONES) == 131
     assert set(TODAS_LAS_ACCIONES) <= set(TODOS_LOS_VALORES)
-    for grupo in ("Asia", "Fondos indexados", "Criptomonedas", "Divisas", "Materias primas", "Índices",
+    for grupo in ("Japón", "Fondos indexados", "Criptomonedas", "Divisas", "Materias primas", "Índices",
                   "Tipos de interés y macro"):
         assert len(CATALOGO[grupo]) >= 7
     assert nombre_de("0700.HK") == "Tencent" and sector_de("NESN.SW") == "Consumo"

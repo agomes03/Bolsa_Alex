@@ -41,20 +41,20 @@ def test_si_la_renovacion_falla_se_queda_el_ultimo_dato_bueno():
 
 
 def test_filas_grupo_ensena_lo_guardado_y_renueva_por_detras(monkeypatch):
-    """Un grupo de Mercados ya visto sale al momento aunque tenga más de 30 min; se renueva en segundo plano."""
+    """Un grupo de Mercados ya visto sale al momento aunque esté viejo; se renueva en segundo plano."""
     import paginas_mercados
 
     ui_comun.olvidar_datos_al_dia()
     llamadas = []
 
-    def descargar(tickers):
+    def descargar(tickers, completar=True):
         llamadas.append(tickers)
         time.sleep(0.2 if len(llamadas) > 1 else 0)
         return [{"ticker": tickers[0], "n": len(llamadas)}]
 
     monkeypatch.setattr(paginas_mercados, "_descargar_filas", descargar)
     assert paginas_mercados.filas_grupo(("A",))[0]["n"] == 1
-    ui_comun._VIVOS[("filas", ("A",))]["t"] -= 1801
+    ui_comun._VIVOS[("precios", "tabla", ("A",))]["t"] -= 1801
     inicio = time.time()
     assert paginas_mercados.filas_grupo(("A",))[0]["n"] == 1     # lo viejo, sin esperar
     assert time.time() - inicio < 0.1
