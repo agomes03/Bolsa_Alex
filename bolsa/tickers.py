@@ -388,7 +388,7 @@ FONDOS_GESTION_ACTIVA = {
                            "0P0001CTGR.F=Baelo Patrimonio FI; 0P00000TJ8.F=Cartesio X FI"),
     **_g("Fondo internacional", "0P0000RU81.L=Fundsmith Equity I Acc (£)"),
     **_g("Fondo mixto", "0P0001H7WN.F=Indexa RV Mixta Internacional 75 FI"),
-    **_g("Fondo Bankinter", "0P00000PIG.F=Bankinter Índice IBEX R FI; "
+    **_g("Fondo Bankinter", "0P00000PGI.F=Bankinter Bolsa España R FI; 0P00000PIG.F=Bankinter Índice IBEX R FI; "
                             "0P00000PI7.F=Bankinter Renta Fija Largo Plazo R FI"),
 }
 

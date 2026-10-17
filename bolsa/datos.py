@@ -320,17 +320,49 @@ _PREFERENCIA_BOLSA = {"MCE": 0, "GER": 1, "AMS": 1, "PAR": 1, "MIL": 1, "FRA": 2
                       "LSE": 4}
 
 
+_SIN_ACENTOS = str.maketrans("áéíóúüñàèìòùâêîôûç", "aeiouunaeiouaeiouc")
+_RELLENO = {"fi", "fim", "fondo", "fondos", "de", "del", "la", "el", "inversion", "sicav", "clase", "eur", "acc", "y"}
+
+
+def _palabras(texto: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", (texto or "").lower().translate(_SIN_ACENTOS))
+
+
+def _buscar_yahoo(consulta: str, maximo: int = 15) -> tuple[list[dict], set[str], str | None]:
+    """Busca en Yahoo y, si no sale nada, prueba versiones más cortas del texto: el buscador de Yahoo falla con
+    nombres como los de los bancos («BANKINTER BOLSA ESPAÑA FI - R» no da nada; «Bankinter Bolsa» sí).
+    Devuelve (resultados, palabras importantes, clase del fondo si se ha escrito, p. ej. «r»)."""
+    import yfinance as yf
+
+    consulta = consulta.strip()
+    palabras = [w for w in _palabras(consulta) if w not in _RELLENO]
+    clase = palabras[-1] if len(palabras) > 1 and len(palabras[-1]) == 1 else None
+    importantes = [w for w in palabras if len(w) > 1]
+    variantes = [consulta]
+    if not re.fullmatch(r"[A-Za-z]{2}[A-Za-z0-9]{9}\d", consulta) and importantes:     # (un ISIN no se recorta)
+        variantes += [" ".join(importantes[:n]) for n in range(len(importantes), 1, -1)]
+        variantes.append(importantes[0])
+    for v in dict.fromkeys(variantes):
+        try:
+            resultados = [r for r in (yf.Search(v, max_results=maximo, news_count=0).quotes or []) if r.get("symbol")]
+        except Exception:  # noqa: BLE001
+            resultados = []
+        if resultados:
+            return resultados, set(importantes), clase
+    return [], set(importantes), clase
+
+
+def _parecido(r: dict, importantes: set[str], clase: str | None) -> int:
+    """Cuántas palabras del texto buscado tiene el nombre (y +1 si coincide la clase del fondo)."""
+    nombre = set(_palabras(r.get("longname") or r.get("shortname") or ""))
+    return len(importantes & nombre) + (1 if clase and clase in nombre else 0)
+
+
 def buscar_simbolo(consulta: str) -> dict | None:
     """Busca en Yahoo un ISIN o un nombre y devuelve {'symbol', 'name', 'type'} (None si no lo encuentra).
     Si hay varias bolsas, prefiere la española para ISIN ES, las europeas en euros para fondos y ETF, y la
     de EEUU para ISIN US."""
-    import yfinance as yf
-
-    try:
-        resultados = yf.Search(consulta, max_results=10, news_count=0).quotes
-    except Exception:  # noqa: BLE001
-        return None
-    resultados = [r for r in resultados or [] if r.get("symbol")]
+    resultados, importantes, clase = _buscar_yahoo(consulta, 10)
     if not resultados:
         return None
     pais = consulta[:2].upper() if len(consulta) == 12 else ""
@@ -341,7 +373,7 @@ def buscar_simbolo(consulta: str) -> dict | None:
             return 0 if bolsa == "MCE" else 5
         if pais == "US":
             return 0 if bolsa in ("NMS", "NYQ", "NGM", "NCM", "ASE") else 5
-        return _PREFERENCIA_BOLSA.get(bolsa, 6)
+        return (-_parecido(r, importantes, clase), _PREFERENCIA_BOLSA.get(bolsa, 6))
 
     r = sorted(resultados, key=orden)[0]
     return {"symbol": r["symbol"], "name": r.get("longname") or r.get("shortname") or "",
@@ -356,20 +388,16 @@ TIPOS_BUSCABLES = {"EQUITY": "Acción", "ETF": "ETF", "MUTUALFUND": "Fondo", "CR
 def buscar_simbolos(consulta: str, maximo: int = 8) -> list[dict]:
     """Resultados de Yahoo para un nombre, ticker o ISIN: [{'symbol', 'name', 'type', 'exchange'}], primero las
     bolsas europeas en euros y EEUU (más fáciles de comprar desde España)."""
-    import yfinance as yf
-
     consulta = consulta.strip()
     if len(consulta) < 2:
         return []
-    try:
-        resultados = yf.Search(consulta, max_results=15, news_count=0).quotes or []
-    except Exception:  # noqa: BLE001
-        return []
+    resultados, importantes, clase = _buscar_yahoo(consulta)
+    parecido = {r["symbol"]: _parecido(r, importantes, clase) for r in resultados}
     salida = [{"symbol": r["symbol"], "name": r.get("longname") or r.get("shortname") or r["symbol"],
                "type": r.get("quoteType"), "exchange": r.get("exchDisp") or r.get("exchange") or ""}
               for r in resultados if r.get("symbol") and r.get("quoteType") in TIPOS_BUSCABLES]
     exacto = consulta.upper()
-    salida.sort(key=lambda r: (r["symbol"] != exacto, _PREFERENCIA_BOLSA.get(
+    salida.sort(key=lambda r: (r["symbol"] != exacto, -parecido.get(r["symbol"], 0), _PREFERENCIA_BOLSA.get(
         next((x.get("exchange") for x in resultados if x.get("symbol") == r["symbol"]), ""), 6)))
     return salida[:maximo]
 

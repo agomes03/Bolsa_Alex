@@ -813,3 +813,27 @@ def test_mercados_acciones_mas_empresas():
     at = abrir("pagina_resumen", estado={"mk_pestana": "Acciones", "mk_zona": "SOCIMIs e inmobiliarias"})
     sin_fallos(at)
     assert at.dataframe
+
+
+def test_apuntar_un_fondo_como_lo_ensena_el_banco(monkeypatch):
+    from bolsa import tickers
+
+    monkeypatch.setattr(datos, "buscar_simbolos", lambda q, maximo=8: [
+        {"symbol": "0P00000PGI.F", "name": "Bankinter Bolsa España R FI", "type": "MUTUALFUND",
+         "exchange": "Frankfurt"}])
+    hoy = pd.Timestamp.now(tz="Europe/Madrid").date()
+    monkeypatch.setattr(datos, "precios_recientes", lambda ts: {
+        t: {"precio": 2443.91, "anterior": 2453.86, "fecha": hoy, "variacion_pct": -0.4} for t in ts})
+    at = abrir("pagina_bankinter", datos_usuario={}, estado={"mc_pestana": "➕ Añadir"})
+    at.text_input(key="alta_buscar").set_value("BANKINTER BOLSA ESPAÑA FI - R").run()
+    sin_fallos(at)
+    assert at.radio(key="alta_modo").value == "importes"
+    at.number_input[0].set_value(66598.66)
+    at.number_input[1].set_value(-2315.09)
+    [b for b in at.button if b.label == "Guardar posición"][0].click().run()
+    sin_fallos(at)
+    d = at.session_state["_datos"]
+    pos = d["cuentas"][d["cuenta_activa"]]["posiciones"]["0P00000PGI.F"]
+    assert round(pos["acciones"], 2) == 27.25 and round(pos["precio_medio"]) == 2529
+    assert pos["clase"] == "Fondos y ETF" and pos["nombre"] == "Bankinter Bolsa España R FI"
+    tickers.NOMBRES_BUSCADOS.pop("0P00000PGI.F", None)

@@ -997,6 +997,7 @@ def buscador_valores(clave: str, solo_invertibles: bool = False) -> str | None:
         "Resultados", list(por_simbolo), key=f"{clave}_hallado",
         format_func=lambda s: f"{por_simbolo[s]['name']} · {s} · "
                               f"{datos.TIPOS_BUSCABLES.get(por_simbolo[s]['type'], '')} {por_simbolo[s]['exchange']}")
+    st.session_state[f"{clave}_tipo_hallado"] = por_simbolo[simbolo]["type"]
     if simbolo not in tickers.TODOS_LOS_VALORES:
         registrar_nombre(simbolo, por_simbolo[simbolo]["name"])
     if re.search(r"\b(\d(\.\d)?x|bull|bear|short|leveraged|inverse|ultra|daily)\b", por_simbolo[simbolo]["name"], re.I):

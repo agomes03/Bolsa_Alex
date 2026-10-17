@@ -126,3 +126,28 @@ def test_catalogo_mundial_por_niveles():
     assert tickers.nombre_de("ITX.MC") == "Inditex"              # el nombre escrito a mano manda
     assert "NVD.DE" not in tickers.CATALOGO["Alemania"]          # Nvidia en Fráncfort no es una empresa alemana
     assert max(len(d) for d in tickers.CATALOGO.values()) <= 200  # listas cortas para el móvil
+
+
+def test_fondo_desde_importes_del_banco():
+    from bolsa import cartera
+
+    n, p = cartera.desde_importes(66_598.66, -2_315.09, 2_443.91)
+    assert round(n, 4) == 27.2509 and round(p, 2) == 2528.86
+    assert cartera.desde_importes(0, 0, 10) == (0.0, 0.0)
+
+
+def test_buscar_con_el_nombre_del_banco(monkeypatch):
+    import yfinance
+
+    from bolsa import datos
+
+    def falso(q, max_results=15, news_count=0):
+        # Como Yahoo: con el nombre completo no da nada; con «bankinter bolsa», las dos clases
+        quotes = [] if "espana" in q.lower() or "españa" in q.lower() else [
+            {"symbol": "0P0001DEY6.F", "longname": "Bankinter Bolsa España C FI", "quoteType": "MUTUALFUND"},
+            {"symbol": "0P00000PGI.F", "longname": "Bankinter Bolsa España R FI", "quoteType": "MUTUALFUND"}]
+        return type("R", (), {"quotes": quotes})()
+
+    monkeypatch.setattr(yfinance, "Search", falso)
+    assert datos.buscar_simbolos("BANKINTER BOLSA ESPAÑA FI - R")[0]["symbol"] == "0P00000PGI.F"
+    assert datos.buscar_simbolo("Bankinter Bolsa España FI - C")["symbol"] == "0P0001DEY6.F"

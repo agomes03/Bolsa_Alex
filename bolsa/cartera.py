@@ -24,6 +24,15 @@ def nueva(capital: float | None = 10_000.0) -> dict:
             "creada": hoy()}
 
 
+def desde_importes(valor_actual: float, ganancia: float, precio_actual: float) -> tuple[float, float]:
+    """Para apuntar un fondo como lo enseña el banco («vale 66.598,66 €, -2.315,09 € desde el inicio»): devuelve
+    (participaciones, precio medio de compra) con el valor liquidativo de hoy."""
+    if valor_actual <= 0 or precio_actual <= 0:
+        return 0.0, 0.0
+    participaciones = valor_actual / precio_actual
+    return round(participaciones, 6), (valor_actual - ganancia) / participaciones
+
+
 def comprar(c: dict, ticker: str, acciones: int, precio: float, tarifa: Tarifa, fecha: str | None = None,
             stop: float | None = None, objetivo: float | None = None, nota: str = "", fx: float = 1.0,
             orden: str | None = None, capitalizacion: float | None = None) -> str | None:

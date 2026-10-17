@@ -1035,45 +1035,75 @@ def bloque_anadir():
         if texto.strip():
             revisar_e_importar(importador.leer_texto(texto, resolver=buscar_simbolo), "pegado", cuenta)
     with t1:
-        ticker = selector_valor("alta", solo_invertibles=True, buscar=False)
-        with st.form("alta_real"):
-            otro = st.text_input("¿Otro activo? Escribe su ISIN, su código (BTC-EUR, 4GLD.DE...) o su nombre",
-                                 "").strip()
-            c = st.columns(2 if pf.movil else 4)
+        alta_a_mano(cr, pf)
+    copia_seguridad()
+
+
+def alta_a_mano(cr: dict, pf):
+    """Apuntar una posición a mano. Los fondos, como los enseña el banco: lo que valen hoy y lo que ganas o
+    pierdes (la app calcula las participaciones con el valor liquidativo)."""
+    if st.session_state.get("_alta_hecha"):
+        st.success(st.session_state.pop("_alta_hecha"))
+    st.caption("Elige el valor de la lista o búscalo por su nombre (tal cual sale en tu banco), su ticker o su ISIN.")
+    t = selector_valor("alta", solo_invertibles=True)
+    nombre = nombre_de(t) if nombre_de(t) != t else ""
+    tipo = st.session_state.get("alta_tipo_hallado") if st.session_state.get("alta_buscar") else None
+    clase = clase_de(t, tipo, nombre)
+    es_fondo = t.startswith("0P") or tipo == "MUTUALFUND"
+    try:
+        q = cotizaciones_ahora([t]).get(t)
+    except Exception:  # noqa: BLE001
+        q = None
+    liquidativo = q["precio"] if q else None
+    if liquidativo:
+        st.caption(f"{'Valor liquidativo' if es_fondo else 'Último precio'} de **{nombre or t}**: "
+                   f"**{precio(liquidativo, costes.simbolo(t))}** (del {q['fecha']:%d/%m}).")
+    modo = "títulos"
+    if es_fondo and liquidativo:
+        modo = st.radio("¿Cómo lo apuntas?", ["importes", "títulos"], horizontal=True, key="alta_modo",
+                        format_func={"importes": "Con lo que vale y lo que ganas o pierdes (como en el banco)",
+                                     "títulos": "Con participaciones y precio medio"}.get)
+    with st.form("alta_real"):
+        c = st.columns(2 if pf.movil else 4)
+        if modo == "importes":
+            valor = c[0].number_input("Lo que vale ahora (€)", 0.0, 1e9, 0.0, 100.0, format="%.2f",
+                                      help="El importe grande de la ficha del fondo en tu banco.")
+            ganancia = c[1].number_input("Lo que ganas o pierdes desde el inicio (€)", -1e9, 1e9, 0.0, 10.0,
+                                         format="%.2f", help="La «rentabilidad desde inicio» en euros. En negativo "
+                                                             "si pierdes (p. ej. -2315,09).")
+        else:
             n = c[0].number_input("Cantidad (títulos o participaciones)", 0.0, 1e9, 10.0, format="%.6g")
-            precio = c[1].number_input("Precio medio de compra", 0.0, value=0.0, format="%.4f")
-            f_compra = c[2 % len(c)].date_input("Fecha de compra", date.today(), format="DD/MM/YYYY")
+            p_medio = c[1].number_input("Precio medio de compra", 0.0, value=0.0, format="%.4f")
+        f_compra = c[2 % len(c)].date_input("Fecha de compra", date.today(), format="DD/MM/YYYY")
+        stop, solo_vigilar = 0.0, False
+        if not es_fondo:
             stop = c[3 % len(c)].number_input("Stop-loss puesto (0 si no tienes)", 0.0, value=0.0)
             solo_vigilar = st.checkbox(f"La compré sin stop-loss: vigílala y avísame si cae un "
                                        f"{CAIDA_ALARMA * 100:.0f} %", value=True,
                                        help="Solo si no pones stop-loss. Avisar no es vender: la decisión es tuya.")
-            if st.form_submit_button("Guardar posición", type="primary"):
-                t, nombre, tipo = ticker, "", None
-                if otro:
-                    hallado = buscar_simbolo(otro) if (importador.es_isin(otro) or " " in otro
-                                                       or len(otro) > 12) else None
-                    if hallado:
-                        t, nombre, tipo = hallado["symbol"], hallado["name"], hallado.get("type")
-                    else:
-                        t = importador.ticker_cripto(otro) or otro.upper()
-                err = cartera.comprar(cr, t, _cantidad(n), precio, pf.tarifa, f_compra.isoformat(), stop or None,
-                                      nota="Registrada a mano",
-                                      fx=fx(t, cargar_fundamentales(t)) or 1.0)
-                if err:
-                    st.error(err)
-                else:
-                    cr["posiciones"][t].update(nombre=nombre or cr["posiciones"][t].get("nombre"),
-                                               clase=clase_de(t, tipo, nombre))
-                    if solo_vigilar and not stop and cr["posiciones"][t]["clase"] == "Acciones":
-                        try:
-                            df = cargar_varios((t,), "1mo").get(t)
-                            actual = float(df["Close"].iloc[-1]) if df is not None and not df.empty else precio
-                        except Exception:  # noqa: BLE001
-                            actual = precio
-                        vigilar_sin_stop(t, nombre_posicion(t, cr["posiciones"][t]), None, actual)
-                    guardar_datos()
-                    st.rerun()
-    copia_seguridad()
+        if not st.form_submit_button("Guardar posición", type="primary"):
+            return
+    if modo == "importes":
+        n, p_medio = cartera.desde_importes(valor, ganancia, liquidativo)
+        if not n:
+            st.error("Escribe lo que vale ahora el fondo.")
+            return
+    err = cartera.comprar(cr, t, _cantidad(n), p_medio, pf.tarifa, f_compra.isoformat(), stop or None,
+                          nota="Registrada a mano", fx=fx(t, cargar_fundamentales(t)) or 1.0)
+    if err:
+        st.error(err)
+        return
+    cr["posiciones"][t].update(nombre=nombre or cr["posiciones"][t].get("nombre"), clase=clase)
+    if solo_vigilar and not stop and clase == "Acciones":
+        vigilar_sin_stop(t, nombre_posicion(t, cr["posiciones"][t]), None, liquidativo or p_medio)
+    if modo == "importes":
+        st.session_state["_alta_hecha"] = (f"Apuntado: {n:,.4f} participaciones a {p_medio:,.2f} € de media "
+                                           f"(con el valor liquidativo de hoy). Si en tu banco («Más "
+                                           f"información») ves las participaciones exactas y no coinciden, "
+                                           f"quítalo y apúntalo con participaciones y precio medio."
+                                           ).replace(",", "X").replace(".", ",").replace("X", ".")
+    guardar_datos()
+    st.rerun()
 
 
 ICONO_GRAVEDAD = {"alta": "🔴", "media": "🟠", "baja": "🔵", "ok": "🟢"}
