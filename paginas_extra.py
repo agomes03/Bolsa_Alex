@@ -743,6 +743,8 @@ def avisos_resumen():
 def pagina_bankinter():
     broker = bankinter.broker() if bankinter.broker() != "Otro" else "tu banco"
     st.title("🏦 Mi cartera")
+    if st.session_state.get("_alta_hecha"):          # lo que se acaba de apuntar a mano (arriba, se vea la pestaña que se vea)
+        st.success(st.session_state.pop("_alta_hecha"))
     with st.expander(f"🔒 Cómo se conecta con {broker} (y por qué no te pide la contraseña)"):
         st.markdown(
             f"Ni {broker} ni ningún banco español ofrece a particulares una forma oficial de que otra app lea tus "
@@ -1042,8 +1044,6 @@ def bloque_anadir():
 def alta_a_mano(cr: dict, pf):
     """Apuntar una posición a mano. Los fondos, como los enseña el banco: lo que valen hoy y lo que ganas o
     pierdes (la app calcula las participaciones con el valor liquidativo)."""
-    if st.session_state.get("_alta_hecha"):
-        st.success(st.session_state.pop("_alta_hecha"))
     st.caption("Elige el valor de la lista o búscalo por su nombre (tal cual sale en tu banco), su ticker o su ISIN.")
     t = selector_valor("alta", solo_invertibles=True)
     nombre = nombre_de(t) if nombre_de(t) != t else ""
@@ -1059,13 +1059,21 @@ def alta_a_mano(cr: dict, pf):
         st.caption(f"{'Valor liquidativo' if es_fondo else 'Último precio'} de **{nombre or t}**: "
                    f"**{precio(liquidativo, costes.simbolo(t))}** (del {q['fecha']:%d/%m}).")
     modo = "títulos"
-    if es_fondo and liquidativo:
-        modo = st.radio("¿Cómo lo apuntas?", ["importes", "títulos"], horizontal=True, key="alta_modo",
-                        format_func={"importes": "Con lo que vale y lo que ganas o pierdes (como en el banco)",
-                                     "títulos": "Con participaciones y precio medio"}.get)
+    if es_fondo:
+        # En la ficha del fondo el banco enseña «Participaciones» y «Aportaciones»: con eso es exacto.
+        modos = ["aportaciones", "importes"] if liquidativo else ["aportaciones"]
+        modo = st.radio("¿Cómo lo apuntas?", modos, horizontal=True, key="alta_modo",
+                        format_func={"aportaciones": "Con participaciones y aportaciones (exacto)",
+                                     "importes": "Con lo que vale y lo que ganas o pierdes"}.get)
     with st.form("alta_real"):
         c = st.columns(2 if pf.movil else 4)
-        if modo == "importes":
+        if modo == "aportaciones":
+            n = c[0].number_input("Participaciones", 0.0, 1e9, 0.0, format="%.6f",
+                                  help="En la ficha del fondo de tu banco: «Participaciones» (p. ej. 1,25803).")
+            aportado = c[1].number_input("Aportaciones: lo que pusiste (€)", 0.0, 1e9, 0.0, 100.0, format="%.2f",
+                                         help="En la ficha del fondo: «Aportaciones» o «Importe invertido». Si "
+                                              "lo traspasaste de otro fondo, el importe del traspaso de entrada.")
+        elif modo == "importes":
             valor = c[0].number_input("Lo que vale ahora (€)", 0.0, 1e9, 0.0, 100.0, format="%.2f",
                                       help="El importe grande de la ficha del fondo en tu banco.")
             ganancia = c[1].number_input("Lo que ganas o pierdes desde el inicio (€)", -1e9, 1e9, 0.0, 10.0,
@@ -1083,6 +1091,11 @@ def alta_a_mano(cr: dict, pf):
                                        help="Solo si no pones stop-loss. Avisar no es vender: la decisión es tuya.")
         if not st.form_submit_button("Guardar posición", type="primary"):
             return
+    if modo == "aportaciones":
+        if not n or not aportado:
+            st.error("Escribe las participaciones y lo que pusiste.")
+            return
+        p_medio = aportado / n            # lo que pagaste por cada participación
     if modo == "importes":
         n, p_medio = cartera.desde_importes(valor, ganancia, liquidativo)
         if not n:
@@ -1096,7 +1109,11 @@ def alta_a_mano(cr: dict, pf):
     cr["posiciones"][t].update(nombre=nombre or cr["posiciones"][t].get("nombre"), clase=clase)
     if solo_vigilar and not stop and clase == "Acciones":
         vigilar_sin_stop(t, nombre_posicion(t, cr["posiciones"][t]), None, liquidativo or p_medio)
-    if modo == "importes":
+    if modo == "aportaciones":
+        st.session_state["_alta_hecha"] = (f"Apuntado: {n:,.5f} participaciones; pagaste {p_medio:,.2f} € por cada "
+                                           f"una ({n * p_medio:,.2f} € en total)."
+                                           ).replace(",", "X").replace(".", ",").replace("X", ".")
+    elif modo == "importes":
         st.session_state["_alta_hecha"] = (f"Apuntado: {n:,.4f} participaciones a {p_medio:,.2f} € de media "
                                            f"(con el valor liquidativo de hoy). Si en tu banco («Más "
                                            f"información») ves las participaciones exactas y no coinciden, "
