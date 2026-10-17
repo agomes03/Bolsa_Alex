@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import threading
+import time
+
 import pandas as pd
 import streamlit as st
 
@@ -52,6 +56,7 @@ def pagina_resumen():
         grupo = st.selectbox("Mercado", GRUPOS_ACCIONES, key="mk_acciones")
     else:
         grupo = pestana
+    precargar_grupos(grupo)
     if not bloque_mercado(grupo):
         return
     texto_ayuda = {
@@ -94,18 +99,53 @@ def filas_al_dia(tickers: tuple[str, ...]) -> list[dict]:
     return filas
 
 
+def precargar_grupos(actual: str) -> None:
+    """Al entrar en Mercados, descarga en segundo plano los demás grupos (unos pocos a la vez), para que al
+    cambiar de pestaña la tabla salga al momento. Se repite cada 25 min, antes de que caduque la caché."""
+    if os.environ.get("PYTEST_CURRENT_TEST") or time.time() - st.session_state.get("_mk_precarga", 0) < 1500:
+        return
+    st.session_state["_mk_precarga"] = time.time()
+    from concurrent.futures import ThreadPoolExecutor
+    from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+
+    ctx = get_script_run_ctx()
+    grupos = [g for g in [*PESTANAS, *GRUPOS_ACCIONES] if g != actual and g in CATALOGO]
+
+    def uno(g: str) -> None:
+        add_script_run_ctx(threading.current_thread(), ctx)
+        try:
+            tickers = tuple(CATALOGO[g])
+            filas_grupo(tickers)
+            cotizaciones_ahora(tickers)
+        except Exception:  # noqa: BLE001 - si falla, se descargará al abrir ese grupo
+            pass
+
+    def todos() -> None:
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            list(pool.map(uno, grupos))
+
+    threading.Thread(target=todos, daemon=True).start()
+
+
 @st.fragment(run_every=SEGUNDOS_REFRESCO)
 def bloque_mercado(grupo: str) -> bool:
     """Tarjetas de índices y tabla del grupo, con precios de ahora. Se refresca solo cada minuto."""
+    hueco = st.empty()
+    if st.session_state.get("_mk_pintado") != grupo:
+        # Al cambiar de grupo, la tabla anterior se quita al momento (si no, Streamlit la deja a la vista,
+        # apagada, hasta que llega la nueva y parece que no ha cambiado)
+        hueco.info(f"⏳ Cargando {grupo}…")
     with st.spinner("Descargando cotizaciones..."):
         filas = filas_al_dia(tuple(CATALOGO[grupo]))
     if not filas:
-        st.error("No se han podido descargar cotizaciones ahora mismo. Se volverá a intentar en un minuto.")
+        hueco.error("No se han podido descargar cotizaciones ahora mismo. Se volverá a intentar en un minuto.")
         return False
-    if grupo == "Índices":
-        tarjetas_indices(filas)
-    tabla_mercado(grupo, filas)
-    st.caption(linea_actualizado())
+    st.session_state["_mk_pintado"] = grupo
+    with hueco.container():
+        if grupo == "Índices":
+            tarjetas_indices(filas)
+        tabla_mercado(grupo, filas)
+        st.caption(linea_actualizado())
     return True
 
 
