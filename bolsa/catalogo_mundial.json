@@ -8,10 +8,6 @@
 "Coca-Cola Europacific Partners",
 "Mercado Continuo"
 ],
-"CIE.MC": [
-"CIE Automotive",
-"Mercado Continuo"
-],
 "VID.MC": [
 "Vidrala",
 "Mercado Continuo"
@@ -20,80 +16,84 @@
 "Cirsa Enterprises",
 "Mercado Continuo"
 ],
-"EBRO.MC": [
-"Ebro Foods",
+"CIE.MC": [
+"CIE Automotive",
 "Mercado Continuo"
 ],
-"APAM.MC": [
-"Aperam",
+"EBRO.MC": [
+"Ebro Foods",
 "Mercado Continuo"
 ],
 "CAF.MC": [
 "Construcciones y Auxiliar de Ferrocarriles",
 "Mercado Continuo"
 ],
-"DIA.MC": [
-"Distribuidora Internacional de Alimentación",
+"APAM.MC": [
+"Aperam",
 "Mercado Continuo"
 ],
-"ENO.MC": [
-"Elecnor",
+"DIA.MC": [
+"Distribuidora Internacional de Alimentación",
 "Mercado Continuo"
 ],
 "VIS.MC": [
 "Viscofan",
 "Mercado Continuo"
 ],
-"MEL.MC": [
-"Meliá Hotels International",
-"Mercado Continuo"
-],
-"CMO.MC": [
-"Cementos Molins",
+"ENO.MC": [
+"Elecnor",
 "Mercado Continuo"
 ],
 "ALM.MC": [
 "Almirall",
 "Mercado Continuo"
 ],
+"CMO.MC": [
+"Cementos Molins",
+"Mercado Continuo"
+],
+"MEL.MC": [
+"Meliá Hotels International",
+"Mercado Continuo"
+],
 "TRE.MC": [
 "Técnicas Reunidas",
-"Mercado Continuo"
-],
-"ART.MC": [
-"Arteche Lantegi Elkartea",
-"Mercado Continuo"
-],
-"DIGIS.MC": [
-"DIGI Spain Telecom",
-"Mercado Continuo"
-],
-"GRE.MC": [
-"Grenergy Renovables",
 "Mercado Continuo"
 ],
 "HBX.MC": [
 "HBX Group International",
 "Mercado Continuo"
 ],
-"GEST.MC": [
-"Gestamp Automoción",
+"DIGIS.MC": [
+"DIGI Spain Telecom",
+"Mercado Continuo"
+],
+"ART.MC": [
+"Arteche Lantegi Elkartea",
+"Mercado Continuo"
+],
+"GRE.MC": [
+"Grenergy Renovables",
 "Mercado Continuo"
 ],
 "IMC.MC": [
 "Inmocemento",
 "Mercado Continuo"
 ],
-"PSG.MC": [
-"Prosegur Compañía de Seguridad",
+"MVC.MC": [
+"Metrovacesa",
 "Mercado Continuo"
 ],
 "HOME.MC": [
 "Neinor Homes",
 "Mercado Continuo"
 ],
-"MVC.MC": [
-"Metrovacesa",
+"PSG.MC": [
+"Prosegur Compañía de Seguridad",
+"Mercado Continuo"
+],
+"GEST.MC": [
+"Gestamp Automoción",
 "Mercado Continuo"
 ],
 "MFEA.MC": [
@@ -148,20 +148,12 @@
 "ENCE Energía y Celulosa",
 "Mercado Continuo"
 ],
-"EDR.MC": [
-"eDreams ODIGEO",
-"Mercado Continuo"
-],
 "EAT.MC": [
 "AmRest",
 "Mercado Continuo"
 ],
-"EBROM.MC": [
-"EBRO EV Motors",
-"Mercado Continuo"
-],
-"NXT.MC": [
-"Nueva Expresión Textil",
+"EDR.MC": [
+"eDreams ODIGEO",
 "Mercado Continuo"
 ],
 "ADX.MC": [
@@ -172,36 +164,44 @@
 "Obrascón Huarte Lain",
 "Mercado Continuo"
 ],
-"GSJ.MC": [
-"Grupo Empresarial San José",
+"EBROM.MC": [
+"EBRO EV Motors",
 "Mercado Continuo"
 ],
-"MCM.MC": [
-"Miquel y Costas & Miquel",
+"GSJ.MC": [
+"Grupo Empresarial San José",
 "Mercado Continuo"
 ],
 "AMP.MC": [
 "Amper",
 "Mercado Continuo"
 ],
-"DOM.MC": [
-"Global Dominion Access",
+"MCM.MC": [
+"Miquel y Costas & Miquel",
+"Mercado Continuo"
+],
+"NXT.MC": [
+"Nueva Expresión Textil",
 "Mercado Continuo"
 ],
 "ALC.MC": [
 "Altia Consultores",
 "Mercado Continuo"
 ],
+"DOM.MC": [
+"Global Dominion Access",
+"Mercado Continuo"
+],
 "CLR.MC": [
 "CLERHP Estructuras",
 "Mercado Continuo"
 ],
-"ALNT.MC": [
-"Alantra Partners",
-"Mercado Continuo"
-],
 "TUB.MC": [
 "Tubacex",
+"Mercado Continuo"
+],
+"ALNT.MC": [
+"Alantra Partners",
 "Mercado Continuo"
 ],
 "TLGO.MC": [
@@ -220,6 +220,10 @@
 "Árima Real Estate SOCIMI",
 "Mercado Continuo"
 ],
+"NAT.MC": [
+"Natac Natural Ingredients",
+"Mercado Continuo"
+],
 "IZER.MC": [
 "izertis",
 "Mercado Continuo"
@@ -228,28 +232,16 @@
 "Azkoyen",
 "Mercado Continuo"
 ],
-"NAT.MC": [
-"Natac Natural Ingredients",
-"Mercado Continuo"
-],
-"SEC.MC": [
-"Secuoya, Grupo de Comunicación",
-"Mercado Continuo"
-],
 "INDXA.MC": [
 "Indexa Capital",
-"Mercado Continuo"
-],
-"SOL.MC": [
-"Soltec Power",
 "Mercado Continuo"
 ],
 "PRM.MC": [
 "Prim",
 "Mercado Continuo"
 ],
-"BKY.MC": [
-"Berkeley Energia",
+"SOL.MC": [
+"Soltec Power",
 "Mercado Continuo"
 ],
 "RJF.MC": [
@@ -260,12 +252,12 @@
 "Oryzon Genomics",
 "Mercado Continuo"
 ],
-"ATRY.MC": [
-"Atrys Health",
+"BKY.MC": [
+"Berkeley Energia",
 "Mercado Continuo"
 ],
-"SQRL.MC": [
-"Squirrel Media",
+"ATRY.MC": [
+"Atrys Health",
 "Mercado Continuo"
 ],
 "CEV.MC": [
@@ -276,6 +268,10 @@
 "Ecoener",
 "Mercado Continuo"
 ],
+"SQRL.MC": [
+"Squirrel Media",
+"Mercado Continuo"
+],
 "ATSI.MC": [
 "Aplicaciones y Tratamiento de Sistemas",
 "Mercado Continuo"
@@ -284,16 +280,20 @@
 "Iberpapel Gestión",
 "Mercado Continuo"
 ],
-"GAM.MC": [
-"General de Alquiler de Maquinaria",
-"Mercado Continuo"
-],
 "NTH.MC": [
 "Naturhouse Health",
 "Mercado Continuo"
 ],
+"GAM.MC": [
+"General de Alquiler de Maquinaria",
+"Mercado Continuo"
+],
 "AI.MC": [
 "Airtificial Intelligence Structures",
+"Mercado Continuo"
+],
+"BYTE.MC": [
+"ByteTravel",
 "Mercado Continuo"
 ],
 "NEA.MC": [
@@ -308,20 +308,12 @@
 "Duro Felguera",
 "Mercado Continuo"
 ],
-"BYTE.MC": [
-"ByteTravel",
-"Mercado Continuo"
-],
-"SNG.MC": [
-"Singular People",
-"Mercado Continuo"
-],
 "VOC.MC": [
 "Vocento",
 "Mercado Continuo"
 ],
-"STNA.MC": [
-"Santa Ana Global Enterprises",
+"SNG.MC": [
+"Singular People",
 "Mercado Continuo"
 ],
 "AMEN.MC": [
@@ -344,16 +336,16 @@
 "Montebalito",
 "Mercado Continuo"
 ],
-"LLYC.MC": [
-"Llorente & Cuenca",
+"ADZ.MC": [
+"Adolfo Domínguez",
 "Mercado Continuo"
 ],
 "LIB.MC": [
 "Libertas 7",
 "Mercado Continuo"
 ],
-"ADZ.MC": [
-"Adolfo Domínguez",
+"LLYC.MC": [
+"Llorente & Cuenca",
 "Mercado Continuo"
 ],
 "MAKS.MC": [
@@ -368,16 +360,16 @@
 "Seresco",
 "Mercado Continuo"
 ],
-"GGR.MC": [
-"Greening Group Global",
-"Mercado Continuo"
-],
 "EZE.MC": [
 "Grupo Ezentis",
 "Mercado Continuo"
 ],
 "PANG.MC": [
 "Pangaea Oncology",
+"Mercado Continuo"
+],
+"GGR.MC": [
+"Greening Group Global",
 "Mercado Continuo"
 ],
 "480S.MC": [
@@ -400,16 +392,16 @@
 "Desarrollos Especiales de Sistemas de Anclaje",
 "Mercado Continuo"
 ],
+"PAR.MC": [
+"Parlem Telecom Companyia de Telecomunicacions",
+"Mercado Continuo"
+],
 "NBI.MC": [
 "NBI Bearings Europe",
 "Mercado Continuo"
 ],
 "END.MC": [
 "Endurance Motive",
-"Mercado Continuo"
-],
-"PAR.MC": [
-"Parlem Telecom Companyia de Telecomunicacions",
 "Mercado Continuo"
 ],
 "GIGA.MC": [
@@ -424,16 +416,8 @@
 "Optare Solutions",
 "Mercado Continuo"
 ],
-"COM.MC": [
-"Catenon",
-"Mercado Continuo"
-],
 "REN.MC": [
 "Renta Corporación Real Estate",
-"Mercado Continuo"
-],
-"SAI.MC": [
-"Substrate Artificial Inteligence",
 "Mercado Continuo"
 ],
 "HLZ.MC": [
@@ -444,6 +428,14 @@
 "Iflex Flexible Packaging",
 "Mercado Continuo"
 ],
+"COM.MC": [
+"Catenon",
+"Mercado Continuo"
+],
+"SAI.MC": [
+"Substrate Artificial Inteligence",
+"Mercado Continuo"
+],
 "NYE.MC": [
 "Nyesa Valores Corporación",
 "Mercado Continuo"
@@ -452,8 +444,8 @@
 "Biotechnology Assets",
 "Mercado Continuo"
 ],
-"DOMO.MC": [
-"Domo Activos",
+"TRTK.MC": [
+"Tree Technology",
 "Mercado Continuo"
 ],
 "LLN.MC": [
@@ -486,10 +478,6 @@
 "Castellana Properties Socimi",
 "BME Growth"
 ],
-"YZBL.MC": [
-"Zambal Spain Socimi",
-"BME Growth"
-],
 "YATO.MC": [
 "Atom Hoteles SOCIMI",
 "BME Growth"
@@ -500,6 +488,14 @@
 ],
 "YVIT.MC": [
 "Vitruvio Real Estate SOCIMI",
+"BME Growth"
+],
+"YAI1.MC": [
+"All Iron Re I Socimi",
+"BME Growth"
+],
+"YTRM.MC": [
+"Torimbia Socimi",
 "BME Growth"
 ],
 "YGOP.MC": [
@@ -518,12 +514,12 @@
 "Advero Properties SOCIMI",
 "BME Growth"
 ],
-"YTCH.MC": [
-"TECHO HOGAR SOCIMI Sociedad de Beneficio e Interés Común",
-"BME Growth"
-],
 "YIPS.MC": [
 "Inversa Prime SOCIMI",
+"BME Growth"
+],
+"YTCH.MC": [
+"TECHO HOGAR SOCIMI Sociedad de Beneficio e Interés Común",
 "BME Growth"
 ],
 "YMIL.MC": [
@@ -534,8 +530,8 @@
 "Quonia Socimi",
 "BME Growth"
 ],
-"YINB7.MC": [
-"Inbest Prime VII Inmuebles SOCIMI",
+"YMIB.MC": [
+"Mistral Iberia Real Estate SOCIMI",
 "BME Growth"
 ]
 },
@@ -576,11 +572,11 @@
 "Banco BBVA Argentina",
 "Latibex"
 ],
-"XUSI.MC": [
+"XUSIO.MC": [
 "Usinas Siderúrgicas de Minas Gerais",
 "Latibex"
 ],
-"XUSIO.MC": [
+"XUSI.MC": [
 "Usinas Siderúrgicas de Minas Gerais",
 "Latibex"
 ],
@@ -2140,16 +2136,16 @@
 "argenx",
 "EEUU (otras grandes)"
 ],
-"ALAB": [
-"Astera Labs",
+"TRI": [
+"Thomson Reuters",
 "EEUU (otras grandes)"
 ],
 "CCEP": [
 "Coca-Cola Europacific Partners",
 "EEUU (otras grandes)"
 ],
-"TRI": [
-"Thomson Reuters",
+"ALAB": [
+"Astera Labs",
 "EEUU (otras grandes)"
 ],
 "NBIS": [
@@ -2160,60 +2156,56 @@
 "BeOne Medicines",
 "EEUU (otras grandes)"
 ],
-"RVMD": [
-"Revolution Medicines",
-"EEUU (otras grandes)"
-],
-"VOD": [
-"Vodafone Group Public",
-"EEUU (otras grandes)"
-],
-"JD": [
-"JD.com",
-"EEUU (otras grandes)"
-],
-"FER": [
-"Ferrovial",
-"EEUU (otras grandes)"
-],
-"ESLT": [
-"Elbit Systems",
-"EEUU (otras grandes)"
-],
-"ERIC": [
-"Telefonaktiebolaget LM Ericsson",
-"EEUU (otras grandes)"
-],
-"CRWV": [
-"CoreWeave",
-"EEUU (otras grandes)"
-],
 "ZS": [
 "Zscaler",
+"EEUU (otras grandes)"
+],
+"RVMD": [
+"Revolution Medicines",
 "EEUU (otras grandes)"
 ],
 "OKTA": [
 "Okta",
 "EEUU (otras grandes)"
 ],
+"VOD": [
+"Vodafone Group Public",
+"EEUU (otras grandes)"
+],
+"FER": [
+"Ferrovial",
+"EEUU (otras grandes)"
+],
+"ERIC": [
+"Telefonaktiebolaget LM Ericsson",
+"EEUU (otras grandes)"
+],
+"ESLT": [
+"Elbit Systems",
+"EEUU (otras grandes)"
+],
+"JD": [
+"JD.com",
+"EEUU (otras grandes)"
+],
 "RKLB": [
 "Rocket Lab",
-"EEUU (otras grandes)"
-],
-"CRDO": [
-"Credo Technology",
-"EEUU (otras grandes)"
-],
-"MDLN": [
-"Medline",
 "EEUU (otras grandes)"
 ],
 "ALNY": [
 "Alnylam Pharmaceuticals",
 "EEUU (otras grandes)"
 ],
-"CBRS": [
-"Cerebras Systems",
+"CRWV": [
+"CoreWeave",
+"EEUU (otras grandes)"
+],
+"MDLN": [
+"Medline",
+"EEUU (otras grandes)"
+],
+"RPRX": [
+"Royalty Pharma",
 "EEUU (otras grandes)"
 ],
 "BSP": [
@@ -2224,76 +2216,80 @@
 "Zoom Communications",
 "EEUU (otras grandes)"
 ],
-"BIDU": [
-"Baidu",
+"CRDO": [
+"Credo Technology",
 "EEUU (otras grandes)"
 ],
 "RYAAY": [
 "Ryanair",
 "EEUU (otras grandes)"
 ],
-"RPRX": [
-"Royalty Pharma",
-"EEUU (otras grandes)"
-],
-"GFS": [
-"GLOBALFOUNDRIES",
-"EEUU (otras grandes)"
-],
-"LPLA": [
-"LPL Financial",
-"EEUU (otras grandes)"
-],
-"TCOM": [
-"Trip.com",
-"EEUU (otras grandes)"
-],
-"AFRM": [
-"Affirm",
-"EEUU (otras grandes)"
-],
-"ROIV": [
-"Roivant Sciences",
+"GMAB": [
+"Genmab",
 "EEUU (otras grandes)"
 ],
 "FCNCA": [
 "First Citizens BancShares",
 "EEUU (otras grandes)"
 ],
+"ROIV": [
+"Roivant Sciences",
+"EEUU (otras grandes)"
+],
+"CBRS": [
+"Cerebras Systems",
+"EEUU (otras grandes)"
+],
+"BIDU": [
+"Baidu",
+"EEUU (otras grandes)"
+],
 "TW": [
 "Tradeweb Markets",
-"EEUU (otras grandes)"
-],
-"ARXS": [
-"Arxis",
-"EEUU (otras grandes)"
-],
-"ROKU": [
-"Roku",
 "EEUU (otras grandes)"
 ],
 "UTHR": [
 "United Therapeutics",
 "EEUU (otras grandes)"
 ],
+"TCOM": [
+"Trip.com",
+"EEUU (otras grandes)"
+],
+"LPLA": [
+"LPL Financial",
+"EEUU (otras grandes)"
+],
+"GFS": [
+"GLOBALFOUNDRIES",
+"EEUU (otras grandes)"
+],
+"AFRM": [
+"Affirm",
+"EEUU (otras grandes)"
+],
+"ROKU": [
+"Roku",
+"EEUU (otras grandes)"
+],
+"GH": [
+"Guardant Health",
+"EEUU (otras grandes)"
+],
 "FWONK": [
 "Formula One",
 "EEUU (otras grandes)"
 ],
-"GMAB": [
-"Genmab",
-"EEUU (otras grandes)"
-],
-"TSEM": [
-"Tower Semiconductor",
+"ARXS": [
+"Arxis",
 "EEUU (otras grandes)"
 ],
 "BNTX": [
 "BioNTech",
 "EEUU (otras grandes)"
 ],
-"GH": [
-"Guardant Health",
+"FWONA": [
+"Formula One",
 "EEUU (otras grandes)"
 ],
 "ENTG": [
@@ -2302,18 +2298,6 @@
 ],
 "INSM": [
 "Insmed",
-"EEUU (otras grandes)"
-],
-"FWONA": [
-"Formula One",
-"EEUU (otras grandes)"
-],
-"RGLD": [
-"Royal Gold",
-"EEUU (otras grandes)"
-],
-"MTSI": [
-"MACOM Technology Solutions",
 "EEUU (otras grandes)"
 ],
 "TSM": [
@@ -2340,16 +2324,16 @@
 "Royal Bank of Canada",
 "EEUU (otras grandes)"
 ],
-"BABA": [
-"Alibaba",
-"EEUU (otras grandes)"
-],
 "SAP": [
 "SAP",
 "EEUU (otras grandes)"
 ],
 "AZN": [
 "AstraZeneca",
+"EEUU (otras grandes)"
+],
+"BABA": [
+"Alibaba",
 "EEUU (otras grandes)"
 ],
 "MUFG": [
@@ -2360,10 +2344,6 @@
 "Toyota Motor",
 "EEUU (otras grandes)"
 ],
-"BHP": [
-"BHP",
-"EEUU (otras grandes)"
-],
 "TTE": [
 "TotalEnergies",
 "EEUU (otras grandes)"
@@ -2372,16 +2352,16 @@
 "Toronto-Dominion Bank",
 "EEUU (otras grandes)"
 ],
+"BHP": [
+"BHP",
+"EEUU (otras grandes)"
+],
 "SAN": [
 "Banco Santander",
 "EEUU (otras grandes)"
 ],
 "NVO": [
 "Novo Nordisk",
-"EEUU (otras grandes)"
-],
-"SCCO": [
-"Southern Copper",
 "EEUU (otras grandes)"
 ],
 "PBR": [
@@ -2396,28 +2376,32 @@
 "Petróleo Brasileiro S.A. - Petrobras",
 "EEUU (otras grandes)"
 ],
-"SMFG": [
-"Sumitomo Mitsui Financial",
-"EEUU (otras grandes)"
-],
-"RIO": [
-"Rio Tinto",
-"EEUU (otras grandes)"
-],
-"UBS": [
-"UBS",
+"SCCO": [
+"Southern Copper",
 "EEUU (otras grandes)"
 ],
 "SONY": [
 "Sony",
 "EEUU (otras grandes)"
 ],
+"SMFG": [
+"Sumitomo Mitsui Financial",
+"EEUU (otras grandes)"
+],
 "UL": [
 "Unilever",
 "EEUU (otras grandes)"
 ],
+"UBS": [
+"UBS",
+"EEUU (otras grandes)"
+],
 "BBVA": [
 "Banco Bilbao Vizcaya Argentaria",
+"EEUU (otras grandes)"
+],
+"RIO": [
+"Rio Tinto",
 "EEUU (otras grandes)"
 ],
 "BP": [
@@ -2428,56 +2412,56 @@
 "British American Tobacco",
 "EEUU (otras grandes)"
 ],
-"MFG": [
-"Mizuho Financial",
-"EEUU (otras grandes)"
-],
-"HDB": [
-"HDFC Bank",
+"SPOT": [
+"Spotify Technology",
 "EEUU (otras grandes)"
 ],
 "BMO": [
 "Bank of Montreal",
 "EEUU (otras grandes)"
 ],
-"BNS": [
-"Bank of Nova Scotia",
+"NET": [
+"Cloudflare",
 "EEUU (otras grandes)"
 ],
 "EQNR": [
 "Equinor",
 "EEUU (otras grandes)"
 ],
-"CNQ": [
-"Canadian Natural Resources",
-"EEUU (otras grandes)"
-],
-"SPOT": [
-"Spotify Technology",
+"MFG": [
+"Mizuho Financial",
 "EEUU (otras grandes)"
 ],
 "SNOW": [
 "Snowflake",
 "EEUU (otras grandes)"
 ],
-"IBN": [
-"ICICI Bank",
+"HDB": [
+"HDFC Bank",
+"EEUU (otras grandes)"
+],
+"CNQ": [
+"Canadian Natural Resources",
+"EEUU (otras grandes)"
+],
+"BNS": [
+"Bank of Nova Scotia",
 "EEUU (otras grandes)"
 ],
 "ENB": [
 "Enbridge",
 "EEUU (otras grandes)"
 ],
-"WFC-PC": [
-"Wells Fargo &",
-"EEUU (otras grandes)"
-],
-"NET": [
-"Cloudflare",
-"EEUU (otras grandes)"
-],
 "ITUB": [
 "Itaú Unibanco",
+"EEUU (otras grandes)"
+],
+"IBN": [
+"ICICI Bank",
+"EEUU (otras grandes)"
+],
+"WFC-PC": [
+"Wells Fargo &",
 "EEUU (otras grandes)"
 ],
 "CM": [
@@ -2488,24 +2472,24 @@
 "GSK",
 "EEUU (otras grandes)"
 ],
-"AEM": [
-"Agnico Eagle Mines",
+"SU": [
+"Suncor Energy",
 "EEUU (otras grandes)"
 ],
 "ING": [
 "ING Groep",
 "EEUU (otras grandes)"
 ],
-"SU": [
-"Suncor Energy",
+"E": [
+"Eni",
+"EEUU (otras grandes)"
+],
+"AEM": [
+"Agnico Eagle Mines",
 "EEUU (otras grandes)"
 ],
 "ASX": [
 "ASE Technology",
-"EEUU (otras grandes)"
-],
-"E": [
-"Eni",
 "EEUU (otras grandes)"
 ],
 "BN": [
@@ -2520,32 +2504,40 @@
 "Enterprise Products Partners L.P",
 "EEUU (otras grandes)"
 ],
-"LYG": [
-"Lloyds Banking",
-"EEUU (otras grandes)"
-],
 "CP": [
 "Canadian Pacific Kansas City",
 "EEUU (otras grandes)"
 ],
-"BCS": [
-"Barclays",
-"EEUU (otras grandes)"
-],
-"CNI": [
-"Canadian National Railway",
-"EEUU (otras grandes)"
-],
-"MFC": [
-"Manulife Financial",
+"LYG": [
+"Lloyds Banking",
 "EEUU (otras grandes)"
 ],
 "BAM": [
 "Brookfield Asset Management",
 "EEUU (otras grandes)"
 ],
+"CNI": [
+"Canadian National Railway",
+"EEUU (otras grandes)"
+],
+"AMX": [
+"América Móvil",
+"EEUU (otras grandes)"
+],
 "NU": [
 "Nu",
+"EEUU (otras grandes)"
+],
+"MFC": [
+"Manulife Financial",
+"EEUU (otras grandes)"
+],
+"BCS": [
+"Barclays",
+"EEUU (otras grandes)"
+],
+"RELX": [
+"RELX",
 "EEUU (otras grandes)"
 ],
 "RACE": [
@@ -2556,24 +2548,28 @@
 "NatWest",
 "EEUU (otras grandes)"
 ],
-"AMX": [
-"América Móvil",
-"EEUU (otras grandes)"
-],
-"RELX": [
-"RELX",
-"EEUU (otras grandes)"
-],
-"B": [
-"Barrick Mining",
-"EEUU (otras grandes)"
-],
 "TRP": [
 "TC Energy",
 "EEUU (otras grandes)"
 ],
 "TAK": [
 "Takeda Pharmaceutical",
+"EEUU (otras grandes)"
+],
+"B": [
+"Barrick Mining",
+"EEUU (otras grandes)"
+],
+"LNG": [
+"Cheniere Energy",
+"EEUU (otras grandes)"
+],
+"CVE": [
+"Cenovus Energy",
+"EEUU (otras grandes)"
+],
+"MPLX": [
+"MPLX LP",
 "EEUU (otras grandes)"
 ],
 "DB": [
@@ -2584,60 +2580,48 @@
 "Wheaton Precious Metals",
 "EEUU (otras grandes)"
 ],
-"CVE": [
-"Cenovus Energy",
-"EEUU (otras grandes)"
-],
-"LNG": [
-"Cheniere Energy",
-"EEUU (otras grandes)"
-],
-"MPLX": [
-"MPLX LP",
-"EEUU (otras grandes)"
-],
-"SE": [
-"Sea",
+"DEO": [
+"Diageo",
 "EEUU (otras grandes)"
 ],
 "VALE": [
 "Vale",
 "EEUU (otras grandes)"
 ],
-"DEO": [
-"Diageo",
-"EEUU (otras grandes)"
-],
-"NOK": [
-"Nokia",
-"EEUU (otras grandes)"
-],
 "ABEV": [
 "Ambev",
-"EEUU (otras grandes)"
-],
-"UMC": [
-"United Microelectronics",
 "EEUU (otras grandes)"
 ],
 "INFY": [
 "Infosys",
 "EEUU (otras grandes)"
 ],
+"UMC": [
+"United Microelectronics",
+"EEUU (otras grandes)"
+],
+"WCN": [
+"Waste Connections",
+"EEUU (otras grandes)"
+],
 "TEVA": [
 "Teva Pharmaceutical Industries",
 "EEUU (otras grandes)"
 ],
-"MT": [
-"ArcelorMittal",
+"SE": [
+"Sea",
 "EEUU (otras grandes)"
 ],
-"FNV": [
-"Franco-Nevada",
+"NOK": [
+"Nokia",
 "EEUU (otras grandes)"
 ],
-"AU": [
-"AngloGold Ashanti",
+"BBD": [
+"Banco Bradesco",
+"EEUU (otras grandes)"
+],
+"HLN": [
+"Haleon",
 "EEUU (otras grandes)"
 ]
 },
@@ -2823,7 +2807,7 @@
 "Salud"
 ],
 "RMD": [
-"ResMed|",
+"ResMed",
 "Salud"
 ],
 "RVTY": [
@@ -3206,12 +3190,12 @@
 "Münchener Rückversicherungs-Gesellschaft",
 "Alemania"
 ],
-"IFX.DE": [
-"Infineon Technologies",
-"Alemania"
-],
 "DHL.DE": [
 "DHL",
+"Alemania"
+],
+"IFX.DE": [
+"Infineon Technologies",
 "Alemania"
 ],
 "DB1.DE": [
@@ -3222,32 +3206,32 @@
 "Deutsche Bank",
 "Alemania"
 ],
-"RHM.DE": [
-"Rheinmetall",
-"Alemania"
-],
-"NOA3.DE": [
-"Nokia",
-"Alemania"
-],
 "EOAN.DE": [
 "E.ON",
+"Alemania"
+],
+"RHM.DE": [
+"Rheinmetall",
 "Alemania"
 ],
 "SHL.DE": [
 "Siemens Healthineers",
 "Alemania"
 ],
-"RWE.DE": [
-"RWE",
-"Alemania"
-],
 "BAS.DE": [
 "BASF",
 "Alemania"
 ],
+"RWE.DE": [
+"RWE",
+"Alemania"
+],
 "BAYN.DE": [
 "Bayer",
+"Alemania"
+],
+"NOA3.DE": [
+"Nokia",
 "Alemania"
 ],
 "CBK.DE": [
@@ -3262,7 +3246,7 @@
 "Dr. Ing. h.c. F. Porsche",
 "Alemania"
 ],
-"VOW.DE": [
+"VOW3.DE": [
 "Volkswagen",
 "Alemania"
 ],
@@ -3286,12 +3270,12 @@
 "Daimler Truck",
 "Alemania"
 ],
-"HOT.DE": [
-"HOCHTIEF",
-"Alemania"
-],
 "ADS.DE": [
 "adidas",
+"Alemania"
+],
+"HOT.DE": [
+"HOCHTIEF",
 "Alemania"
 ],
 "HEI.DE": [
@@ -3302,10 +3286,6 @@
 "BioNTech",
 "Alemania"
 ],
-"MTX.DE": [
-"MTU Aero Engines",
-"Alemania"
-],
 "SRT3.DE": [
 "Sartorius",
 "Alemania"
@@ -3314,16 +3294,16 @@
 "Beiersdorf",
 "Alemania"
 ],
+"MTX.DE": [
+"MTU Aero Engines",
+"Alemania"
+],
 "8TRA.DE": [
 "Traton",
 "Alemania"
 ],
 "KBX.DE": [
 "Knorr-Bremse",
-"Alemania"
-],
-"8TI.DE": [
-"Stellantis",
 "Alemania"
 ],
 "VNA.DE": [
@@ -3346,16 +3326,28 @@
 "Fresenius Medical Care",
 "Alemania"
 ],
-"HAG.DE": [
-"Hensoldt",
+"8TI.DE": [
+"Stellantis",
 "Alemania"
 ],
 "EVK.DE": [
 "Evonik Industries",
 "Alemania"
 ],
+"HAG.DE": [
+"Hensoldt",
+"Alemania"
+],
+"QIA.DE": [
+"Qiagen",
+"Alemania"
+],
 "BNR.DE": [
 "Brenntag",
+"Alemania"
+],
+"NEM.DE": [
+"Nemetschek",
 "Alemania"
 ],
 "NDX1.DE": [
@@ -3370,24 +3362,12 @@
 "Deutsche Lufthansa",
 "Alemania"
 ],
-"NEM.DE": [
-"Nemetschek",
-"Alemania"
-],
-"QIA.DE": [
-"Qiagen",
-"Alemania"
-],
 "PAH3.DE": [
 "Porsche Automobil",
 "Alemania"
 ],
 "RAA.DE": [
 "RATIONAL",
-"Alemania"
-],
-"NDA.DE": [
-"Aurubis",
 "Alemania"
 ],
 "ZAL.DE": [
@@ -3398,44 +3378,48 @@
 "Deutsche Wohnen",
 "Alemania"
 ],
-"FPE3.DE": [
-"Fuchs",
-"Alemania"
-],
 "EVD.DE": [
 "CTS Eventim",
+"Alemania"
+],
+"FPE3.DE": [
+"Fuchs",
 "Alemania"
 ],
 "G24.DE": [
 "Scout24",
 "Alemania"
 ],
-"FRA.DE": [
-"Fraport",
+"NDA.DE": [
+"Aurubis",
 "Alemania"
 ],
-"SHA0.DE": [
-"Schaeffler",
+"FRA.DE": [
+"Fraport",
 "Alemania"
 ],
 "TKMS.DE": [
 "TKMS",
 "Alemania"
 ],
-"RRTL.DE": [
-"RTL",
+"SHA0.DE": [
+"Schaeffler",
 "Alemania"
 ],
 "IOS.DE": [
 "IONOS",
 "Alemania"
 ],
-"SOH1.DE": [
-"Soitec",
+"RRTL.DE": [
+"RTL",
 "Alemania"
 ],
 "KGX.DE": [
 "KION",
+"Alemania"
+],
+"OHB.DE": [
+"OHB",
 "Alemania"
 ],
 "UTDI.DE": [
@@ -3446,44 +3430,28 @@
 "Springer Nature",
 "Alemania"
 ],
-"AG1.DE": [
-"AUTO1",
-"Alemania"
-],
-"OHB.DE": [
-"OHB",
-"Alemania"
-],
-"R3NK.DE": [
-"RENK",
-"Alemania"
-],
-"AIXA.DE": [
-"AIXTRON",
+"SOH1.DE": [
+"Soitec",
 "Alemania"
 ],
 "1SXP.DE": [
 "SCHOTT Pharma",
 "Alemania"
 ],
+"AG1.DE": [
+"AUTO1",
+"Alemania"
+],
 "LEG.DE": [
 "LEG Immobilien",
 "Alemania"
 ],
+"R3NK.DE": [
+"RENK",
+"Alemania"
+],
 "KRN.DE": [
 "Krones",
-"Alemania"
-],
-"AMV0.DE": [
-"Aumovio",
-"Alemania"
-],
-"OBCK.DE": [
-"Ottobock",
-"Alemania"
-],
-"TUI1.DE": [
-"TUI",
 "Alemania"
 ],
 "SIX2.DE": [
@@ -3494,72 +3462,80 @@
 "Fielmann",
 "Alemania"
 ],
-"AFX.DE": [
-"Carl Zeiss Meditec",
+"TUI1.DE": [
+"TUI",
 "Alemania"
 ],
-"FTK.DE": [
-"flatexDEGIRO",
+"AMV0.DE": [
+"Aumovio",
+"Alemania"
+],
+"AIXA.DE": [
+"AIXTRON",
+"Alemania"
+],
+"OBCK.DE": [
+"Ottobock",
+"Alemania"
+],
+"AFX.DE": [
+"Carl Zeiss Meditec",
 "Alemania"
 ],
 "FNTN.DE": [
 "freenet",
 "Alemania"
 ],
-"SZG.DE": [
-"Salzgitter",
-"Alemania"
-],
 "BOSS.DE": [
 "Hugo Boss",
 "Alemania"
 ],
-"ALI1.DE": [
-"Almonty Industries",
+"SZG.DE": [
+"Salzgitter",
+"Alemania"
+],
+"FTK.DE": [
+"flatexDEGIRO",
 "Alemania"
 ],
 "SZU.DE": [
 "Südzucker",
 "Alemania"
 ],
-"JUN3.DE": [
-"Jungheinrich",
+"ALI1.DE": [
+"Almonty Industries",
 "Alemania"
 ],
 "KWS.DE": [
 "KWS SAAT",
 "Alemania"
 ],
-"ELG.DE": [
-"Elmos Semiconductor",
-"Alemania"
-],
-"WAF.DE": [
-"Siltronic",
-"Alemania"
-],
-"CEC.DE": [
-"Ceconomy",
-"Alemania"
-],
-"SAX.DE": [
-"Ströer",
-"Alemania"
-],
-"JEN.DE": [
-"Jenoptik",
-"Alemania"
-],
-"GBF.DE": [
-"Bilfinger",
+"JUN3.DE": [
+"Jungheinrich",
 "Alemania"
 ],
 "TEG.DE": [
 "TAG Immobilien",
 "Alemania"
 ],
-"VBK.DE": [
-"Verbio",
+"CEC.DE": [
+"Ceconomy",
+"Alemania"
+],
+"JEN.DE": [
+"Jenoptik",
+"Alemania"
+],
+"SAX.DE": [
+"Ströer",
+"Alemania"
+],
+"ELG.DE": [
+"Elmos Semiconductor",
+"Alemania"
+],
+"GBF.DE": [
+"Bilfinger",
 "Alemania"
 ],
 "DMP.DE": [
@@ -3570,148 +3546,152 @@
 "Drägerwerk",
 "Alemania"
 ],
-"PLUN.DE": [
-"Plug Power",
+"WAF.DE": [
+"Siltronic",
 "Alemania"
 ],
-"DEZ.DE": [
-"DEUTZ",
-"Alemania"
-],
-"ACT0.DE": [
-"AlzChem",
-"Alemania"
-],
-"AT1.DE": [
-"Aroundtown",
+"VBK.DE": [
+"Verbio",
 "Alemania"
 ],
 "TNIE.DE": [
 "tonies",
 "Alemania"
 ],
-"WAC.DE": [
-"Wacker Neuson",
+"PLUN.DE": [
+"Plug Power",
 "Alemania"
 ],
-"YSN.DE": [
-"secunet Security Networks",
+"AT1.DE": [
+"Aroundtown",
+"Alemania"
+],
+"ACT0.DE": [
+"AlzChem",
 "Alemania"
 ],
 "RDC.DE": [
 "Redcare Pharmacy",
 "Alemania"
 ],
-"AOF.DE": [
-"ATOSS Software",
+"YSN.DE": [
+"secunet Security Networks",
 "Alemania"
 ],
-"KSB3.DE": [
-"KSB",
+"WAC.DE": [
+"Wacker Neuson",
+"Alemania"
+],
+"DEZ.DE": [
+"DEUTZ",
 "Alemania"
 ],
 "HBH.DE": [
 "HORNBACH",
 "Alemania"
 ],
-"BFSA.DE": [
-"Befesa",
+"AOF.DE": [
+"ATOSS Software",
 "Alemania"
 ],
 "VH2.DE": [
 "Friedrich Vorwerk",
 "Alemania"
 ],
-"DEQ.DE": [
-"Deutsche EuroShop",
-"Alemania"
-],
-"KTN.DE": [
-"Kontron",
-"Alemania"
-],
-"WUW.DE": [
-"Wüstenrot & Württembergische",
+"KSB3.DE": [
+"KSB",
 "Alemania"
 ],
 "GYC.DE": [
 "Grand City Properties",
 "Alemania"
 ],
-"SLYG.DE": [
-"Shelly",
+"BFSA.DE": [
+"Befesa",
+"Alemania"
+],
+"WUW.DE": [
+"Wüstenrot & Württembergische",
+"Alemania"
+],
+"KTN.DE": [
+"Kontron",
 "Alemania"
 ],
 "MLP.DE": [
 "MLP",
 "Alemania"
 ],
-"DUE.DE": [
-"Dürr",
+"DEQ.DE": [
+"Deutsche EuroShop",
 "Alemania"
 ],
-"ADV.DE": [
-"Adtran Networks",
+"SLYG.DE": [
+"Shelly",
 "Alemania"
 ],
 "TMV.DE": [
 "TeamViewer",
 "Alemania"
 ],
-"PFS0.DE": [
-"PFISTERER",
-"Alemania"
-],
-"SMHN.DE": [
-"SUSS MicroTec",
+"ADV.DE": [
+"Adtran Networks",
 "Alemania"
 ],
 "CHG.DE": [
 "CHAPTERS",
 "Alemania"
 ],
+"DUE.DE": [
+"Dürr",
+"Alemania"
+],
 "GXI.DE": [
 "Gerresheimer",
-"Alemania"
-],
-"SFQ.DE": [
-"SAF-Holland",
-"Alemania"
-],
-"INH.DE": [
-"INDUS",
-"Alemania"
-],
-"NCH2.DE": [
-"thyssenkrupp nucera",
-"Alemania"
-],
-"JST.DE": [
-"JOST Werke",
-"Alemania"
-],
-"VOS.DE": [
-"Vossloh",
-"Alemania"
-],
-"NA9.DE": [
-"Nagarro",
-"Alemania"
-],
-"V1NC.DE": [
-"Vincorion",
 "Alemania"
 ],
 "MBB.DE": [
 "MBB",
 "Alemania"
 ],
-"FQT.DE": [
-"Frequentis",
+"PFS0.DE": [
+"PFISTERER",
 "Alemania"
 ],
-"2GB.DE": [
-"2G Energy",
+"INH.DE": [
+"INDUS",
+"Alemania"
+],
+"NA9.DE": [
+"Nagarro",
+"Alemania"
+],
+"JST.DE": [
+"JOST Werke",
+"Alemania"
+],
+"NCH2.DE": [
+"thyssenkrupp nucera",
+"Alemania"
+],
+"SMHN.DE": [
+"SUSS MicroTec",
+"Alemania"
+],
+"VOS.DE": [
+"Vossloh",
+"Alemania"
+],
+"SFQ.DE": [
+"SAF-Holland",
+"Alemania"
+],
+"V1NC.DE": [
+"Vincorion",
+"Alemania"
+],
+"FQT.DE": [
+"Frequentis",
 "Alemania"
 ],
 "TIMA.DE": [
@@ -3726,24 +3706,20 @@
 "Eckert & Ziegler",
 "Alemania"
 ],
-"IJ8.DE": [
-"ITM Power",
-"Alemania"
-],
-"PSM.DE": [
-"ProSiebenSat.1 Media",
+"2GB.DE": [
+"2G Energy",
 "Alemania"
 ],
 "CWC.DE": [
 "CEWE Stiftung",
 "Alemania"
 ],
-"1AST.DE": [
-"ASTA Energy Solutions",
+"PSM.DE": [
+"ProSiebenSat.1 Media",
 "Alemania"
 ],
-"EIN.DE": [
-"Einhell Germany",
+"MUX.DE": [
+"Mutares",
 "Alemania"
 ],
 "SHF.DE": [
@@ -3752,6 +3728,18 @@
 ],
 "GFT.DE": [
 "GFT Technologies",
+"Alemania"
+],
+"EIN.DE": [
+"Einhell Germany",
+"Alemania"
+],
+"IJ8.DE": [
+"ITM Power",
+"Alemania"
+],
+"1AST.DE": [
+"ASTA Energy Solutions",
 "Alemania"
 ],
 "STO3.DE": [
@@ -3766,10 +3754,6 @@
 "Basler",
 "Alemania"
 ],
-"MUX.DE": [
-"Mutares",
-"Alemania"
-],
 "TPE.DE": [
 "PVA TePla",
 "Alemania"
@@ -3778,52 +3762,52 @@
 "Mensch und Maschine Software",
 "Alemania"
 ],
+"HYQ.DE": [
+"Hypoport",
+"Alemania"
+],
 "PAT.DE": [
 "PATRIZIA",
 "Alemania"
 ],
-"HYQ.DE": [
-"Hypoport",
+"AYJ.DE": [
+"Valneva",
 "Alemania"
 ],
 "PCZ.DE": [
 "ProCredit",
 "Alemania"
 ],
-"IVU.DE": [
-"IVU Traffic Technologies",
+"EVT.DE": [
+"Evotec",
+"Alemania"
+],
+"1INN.DE": [
+"innoscripta",
 "Alemania"
 ],
 "IXX.DE": [
 "init innovation in traffic systems",
 "Alemania"
 ],
-"EVT.DE": [
-"Evotec",
+"ADN1.DE": [
+"adesso",
 "Alemania"
 ],
-"GLJ.DE": [
-"Grenke",
+"IVU.DE": [
+"IVU Traffic Technologies",
 "Alemania"
 ],
 "WSU.DE": [
 "WashTec",
 "Alemania"
 ],
-"NOEJ.DE": [
-"NORMA",
-"Alemania"
-],
 "HFG.DE": [
 "HelloFresh",
 "Alemania"
 ],
-"ADN1.DE": [
-"adesso",
-"Alemania"
-],
-"PNE3.DE": [
-"PNE",
+"GLJ.DE": [
+"Grenke",
 "Alemania"
 ]
 },
@@ -3860,12 +3844,12 @@
 "BNP Paribas",
 "Francia"
 ],
-"CS.PA": [
-"AXA",
-"Francia"
-],
 "SAN.PA": [
 "Sanofi",
+"Francia"
+],
+"CS.PA": [
+"AXA",
 "Francia"
 ],
 "EL.PA": [
@@ -3904,20 +3888,16 @@
 "STMicroelectronics",
 "Francia"
 ],
-"LR.PA": [
-"Legrand",
-"Francia"
-],
 "SGO.PA": [
 "Compagnie de Saint-Gobain",
 "Francia"
 ],
-"DSY.PA": [
-"Dassault Systèmes",
+"LR.PA": [
+"Legrand",
 "Francia"
 ],
-"KER.PA": [
-"Kering",
+"DSY.PA": [
+"Dassault Systèmes",
 "Francia"
 ],
 "VIE.PA": [
@@ -3928,12 +3908,16 @@
 "Dassault Aviation",
 "Francia"
 ],
-"DIM.PA": [
-"Sartorius Stedim Biotech",
+"KER.PA": [
+"Kering",
 "Francia"
 ],
 "CAP.PA": [
 "Capgemini",
+"Francia"
+],
+"DIM.PA": [
+"Sartorius Stedim Biotech",
 "Francia"
 ],
 "AMUN.PA": [
@@ -3946,10 +3930,6 @@
 ],
 "EN.PA": [
 "Bouygues",
-"Francia"
-],
-"STLAP.PA": [
-"Stellantis",
 "Francia"
 ],
 "ERF.PA": [
@@ -3968,14 +3948,6 @@
 "Ipsen",
 "Francia"
 ],
-"CA.PA": [
-"Carrefour",
-"Francia"
-],
-"AC.PA": [
-"Accor",
-"Francia"
-],
 "ADP.PA": [
 "Aeroports de Paris",
 "Francia"
@@ -3984,20 +3956,32 @@
 "Getlink",
 "Francia"
 ],
+"BIM.PA": [
+"bioMérieux",
+"Francia"
+],
 "BOL.PA": [
 "Bolloré",
+"Francia"
+],
+"STLAP.PA": [
+"Stellantis",
+"Francia"
+],
+"AC.PA": [
+"Accor",
 "Francia"
 ],
 "RXL.PA": [
 "Rexel",
 "Francia"
 ],
-"BIM.PA": [
-"bioMérieux",
-"Francia"
-],
 "LI.PA": [
 "Klépierre",
+"Francia"
+],
+"CA.PA": [
+"Carrefour",
 "Francia"
 ],
 "FGR.PA": [
@@ -4008,72 +3992,72 @@
 "Sodexo",
 "Francia"
 ],
-"RNO.PA": [
-"Renault",
-"Francia"
-],
 "GTT.PA": [
 "Gaztransport & Technigaz",
+"Francia"
+],
+"RNO.PA": [
+"Renault",
 "Francia"
 ],
 "SPIE.PA": [
 "SPIE",
 "Francia"
 ],
-"AYV.PA": [
-"Ayvens",
-"Francia"
-],
 "ABVX.PA": [
 "ABIVAX",
 "Francia"
 ],
-"EDEN.PA": [
-"Edenred",
+"AYV.PA": [
+"Ayvens",
 "Francia"
 ],
 "SCR.PA": [
 "SCOR",
 "Francia"
 ],
-"NEX.PA": [
-"Nexans",
-"Francia"
-],
-"DEC.PA": [
-"JCDecaux",
-"Francia"
-],
-"ELIS.PA": [
-"Elis",
+"EDEN.PA": [
+"Edenred",
 "Francia"
 ],
 "TE.PA": [
 "Technip Energies",
 "Francia"
 ],
-"VK.PA": [
-"Vallourec",
+"DEC.PA": [
+"JCDecaux",
+"Francia"
+],
+"NEX.PA": [
+"Nexans",
+"Francia"
+],
+"ELIS.PA": [
+"Elis",
 "Francia"
 ],
 "COV.PA": [
 "Covivio",
 "Francia"
 ],
-"GFC.PA": [
-"Gecina",
-"Francia"
-],
-"SOI.PA": [
-"Soitec",
+"VK.PA": [
+"Vallourec",
 "Francia"
 ],
 "TEP.PA": [
 "Teleperformance",
 "Francia"
 ],
+"GFC.PA": [
+"Gecina",
+"Francia"
+],
 "AKE.PA": [
 "Arkema",
+"Francia"
+],
+"SOI.PA": [
+"Soitec",
 "Francia"
 ],
 "FDJU.PA": [
@@ -4092,20 +4076,12 @@
 "Sopra Steria",
 "Francia"
 ],
-"FR.PA": [
-"Valeo",
-"Francia"
-],
 "MF.PA": [
 "Wendel",
 "Francia"
 ],
-"SK.PA": [
-"SEB",
-"Francia"
-],
-"EXENS.PA": [
-"Exosens",
+"ITP.PA": [
+"Interparfums",
 "Francia"
 ],
 "ATE.PA": [
@@ -4116,28 +4092,36 @@
 "Eurazeo",
 "Francia"
 ],
-"ITP.PA": [
-"Interparfums",
+"SK.PA": [
+"SEB",
 "Francia"
 ],
 "VIRP.PA": [
 "Virbac",
 "Francia"
 ],
-"TKO.PA": [
-"Tikehau Capital",
+"EXENS.PA": [
+"Exosens",
 "Francia"
 ],
 "FII.PA": [
 "Lisi",
 "Francia"
 ],
-"AF.PA": [
-"Air France-KLM",
-"Francia"
-],
 "RCO.PA": [
 "Rémy Cointreau",
+"Francia"
+],
+"FR.PA": [
+"Valeo",
+"Francia"
+],
+"TKO.PA": [
+"Tikehau Capital",
+"Francia"
+],
+"AF.PA": [
+"Air France-KLM",
 "Francia"
 ],
 "VCT.PA": [
@@ -4148,84 +4132,76 @@
 "Trigano",
 "Francia"
 ],
-"COFA.PA": [
-"COFACE",
+"IDL.PA": [
+"ID Logistics",
 "Francia"
 ],
 "VRLA.PA": [
 "Verallia",
 "Francia"
 ],
-"OVH.PA": [
-"OVH Groupe",
-"Francia"
-],
-"IDL.PA": [
-"ID Logistics",
+"COFA.PA": [
+"COFACE",
 "Francia"
 ],
 "EXA.PA": [
 "Exail Technologies",
 "Francia"
 ],
-"PLX.PA": [
-"Pluxee",
+"VU.PA": [
+"Vusion",
 "Francia"
 ],
 "ETL.PA": [
 "Eutelsat Communications",
 "Francia"
 ],
-"VU.PA": [
-"Vusion",
+"PLX.PA": [
+"Pluxee",
 "Francia"
 ],
 "CARM.PA": [
 "Carmila",
 "Francia"
 ],
-"ALTA.PA": [
-"Altarea SCA",
+"PLNW.PA": [
+"Planisware SAS",
+"Francia"
+],
+"OVH.PA": [
+"OVH Groupe",
 "Francia"
 ],
 "NK.PA": [
 "Imerys",
 "Francia"
 ],
-"PLNW.PA": [
-"Planisware SAS",
-"Francia"
-],
-"ARG.PA": [
-"Argan",
+"ALTA.PA": [
+"Altarea SCA",
 "Francia"
 ],
 "ALHG.PA": [
 "Louis Hachette",
 "Francia"
 ],
-"SESG.PA": [
-"SES",
-"Francia"
-],
-"EMEIS.PA": [
-"emeis",
-"Francia"
-],
-"FRVIA.PA": [
-"Forvia",
+"ARG.PA": [
+"Argan",
 "Francia"
 ],
 "RBT.PA": [
 "Robertet",
 "Francia"
 ],
+"SESG.PA": [
+"SES",
+"Francia"
+],
 "MAU.PA": [
 "Etablissements Maurel & Prom",
 "Francia"
 ],
-"CRBP2.PA": [
-"Caisse Régionale de Crédit Agricole Mutuel Brie Picardie Société coopérative",
+"EMEIS.PA": [
+"emeis",
 "Francia"
 ],
 "VIV.PA": [
@@ -4236,24 +4212,36 @@
 "STEF",
 "Francia"
 ],
+"FRVIA.PA": [
+"Forvia",
+"Francia"
+],
 "IPS.PA": [
 "Ipsos",
 "Francia"
 ],
-"OPM.PA": [
-"OPmobility",
+"CRBP2.PA": [
+"Caisse Régionale de Crédit Agricole Mutuel Brie Picardie Société coopérative",
+"Francia"
+],
+"NANO.PA": [
+"Nanobiotix",
+"Francia"
+],
+"MMT.PA": [
+"Métropole Télévision",
 "Francia"
 ],
 "PEUG.PA": [
 "Peugeot Invest",
 "Francia"
 ],
-"ANTIN.PA": [
-"Antin Infrastructure Partners",
+"OPM.PA": [
+"OPmobility",
 "Francia"
 ],
-"MMT.PA": [
-"Métropole Télévision",
+"ANTIN.PA": [
+"Antin Infrastructure Partners",
 "Francia"
 ],
 "TFI.PA": [
@@ -4276,14 +4264,6 @@
 "Icade",
 "Francia"
 ],
-"VIL.PA": [
-"VIEL & Cie",
-"Francia"
-],
-"ERA.PA": [
-"ERAMET",
-"Francia"
-],
 "74SW.PA": [
 "74Software",
 "Francia"
@@ -4292,36 +4272,36 @@
 "TotalEnergies EP Gabon",
 "Francia"
 ],
+"VIL.PA": [
+"VIEL & Cie",
+"Francia"
+],
 "FNAC.PA": [
 "Fnac Darty",
+"Francia"
+],
+"ERA.PA": [
+"ERAMET",
 "Francia"
 ],
 "NAE.PA": [
 "North Atlantic Energies",
 "Francia"
 ],
-"NANO.PA": [
-"Nanobiotix",
+"GLO.PA": [
+"GL Events",
 "Francia"
 ],
-"MRN.PA": [
-"Mersen",
+"VETO.PA": [
+"Vetoquinol",
 "Francia"
 ],
 "MEDCL.PA": [
 "MedinCell",
 "Francia"
 ],
-"GLO.PA": [
-"GL Events",
-"Francia"
-],
 "MERY.PA": [
 "Mercialys",
-"Francia"
-],
-"VETO.PA": [
-"Vetoquinol",
 "Francia"
 ],
 "CDA.PA": [
@@ -4336,16 +4316,20 @@
 "Pierre et Vacances",
 "Francia"
 ],
-"ALVDM.PA": [
-"Voyageurs du Monde",
-"Francia"
-],
-"MTU.PA": [
-"Manitou BF",
+"MRN.PA": [
+"Mersen",
 "Francia"
 ],
 "LSS.PA": [
 "Lectra",
+"Francia"
+],
+"ALVDM.PA": [
+"Voyageurs du Monde",
+"Francia"
+],
+"WAVE.PA": [
+"Wavestone",
 "Francia"
 ]
 },
@@ -4402,10 +4386,6 @@
 "Tenaris",
 "Italia"
 ],
-"BAMI.MI": [
-"Banco BPM",
-"Italia"
-],
 "MB.MI": [
 "Mediobanca Banca di Credito Finanziario",
 "Italia"
@@ -4414,24 +4394,24 @@
 "Snam",
 "Italia"
 ],
-"UNI.MI": [
-"Unipol Assicurazioni",
+"BAMI.MI": [
+"Banco BPM",
 "Italia"
 ],
 "TRN.MI": [
 "Terna",
 "Italia"
 ],
-"TPRO.MI": [
-"Technoprobe",
+"UNI.MI": [
+"Unipol Assicurazioni",
 "Italia"
 ],
 "BMED.MI": [
 "Banca Mediolanum",
 "Italia"
 ],
-"STLAM.MI": [
-"Stellantis",
+"TPRO.MI": [
+"Technoprobe",
 "Italia"
 ],
 "FBK.MI": [
@@ -4450,6 +4430,10 @@
 "Recordati Industria Chimica e Farmaceutica",
 "Italia"
 ],
+"STLAM.MI": [
+"Stellantis",
+"Italia"
+],
 "IG.MI": [
 "Italgas",
 "Italia"
@@ -4466,14 +4450,6 @@
 "Pirelli & C",
 "Italia"
 ],
-"BGN.MI": [
-"Banca Generali",
-"Italia"
-],
-"CE.MI": [
-"Credito Emiliano",
-"Italia"
-],
 "BZU.MI": [
 "Buzzi",
 "Italia"
@@ -4482,16 +4458,28 @@
 "Infrastrutture Wireless Italiane",
 "Italia"
 ],
+"CE.MI": [
+"Credito Emiliano",
+"Italia"
+],
+"BGN.MI": [
+"Banca Generali",
+"Italia"
+],
 "DLG.MI": [
 "De'Longhi",
+"Italia"
+],
+"LTMC.MI": [
+"Lottomatica",
 "Italia"
 ],
 "BC.MI": [
 "Brunello Cucinelli",
 "Italia"
 ],
-"LTMC.MI": [
-"Lottomatica",
+"SOL.MI": [
+"SOL",
 "Italia"
 ],
 "HER.MI": [
@@ -4502,44 +4490,40 @@
 "Nexi",
 "Italia"
 ],
-"SOL.MI": [
-"SOL",
-"Italia"
-],
 "AZM.MI": [
 "Azimut",
-"Italia"
-],
-"FCT.MI": [
-"Fincantieri",
 "Italia"
 ],
 "REY.MI": [
 "Reply",
 "Italia"
 ],
+"FCT.MI": [
+"Fincantieri",
+"Italia"
+],
 "ACE.MI": [
 "ACEA",
-"Italia"
-],
-"MAIRE.MI": [
-"Maire",
-"Italia"
-],
-"IP.MI": [
-"Interpump",
-"Italia"
-],
-"IVG.MI": [
-"Iveco",
 "Italia"
 ],
 "DIA.MI": [
 "DiaSorin",
 "Italia"
 ],
+"MAIRE.MI": [
+"Maire",
+"Italia"
+],
+"IVG.MI": [
+"Iveco",
+"Italia"
+],
 "DAN.MI": [
 "Danieli & C. Officine Meccaniche",
+"Italia"
+],
+"IP.MI": [
+"Interpump",
 "Italia"
 ],
 "AMP.MI": [
@@ -4570,10 +4554,6 @@
 "Anima",
 "Italia"
 ],
-"BFG.MI": [
-"B.F",
-"Italia"
-],
 "BDB.MI": [
 "Banco di Desio e della Brianza",
 "Italia"
@@ -4582,44 +4562,40 @@
 "Cementir",
 "Italia"
 ],
+"BFG.MI": [
+"B.F",
+"Italia"
+],
 "WBD.MI": [
 "Webuild",
-"Italia"
-],
-"OVS.MI": [
-"OVS",
-"Italia"
-],
-"TIP.MI": [
-"Tamburi Investment Partners",
-"Italia"
-],
-"SES.MI": [
-"SeSa",
-"Italia"
-],
-"LUVE.MI": [
-"LU-VE",
 "Italia"
 ],
 "AVIO.MI": [
 "Avio",
 "Italia"
 ],
+"SES.MI": [
+"SeSa",
+"Italia"
+],
+"TIP.MI": [
+"Tamburi Investment Partners",
+"Italia"
+],
+"OVS.MI": [
+"OVS",
+"Italia"
+],
 "CMB.MI": [
 "Cembre",
 "Italia"
 ],
+"LUVE.MI": [
+"LU-VE",
+"Italia"
+],
 "COM.MI": [
 "Comer Industries",
-"Italia"
-],
-"OROX.MI": [
-"Gens Aurea",
-"Italia"
-],
-"SL.MI": [
-"Sanlorenzo",
 "Italia"
 ],
 "MOL.MI": [
@@ -4630,12 +4606,16 @@
 "EL.En",
 "Italia"
 ],
+"SL.MI": [
+"Sanlorenzo",
+"Italia"
+],
 "ARIS.MI": [
 "Ariston",
 "Italia"
 ],
-"SFER.MI": [
-"Salvatore Ferragamo",
+"OROX.MI": [
+"Gens Aurea",
 "Italia"
 ],
 "ICOS.MI": [
@@ -4662,6 +4642,10 @@
 "d'Amico International Shipping",
 "Italia"
 ],
+"SFER.MI": [
+"Salvatore Ferragamo",
+"Italia"
+],
 "GVS.MI": [
 "GVS",
 "Italia"
@@ -4670,16 +4654,16 @@
 "Officina Stellare",
 "Italia"
 ],
+"NWL.MI": [
+"NewPrinces",
+"Italia"
+],
 "YACHT.MI": [
 "Ferretti",
 "Italia"
 ],
 "ARN.MI": [
 "Alerion Clean Power",
-"Italia"
-],
-"NWL.MI": [
-"NewPrinces",
 "Italia"
 ],
 "PHIL.MI": [
@@ -4702,8 +4686,8 @@
 "Wiit",
 "Italia"
 ],
-"JUVE.MI": [
-"Juventus Football Club",
+"PHN.MI": [
+"Pharmanutra",
 "Italia"
 ],
 "PIA.MI": [
@@ -4752,12 +4736,12 @@
 "Adyen",
 "Países Bajos y Bélgica"
 ],
-"UMG.AS": [
-"Universal Music",
-"Países Bajos y Bélgica"
-],
 "AD.AS": [
 "Koninklijke Ahold Delhaize",
+"Países Bajos y Bélgica"
+],
+"UMG.AS": [
+"Universal Music",
 "Países Bajos y Bélgica"
 ],
 "DSFIR.AS": [
@@ -4776,28 +4760,28 @@
 "Wolters Kluwer",
 "Países Bajos y Bélgica"
 ],
-"CSG.AS": [
-"CSG",
-"Países Bajos y Bélgica"
-],
 "KPN.AS": [
 "Koninklijke KPN",
-"Países Bajos y Bélgica"
-],
-"ASRNL.AS": [
-"ASR Nederland",
 "Países Bajos y Bélgica"
 ],
 "HAL.AS": [
 "HAL Trust",
 "Países Bajos y Bélgica"
 ],
-"EXO.AS": [
-"Exor",
+"ASRNL.AS": [
+"ASR Nederland",
 "Países Bajos y Bélgica"
 ],
 "CVC.AS": [
 "CVC Capital Partners",
+"Países Bajos y Bélgica"
+],
+"CSG.AS": [
+"CSG",
+"Países Bajos y Bélgica"
+],
+"EXO.AS": [
+"Exor",
 "Países Bajos y Bélgica"
 ],
 "BESI.AS": [
@@ -4820,20 +4804,20 @@
 "InPost",
 "Países Bajos y Bélgica"
 ],
-"CTPNV.AS": [
-"CTP",
+"RAND.AS": [
+"Randstad",
 "Países Bajos y Bélgica"
 ],
-"IMCD.AS": [
-"IMCD",
+"CTPNV.AS": [
+"CTP",
 "Países Bajos y Bélgica"
 ],
 "VPK.AS": [
 "Koninklijke Vopak",
 "Países Bajos y Bélgica"
 ],
-"RAND.AS": [
-"Randstad",
+"IMCD.AS": [
+"IMCD",
 "Países Bajos y Bélgica"
 ],
 "ALLFG.AS": [
@@ -4876,6 +4860,10 @@
 "Basic-Fit",
 "Países Bajos y Bélgica"
 ],
+"LKFT.AS": [
+"Lakefront Biotherapeutics",
+"Países Bajos y Bélgica"
+],
 "LIGHT.AS": [
 "Signify",
 "Países Bajos y Bélgica"
@@ -4884,20 +4872,16 @@
 "Havas",
 "Países Bajos y Bélgica"
 ],
-"LKFT.AS": [
-"Lakefront Biotherapeutics",
-"Países Bajos y Bélgica"
-],
 "ECMPA.AS": [
 "Eurocommercial Properties",
 "Países Bajos y Bélgica"
 ],
-"FAST.AS": [
-"Fastned B.V",
-"Países Bajos y Bélgica"
-],
 "CRBN.AS": [
 "Corbion",
+"Países Bajos y Bélgica"
+],
+"FAST.AS": [
+"Fastned B.V",
 "Países Bajos y Bélgica"
 ],
 "TFG.AS": [
@@ -4908,40 +4892,40 @@
 "Flow Traders",
 "Países Bajos y Bélgica"
 ],
-"AMG.AS": [
-"AMG Critical Materials",
-"Países Bajos y Bélgica"
-],
 "FUR.AS": [
 "Fugro",
+"Países Bajos y Bélgica"
+],
+"AMG.AS": [
+"AMG Critical Materials",
 "Países Bajos y Bélgica"
 ],
 "WHA.AS": [
 "Wereldhave",
 "Países Bajos y Bélgica"
 ],
-"FERGR.AS": [
-"Ferrari",
+"PHARM.AS": [
+"Pharming",
 "Países Bajos y Bélgica"
 ],
 "ACOMO.AS": [
 "Acomo",
 "Países Bajos y Bélgica"
 ],
+"FERGR.AS": [
+"Ferrari",
+"Países Bajos y Bélgica"
+],
 "NEDAP.AS": [
 "Nedap",
 "Países Bajos y Bélgica"
 ],
-"PHARM.AS": [
-"Pharming",
+"FFARM.AS": [
+"ForFarmers",
 "Países Bajos y Bélgica"
 ],
 "TRIO.AS": [
 "Triodos Bank",
-"Países Bajos y Bélgica"
-],
-"FFARM.AS": [
-"ForFarmers",
 "Países Bajos y Bélgica"
 ],
 "TOM2.AS": [
@@ -4956,12 +4940,12 @@
 "Anheuser-Busch InBev",
 "Países Bajos y Bélgica"
 ],
-"ARGX.BR": [
-"argenx",
-"Países Bajos y Bélgica"
-],
 "UCB.BR": [
 "UCB",
+"Países Bajos y Bélgica"
+],
+"ARGX.BR": [
+"argenx",
 "Países Bajos y Bélgica"
 ],
 "ELI.BR": [
@@ -4972,28 +4956,28 @@
 "Lotus Bakeries",
 "Países Bajos y Bélgica"
 ],
-"DIE.BR": [
-"D'Ieteren",
+"TUB.BR": [
+"Financière de Tubize",
 "Países Bajos y Bélgica"
 ],
 "SOF.BR": [
 "Sofina",
 "Países Bajos y Bélgica"
 ],
-"ACKB.BR": [
-"Ackermans & Van Haaren",
+"DIE.BR": [
+"D'Ieteren",
 "Países Bajos y Bélgica"
 ],
 "GBLB.BR": [
 "Groupe Bruxelles Lambert",
 "Países Bajos y Bélgica"
 ],
-"SYENS.BR": [
-"Syensqo",
+"ACKB.BR": [
+"Ackermans & Van Haaren",
 "Países Bajos y Bélgica"
 ],
-"TUB.BR": [
-"Financière de Tubize",
+"SYENS.BR": [
+"Syensqo",
 "Países Bajos y Bélgica"
 ],
 "KBCA.BR": [
@@ -5008,10 +4992,6 @@
 "Warehouses De Pauw",
 "Países Bajos y Bélgica"
 ],
-"UMI.BR": [
-"Umicore",
-"Países Bajos y Bélgica"
-],
 "CMBT.BR": [
 "Cmb.Tech",
 "Países Bajos y Bélgica"
@@ -5020,44 +5000,52 @@
 "Colruyt",
 "Países Bajos y Bélgica"
 ],
+"UMI.BR": [
+"Umicore",
+"Países Bajos y Bélgica"
+],
 "DEME.BR": [
 "DEME",
 "Países Bajos y Bélgica"
 ],
-"AZE.BR": [
-"Azelis",
+"TITC.BR": [
+"Titan",
 "Países Bajos y Bélgica"
 ],
 "BREB.BR": [
 "Brederode",
 "Países Bajos y Bélgica"
 ],
-"SOLB.BR": [
-"Solvay",
+"AZE.BR": [
+"Azelis",
 "Países Bajos y Bélgica"
 ],
 "SHUR.BR": [
 "Shurgard Self Storage",
 "Países Bajos y Bélgica"
 ],
+"SOLB.BR": [
+"Solvay",
+"Países Bajos y Bélgica"
+],
 "MELE.BR": [
 "Melexis",
-"Países Bajos y Bélgica"
-],
-"PROX.BR": [
-"Proximus",
-"Países Bajos y Bélgica"
-],
-"VGP.BR": [
-"VGP",
 "Países Bajos y Bélgica"
 ],
 "BEKB.BR": [
 "NV Bekaert",
 "Países Bajos y Bélgica"
 ],
+"VGP.BR": [
+"VGP",
+"Países Bajos y Bélgica"
+],
 "GIMB.BR": [
 "Gimv",
+"Países Bajos y Bélgica"
+],
+"PROX.BR": [
+"Proximus",
 "Países Bajos y Bélgica"
 ],
 "FAGR.BR": [
@@ -5092,12 +5080,12 @@
 "Retail Estates",
 "Países Bajos y Bélgica"
 ],
-"RECT.BR": [
-"Recticel",
-"Países Bajos y Bélgica"
-],
 "JEN.BR": [
 "Jensen-Group",
+"Países Bajos y Bélgica"
+],
+"RECT.BR": [
+"Recticel",
 "Países Bajos y Bélgica"
 ],
 "WEHB.BR": [
@@ -5106,10 +5094,6 @@
 ],
 "CPINV.BR": [
 "Care Property Invest",
-"Países Bajos y Bélgica"
-],
-"TINC.BR": [
-"TINC",
 "Países Bajos y Bélgica"
 ]
 },
@@ -5226,12 +5210,12 @@
 "KONE",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
-"NESTE.HE": [
-"Neste",
-"Portugal, Irlanda, Austria y Finlandia"
-],
 "SAMPO.HE": [
 "Sampo",
+"Portugal, Irlanda, Austria y Finlandia"
+],
+"NESTE.HE": [
+"Neste",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
 "FORTUM.HE": [
@@ -5246,12 +5230,12 @@
 "Metso",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
-"UPM.HE": [
-"UPM-Kymmene",
-"Portugal, Irlanda, Austria y Finlandia"
-],
 "ORNBV.HE": [
 "Orion",
+"Portugal, Irlanda, Austria y Finlandia"
+],
+"UPM.HE": [
+"UPM-Kymmene",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
 "KESKOB.HE": [
@@ -5290,16 +5274,16 @@
 "Huhtamäki",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
+"KALMAR.HE": [
+"Kalmar",
+"Portugal, Irlanda, Austria y Finlandia"
+],
 "VAIAS.HE": [
 "Vaisala",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
 "KEMIRA.HE": [
 "Kemira",
-"Portugal, Irlanda, Austria y Finlandia"
-],
-"KALMAR.HE": [
-"Kalmar",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
 "OUT1V.HE": [
@@ -5310,12 +5294,12 @@
 "Tieto",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
-"TYRES.HE": [
-"Nokian Renkaat",
-"Portugal, Irlanda, Austria y Finlandia"
-],
 "LUMO.HE": [
 "Lumo Kodit",
+"Portugal, Irlanda, Austria y Finlandia"
+],
+"TYRES.HE": [
+"Nokian Renkaat",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
 "SENSO.HE": [
@@ -5326,32 +5310,32 @@
 "Sanoma",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
-"IQMX.HE": [
-"IQM Quantum Computers",
-"Portugal, Irlanda, Austria y Finlandia"
-],
 "PUUILO.HE": [
 "Puuilo",
+"Portugal, Irlanda, Austria y Finlandia"
+],
+"IQMX.HE": [
+"IQM Quantum Computers",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
 "BITTI.HE": [
 "Bittium",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
-"METSB.HE": [
-"Metsä Board",
+"FSKRS.HE": [
+"Fiskars Oyj Abp",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
 "ALMA.HE": [
 "Alma Media",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
-"GRK.HE": [
-"GRK Infra",
+"METSB.HE": [
+"Metsä Board",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
-"FSKRS.HE": [
-"Fiskars Oyj Abp",
+"GRK.HE": [
+"GRK Infra",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
 "YIT.HE": [
@@ -5362,16 +5346,16 @@
 "Aktia Pankki",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
-"TTALO.HE": [
-"Terveystalo",
+"QTCOM.HE": [
+"Qt",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
 "FIA1S.HE": [
 "Finnair",
 "Portugal, Irlanda, Austria y Finlandia"
 ],
-"SCANFL.HE": [
-"Scanfil",
+"HARVIA.HE": [
+"Harvia",
 "Portugal, Irlanda, Austria y Finlandia"
 ]
 },
@@ -5392,24 +5376,24 @@
 "BHP",
 "Reino Unido"
 ],
-"RR.L": [
-"Rolls-Royce",
+"ULVR.L": [
+"Unilever",
 "Reino Unido"
 ],
 "RIO.L": [
 "Rio Tinto",
 "Reino Unido"
 ],
-"ULVR.L": [
-"Unilever",
+"BP.L": [
+"BP",
+"Reino Unido"
+],
+"RR.L": [
+"Rolls-Royce",
 "Reino Unido"
 ],
 "BATS.L": [
 "British American Tobacco",
-"Reino Unido"
-],
-"BP.L": [
-"BP",
 "Reino Unido"
 ],
 "GSK.L": [
@@ -5428,64 +5412,60 @@
 "Lloyds Banking",
 "Reino Unido"
 ],
-"BARC.L": [
-"Barclays",
-"Reino Unido"
-],
 "BA.L": [
 "BAE Systems",
 "Reino Unido"
 ],
-"NWG.L": [
-"NatWest",
+"BARC.L": [
+"Barclays",
 "Reino Unido"
 ],
 "REL.L": [
 "RELX",
 "Reino Unido"
 ],
-"STAN.L": [
-"Standard Chartered",
-"Reino Unido"
-],
-"AAL.L": [
-"Anglo American",
+"NWG.L": [
+"NatWest",
 "Reino Unido"
 ],
 "LSEG.L": [
 "London Stock Exchange",
 "Reino Unido"
 ],
+"STAN.L": [
+"Standard Chartered",
+"Reino Unido"
+],
 "DGE.L": [
 "Diageo",
+"Reino Unido"
+],
+"AAL.L": [
+"Anglo American",
 "Reino Unido"
 ],
 "RKT.L": [
 "Reckitt Benckiser",
 "Reino Unido"
 ],
-"ANTO.L": [
-"Antofagasta",
+"HLN.L": [
+"Haleon",
 "Reino Unido"
 ],
 "TSCO.L": [
 "Tesco",
 "Reino Unido"
 ],
-"HLN.L": [
-"Haleon",
-"Reino Unido"
-],
 "SSE.L": [
 "SSE",
 "Reino Unido"
 ],
-"VOD.L": [
-"Vodafone Group Public",
+"ANTO.L": [
+"Antofagasta",
 "Reino Unido"
 ],
-"III.L": [
-"3i Group Ord",
+"VOD.L": [
+"Vodafone Group Public",
 "Reino Unido"
 ],
 "EXPN.L": [
@@ -5494,6 +5474,10 @@
 ],
 "SUNB.L": [
 "Sunbelt Rentals",
+"Reino Unido"
+],
+"III.L": [
+"3i Group Ord",
 "Reino Unido"
 ],
 "PRU.L": [
@@ -5524,10 +5508,6 @@
 "NEXT",
 "Reino Unido"
 ],
-"SMT.L": [
-"Scottish Mortgage Ord",
-"Reino Unido"
-],
 "CCH.L": [
 "Coca-Cola HBC",
 "Reino Unido"
@@ -5536,68 +5516,76 @@
 "Legal & General",
 "Reino Unido"
 ],
-"VALT.L": [
-"Valterra Platinum",
+"SMT.L": [
+"Scottish Mortgage Ord",
 "Reino Unido"
 ],
 "ABF.L": [
 "Associated British Foods",
 "Reino Unido"
 ],
-"SGRO.L": [
-"SEGRO",
+"VALT.L": [
+"Valterra Platinum",
 "Reino Unido"
 ],
-"INF.L": [
-"Informa",
+"SGRO.L": [
+"SEGRO",
 "Reino Unido"
 ],
 "ADM.L": [
 "Admiral",
 "Reino Unido"
 ],
+"INF.L": [
+"Informa",
+"Reino Unido"
+],
 "UU.L": [
 "United Utilities",
-"Reino Unido"
-],
-"DPLM.L": [
-"Diploma",
-"Reino Unido"
-],
-"AAF.L": [
-"Airtel Africa",
-"Reino Unido"
-],
-"EDV.L": [
-"Endeavour Mining",
 "Reino Unido"
 ],
 "SGE.L": [
 "Sage",
 "Reino Unido"
 ],
-"SVT.L": [
-"Severn Trent",
+"AAF.L": [
+"Airtel Africa",
 "Reino Unido"
 ],
-"SDLF.L": [
-"Standard Life",
+"SVT.L": [
+"Severn Trent",
 "Reino Unido"
 ],
 "SN.L": [
 "Smith & Nephew",
 "Reino Unido"
 ],
+"EDV.L": [
+"Endeavour Mining",
+"Reino Unido"
+],
+"DPLM.L": [
+"Diploma",
+"Reino Unido"
+],
+"SDLF.L": [
+"Standard Life",
+"Reino Unido"
+],
 "BNZL.L": [
 "Bunzl",
+"Reino Unido"
+],
+"MKS.L": [
+"Marks and Spencer",
 "Reino Unido"
 ],
 "MICC.L": [
 "Magnum Ice Cream",
 "Reino Unido"
 ],
-"MKS.L": [
-"Marks and Spencer",
+"RTO.L": [
+"Rentokil Initial",
 "Reino Unido"
 ],
 "PSON.L": [
@@ -5606,10 +5594,6 @@
 ],
 "WISE.L": [
 "Wise",
-"Reino Unido"
-],
-"RTO.L": [
-"Rentokil Initial",
 "Reino Unido"
 ],
 "SBRY.L": [
@@ -5624,32 +5608,28 @@
 "Smiths",
 "Reino Unido"
 ],
-"IMI.L": [
-"IMI",
+"CNA.L": [
+"Centrica",
 "Reino Unido"
 ],
 "PCT.L": [
 "Polar Capital Technology Ord",
 "Reino Unido"
 ],
-"WEIR.L": [
-"Weir",
-"Reino Unido"
-],
-"CNA.L": [
-"Centrica",
+"IMI.L": [
+"IMI",
 "Reino Unido"
 ],
 "PSH.L": [
 "Pershing Square",
 "Reino Unido"
 ],
-"FCIT.L": [
-"F&C Investment Trust Ord",
+"WEIR.L": [
+"Weir",
 "Reino Unido"
 ],
-"MRO.L": [
-"Melrose Industries",
+"FCIT.L": [
+"F&C Investment Trust Ord",
 "Reino Unido"
 ],
 "HSX.L": [
@@ -5660,48 +5640,40 @@
 "Kingfisher",
 "Reino Unido"
 ],
-"GAW.L": [
-"Games Workshop",
+"MRO.L": [
+"Melrose Industries",
 "Reino Unido"
 ],
 "DCC.L": [
 "DCC Energy",
 "Reino Unido"
 ],
-"SPX.L": [
-"Spirax",
-"Reino Unido"
-],
-"BGEO.L": [
-"Lion Finance",
-"Reino Unido"
-],
 "LAND.L": [
 "Land Securities",
 "Reino Unido"
 ],
-"CCC.L": [
-"Computacenter",
+"SPX.L": [
+"Spirax",
 "Reino Unido"
 ],
 "STJ.L": [
 "St. James's Place",
 "Reino Unido"
 ],
-"AMC.L": [
-"Airtel Mobile Commerce",
+"GAW.L": [
+"Games Workshop",
 "Reino Unido"
 ],
 "ICG.L": [
 "ICG",
 "Reino Unido"
 ],
-"EZJ.L": [
-"easyJet",
+"BGEO.L": [
+"Lion Finance",
 "Reino Unido"
 ],
-"ALW.L": [
-"Alliance Witan Ord",
+"EZJ.L": [
+"easyJet",
 "Reino Unido"
 ],
 "SEPL.L": [
@@ -5712,24 +5684,32 @@
 "Ithaca Energy",
 "Reino Unido"
 ],
-"BAB.L": [
-"Babcock International",
+"ALW.L": [
+"Alliance Witan Ord",
+"Reino Unido"
+],
+"CCC.L": [
+"Computacenter",
+"Reino Unido"
+],
+"AMC.L": [
+"Airtel Mobile Commerce",
 "Reino Unido"
 ],
 "CTEC.L": [
 "Convatec",
 "Reino Unido"
 ],
-"WPP.L": [
-"WPP",
+"BAB.L": [
+"Babcock International",
 "Reino Unido"
 ],
 "HBR.L": [
 "Harbour Energy",
 "Reino Unido"
 ],
-"JD.L": [
-"JD Sports Fashion",
+"BTRW.L": [
+"Barratt Redrow",
 "Reino Unido"
 ],
 "LMP.L": [
@@ -5740,24 +5720,24 @@
 "Whitbread",
 "Reino Unido"
 ],
-"BLND.L": [
-"British Land",
-"Reino Unido"
-],
 "HWDN.L": [
 "Howden Joinery",
 "Reino Unido"
 ],
-"ABDN.L": [
-"Aberdeen",
+"WPP.L": [
+"WPP",
 "Reino Unido"
 ],
-"BTRW.L": [
-"Barratt Redrow",
+"BLND.L": [
+"British Land",
 "Reino Unido"
 ],
 "BBOX.L": [
 "Tritax Big Box Ord",
+"Reino Unido"
+],
+"JD.L": [
+"JD Sports Fashion",
 "Reino Unido"
 ],
 "AUTO.L": [
@@ -5772,12 +5752,12 @@
 "Rotork",
 "Reino Unido"
 ],
-"RSW.L": [
-"Renishaw",
+"RMV.L": [
+"Rightmove",
 "Reino Unido"
 ],
-"BRBY.L": [
-"Burberry",
+"ABDN.L": [
+"Aberdeen",
 "Reino Unido"
 ],
 "BBY.L": [
@@ -5788,28 +5768,28 @@
 "Zegona Communications",
 "Reino Unido"
 ],
-"RMV.L": [
-"Rightmove",
+"FRAS.L": [
+"Frasers",
+"Reino Unido"
+],
+"BRBY.L": [
+"Burberry",
 "Reino Unido"
 ],
 "INVP.L": [
 "Investec",
 "Reino Unido"
 ],
-"EMG.L": [
-"Man",
-"Reino Unido"
-],
-"FRAS.L": [
-"Frasers",
-"Reino Unido"
-],
-"SCT.L": [
-"Softcat",
+"RSW.L": [
+"Renishaw",
 "Reino Unido"
 ],
 "3IN.L": [
 "3i Infrastructure",
+"Reino Unido"
+],
+"SCT.L": [
+"Softcat",
 "Reino Unido"
 ],
 "BPT.L": [
@@ -5820,24 +5800,36 @@
 "RS",
 "Reino Unido"
 ],
-"GGP.L": [
-"Greatland Resources",
-"Reino Unido"
-],
 "HIK.L": [
 "Hikma Pharmaceuticals",
+"Reino Unido"
+],
+"EMG.L": [
+"Man",
 "Reino Unido"
 ],
 "MNDI.L": [
 "Mondi",
 "Reino Unido"
 ],
+"JGGI.L": [
+"JPMorgan Global Growth & Income Ord",
+"Reino Unido"
+],
+"BKG.L": [
+"Berkeley",
+"Reino Unido"
+],
 "IGG.L": [
 "IG",
 "Reino Unido"
 ],
-"JGGI.L": [
-"JPMorgan Global Growth & Income Ord",
+"ROSE.L": [
+"Rosebank Industries",
+"Reino Unido"
+],
+"GGP.L": [
+"Greatland Resources",
 "Reino Unido"
 ],
 "JMAT.L": [
@@ -5848,64 +5840,56 @@
 "City of London Ord",
 "Reino Unido"
 ],
-"ROSE.L": [
-"Rosebank Industries",
-"Reino Unido"
-],
 "RCP.L": [
 "RIT Capital Partners Ord",
-"Reino Unido"
-],
-"BKG.L": [
-"Berkeley",
-"Reino Unido"
-],
-"BME.L": [
-"B&M European Value Retail",
 "Reino Unido"
 ],
 "ENT.L": [
 "Entain",
 "Reino Unido"
 ],
-"TBCG.L": [
-"TBC Bank",
-"Reino Unido"
-],
-"TEM.L": [
-"Templeton Emerging Mkts Invmt Tr TEMIT",
+"TW.L": [
+"Taylor Wimpey",
 "Reino Unido"
 ],
 "CWK.L": [
 "Cranswick",
 "Reino Unido"
 ],
-"TW.L": [
-"Taylor Wimpey",
+"TEM.L": [
+"Templeton Emerging Mkts Invmt Tr TEMIT",
 "Reino Unido"
 ],
-"MTO.L": [
-"Mitie",
+"BME.L": [
+"B&M European Value Retail",
 "Reino Unido"
 ],
-"HOC.L": [
-"Hochschild Mining",
-"Reino Unido"
-],
-"DRX.L": [
-"Drax",
+"OCDO.L": [
+"Ocado",
 "Reino Unido"
 ],
 "SRP.L": [
 "Serco",
 "Reino Unido"
 ],
+"MTO.L": [
+"Mitie",
+"Reino Unido"
+],
+"DRX.L": [
+"Drax",
+"Reino Unido"
+],
 "SHC.L": [
 "Shaftesbury Capital",
 "Reino Unido"
 ],
-"JET2.L": [
-"Jet2",
+"TBCG.L": [
+"TBC Bank",
+"Reino Unido"
+],
+"UKW.L": [
+"Greencoat UK Wind",
 "Reino Unido"
 ],
 "QQ.L": [
@@ -5916,64 +5900,64 @@
 "Tate & Lyle",
 "Reino Unido"
 ],
-"OMU.L": [
-"Old Mutual",
-"Reino Unido"
-],
-"UKW.L": [
-"Greencoat UK Wind",
-"Reino Unido"
-],
-"PAF.L": [
-"Pan African Resources",
-"Reino Unido"
-],
-"INPP.L": [
-"International Public Partnerships",
+"JET2.L": [
+"Jet2",
 "Reino Unido"
 ],
 "HICL.L": [
 "HICL Infrastructure PLC Ord",
 "Reino Unido"
 ],
-"MNKS.L": [
-"Monks Ord",
-"Reino Unido"
-],
-"OCDO.L": [
-"Ocado",
-"Reino Unido"
-],
-"QLT.L": [
-"Quilter",
-"Reino Unido"
-],
-"CAN.L": [
-"Canal+",
-"Reino Unido"
-],
-"ITV.L": [
-"ITV",
-"Reino Unido"
-],
-"PLUS.L": [
-"Plus500",
-"Reino Unido"
-],
-"HILS.L": [
-"Hill & Smith",
-"Reino Unido"
-],
-"PHP.L": [
-"Primary Health Properties",
+"INPP.L": [
+"International Public Partnerships",
 "Reino Unido"
 ],
 "BWY.L": [
 "Bellway",
 "Reino Unido"
 ],
+"QLT.L": [
+"Quilter",
+"Reino Unido"
+],
+"MNKS.L": [
+"Monks Ord",
+"Reino Unido"
+],
+"PHP.L": [
+"Primary Health Properties",
+"Reino Unido"
+],
+"ITV.L": [
+"ITV",
+"Reino Unido"
+],
 "GRG.L": [
 "Greggs",
+"Reino Unido"
+],
+"UTG.L": [
+"Unite",
+"Reino Unido"
+],
+"PLUS.L": [
+"Plus500",
+"Reino Unido"
+],
+"HVPE.L": [
+"HarbourVest Global Private Equity",
+"Reino Unido"
+],
+"AJB.L": [
+"AJ Bell",
+"Reino Unido"
+],
+"GNC.L": [
+"Greencore",
+"Reino Unido"
+],
+"TCAP.L": [
+"TP ICAP",
 "Reino Unido"
 ]
 },
@@ -6014,20 +5998,20 @@
 "Swiss Re",
 "Suiza"
 ],
-"LONN.SW": [
-"Lonza",
-"Suiza"
-],
 "GALD.SW": [
 "Galderma",
 "Suiza"
 ],
-"GIVN.SW": [
-"Givaudan",
+"LONN.SW": [
+"Lonza",
 "Suiza"
 ],
 "HOLN.SW": [
 "Holcim",
+"Suiza"
+],
+"GIVN.SW": [
+"Givaudan",
 "Suiza"
 ],
 "SCMN.SW": [
@@ -6038,20 +6022,20 @@
 "Sandoz",
 "Suiza"
 ],
-"SIKA.SW": [
-"Sika",
-"Suiza"
-],
 "SCHP.SW": [
 "Schindler",
 "Suiza"
 ],
-"KNIN.SW": [
-"Kuehne + Nagel International",
+"SIKA.SW": [
+"Sika",
 "Suiza"
 ],
 "ALC.SW": [
 "Alcon",
+"Suiza"
+],
+"KNIN.SW": [
+"Kuehne + Nagel International",
 "Suiza"
 ],
 "SLHN.SW": [
@@ -6074,10 +6058,6 @@
 "SGS",
 "Suiza"
 ],
-"VACN.SW": [
-"VAT",
-"Suiza"
-],
 "GEBN.SW": [
 "Geberit",
 "Suiza"
@@ -6088,6 +6068,10 @@
 ],
 "SOON.SW": [
 "Sonova",
+"Suiza"
+],
+"VACN.SW": [
+"VAT",
 "Suiza"
 ],
 "PGHN.SW": [
@@ -6114,40 +6098,36 @@
 "Swiss Prime Site",
 "Suiza"
 ],
-"UHR.SW": [
-"Swatch",
-"Suiza"
-],
 "BEAN.SW": [
 "BELIMO",
+"Suiza"
+],
+"UHR.SW": [
+"Swatch",
 "Suiza"
 ],
 "PSPN.SW": [
 "PSP Swiss Property",
 "Suiza"
 ],
-"ACLN.SW": [
-"Accelleron Industries",
-"Suiza"
-],
 "VZN.SW": [
 "VZ",
-"Suiza"
-],
-"BARN.SW": [
-"Barry Callebaut",
 "Suiza"
 ],
 "BKW.SW": [
 "BKW",
 "Suiza"
 ],
-"BANB.SW": [
-"Bachem",
+"BARN.SW": [
+"Barry Callebaut",
 "Suiza"
 ],
 "AVOL.SW": [
 "Avolta",
+"Suiza"
+],
+"BANB.SW": [
+"Bachem",
 "Suiza"
 ],
 "LUKN.SW": [
@@ -6158,6 +6138,10 @@
 "Flughafen Zürich",
 "Suiza"
 ],
+"ACLN.SW": [
+"Accelleron Industries",
+"Suiza"
+],
 "SUN.SW": [
 "Sulzer",
 "Suiza"
@@ -6166,20 +6150,28 @@
 "SFS",
 "Suiza"
 ],
-"SIGN.SW": [
-"SIG",
-"Suiza"
-],
 "SQN.SW": [
 "Swissquote",
 "Suiza"
 ],
-"VONN.SW": [
-"Vontobel",
+"SIGN.SW": [
+"SIG",
 "Suiza"
 ],
 "YPSN.SW": [
 "Ypsomed",
+"Suiza"
+],
+"TEMN.SW": [
+"Temenos",
+"Suiza"
+],
+"DKSH.SW": [
+"DKSH",
+"Suiza"
+],
+"VONN.SW": [
+"Vontobel",
 "Suiza"
 ],
 "EMMN.SW": [
@@ -6190,28 +6182,24 @@
 "EFG International",
 "Suiza"
 ],
-"TEMN.SW": [
-"Temenos",
-"Suiza"
-],
 "GF.SW": [
 "Georg Fischer",
-"Suiza"
-],
-"DKSH.SW": [
-"DKSH",
 "Suiza"
 ],
 "GALE.SW": [
 "Galenica",
 "Suiza"
 ],
+"SGKN.SW": [
+"St. Galler Kantonalbank",
+"Suiza"
+],
 "IFCN.SW": [
 "INFICON",
 "Suiza"
 ],
-"SGKN.SW": [
-"St. Galler Kantonalbank",
+"ADEN.SW": [
+"Adecco",
 "Suiza"
 ],
 "BEKN.SW": [
@@ -6222,10 +6210,6 @@
 "Dottikon ES",
 "Suiza"
 ],
-"ADEN.SW": [
-"Adecco",
-"Suiza"
-],
 "LLBN.SW": [
 "Liechtensteinische Landesbank",
 "Suiza"
@@ -6234,12 +6218,20 @@
 "Clariant",
 "Suiza"
 ],
+"BUCN.SW": [
+"Bucher Industries",
+"Suiza"
+],
 "ZUGER.SW": [
 "Zuger Kantonalbank",
 "Suiza"
 ],
-"BUCN.SW": [
-"Bucher Industries",
+"SFZN.SW": [
+"Siegfried",
+"Suiza"
+],
+"ALLN.SW": [
+"Allreal",
 "Suiza"
 ],
 "SUNN.SW": [
@@ -6250,52 +6242,44 @@
 "Stadler Rail",
 "Suiza"
 ],
-"ALLN.SW": [
-"Allreal",
-"Suiza"
-],
-"SFZN.SW": [
-"Siegfried",
-"Suiza"
-],
 "TECN.SW": [
 "Tecan",
-"Suiza"
-],
-"HUBN.SW": [
-"Huber+Suhner",
 "Suiza"
 ],
 "SMG.SW": [
 "SMG Swiss Marketplace",
 "Suiza"
 ],
-"DOKA.SW": [
-"dormakaba",
+"HUBN.SW": [
+"Huber+Suhner",
 "Suiza"
 ],
-"WKBN.SW": [
-"Walliser Kantonalbank",
+"DOKA.SW": [
+"dormakaba",
 "Suiza"
 ],
 "BION.SW": [
 "BB Biotech",
 "Suiza"
 ],
-"CMBN.SW": [
-"Cembra Money Bank",
-"Suiza"
-],
 "ALSN.SW": [
 "ALSO",
 "Suiza"
 ],
-"MOBN.SW": [
-"Mobimo",
+"WKBN.SW": [
+"Walliser Kantonalbank",
+"Suiza"
+],
+"CMBN.SW": [
+"Cembra Money Bank",
 "Suiza"
 ],
 "COTN.SW": [
 "Comet",
+"Suiza"
+],
+"MOBN.SW": [
+"Mobimo",
 "Suiza"
 ]
 },
@@ -6328,12 +6312,12 @@
 "Nokia",
 "Suecia"
 ],
-"SWED-A.ST": [
-"Swedbank",
-"Suecia"
-],
 "SAND.ST": [
 "Sandvik",
+"Suecia"
+],
+"SWED-A.ST": [
+"Swedbank",
 "Suecia"
 ],
 "SEB-A.ST": [
@@ -6372,48 +6356,48 @@
 "AB Industrivärden",
 "Suecia"
 ],
-"LUMI.ST": [
-"Lundin Mining",
-"Suecia"
-],
-"8TRA.ST": [
-"Traton",
+"TELIA.ST": [
+"Telia",
 "Suecia"
 ],
 "ESSITY-B.ST": [
 "Essity",
 "Suecia"
 ],
-"TELIA.ST": [
-"Telia",
+"8TRA.ST": [
+"Traton",
 "Suecia"
 ],
-"LUG.ST": [
-"Lundin Gold",
+"LUMI.ST": [
+"Lundin Mining",
 "Suecia"
 ],
 "SOBI.ST": [
 "Swedish Orphan Biovitrum",
 "Suecia"
 ],
-"BOL.ST": [
-"Boliden",
-"Suecia"
-],
-"LIFCO-B.ST": [
-"Lifco",
-"Suecia"
-],
 "EVO.ST": [
 "Evolution",
+"Suecia"
+],
+"LUG.ST": [
+"Lundin Gold",
 "Suecia"
 ],
 "LUND-B.ST": [
 "L E Lundbergföretagen",
 "Suecia"
 ],
+"BOL.ST": [
+"Boliden",
+"Suecia"
+],
 "LATO-B.ST": [
 "Investment AB Latour",
+"Suecia"
+],
+"LIFCO-B.ST": [
+"Lifco",
 "Suecia"
 ],
 "SKF-B.ST": [
@@ -6440,6 +6424,10 @@
 "Indutrade",
 "Suecia"
 ],
+"NIBE-B.ST": [
+"NIBE Industrier",
+"Suecia"
+],
 "SECU-B.ST": [
 "Securitas",
 "Suecia"
@@ -6448,28 +6436,24 @@
 "Stora Enso",
 "Suecia"
 ],
-"NIBE-B.ST": [
-"NIBE Industrier",
+"SCA-B.ST": [
+"Svenska Cellulosa Aktiebolaget SCA",
+"Suecia"
+],
+"SAGA-B.ST": [
+"AB Sagax",
 "Suecia"
 ],
 "ADDT-B.ST": [
 "Addtech AB (publ.)",
 "Suecia"
 ],
-"SCA-B.ST": [
-"Svenska Cellulosa Aktiebolaget SCA",
-"Suecia"
-],
-"SAVE.ST": [
-"Nordnet",
-"Suecia"
-],
 "ALIV-SDB.ST": [
 "Autoliv",
 "Suecia"
 ],
-"SAGA-B.ST": [
-"AB Sagax",
+"SAVE.ST": [
+"Nordnet",
 "Suecia"
 ],
 "BEIJ-B.ST": [
@@ -6484,16 +6468,12 @@
 "Sectra",
 "Suecia"
 ],
-"MYCR.ST": [
-"Mycronic",
-"Suecia"
-],
 "AXFO.ST": [
 "Axfood",
 "Suecia"
 ],
-"AZA.ST": [
-"Avanza Bank",
+"MYCR.ST": [
+"Mycronic",
 "Suecia"
 ],
 "CAST.ST": [
@@ -6504,12 +6484,16 @@
 "Fastighets AB Balder",
 "Suecia"
 ],
-"AAK.ST": [
-"AAK AB (publ.)",
+"AZA.ST": [
+"Avanza Bank",
 "Suecia"
 ],
 "SWEC-B.ST": [
 "Sweco",
+"Suecia"
+],
+"AAK.ST": [
+"AAK AB (publ.)",
 "Suecia"
 ],
 "HOLM-B.ST": [
@@ -6522,10 +6506,6 @@
 ],
 "NOBA.ST": [
 "NOBA Bank",
-"Suecia"
-],
-"VOLCAR-B.ST": [
-"Volvo Car AB (publ.)",
 "Suecia"
 ],
 "MCOV-B.ST": [
@@ -6548,76 +6528,80 @@
 "Sinch",
 "Suecia"
 ],
-"PNDX-B.ST": [
-"Pandox",
-"Suecia"
-],
-"BRAV.ST": [
-"Bravida",
-"Suecia"
-],
-"CLAS-B.ST": [
-"Clas Ohlson",
-"Suecia"
-],
 "IPCO.ST": [
 "International Petroleum",
 "Suecia"
 ],
-"ALLEI.ST": [
-"Alleima",
+"VOLCAR-B.ST": [
+"Volvo Car AB (publ.)",
+"Suecia"
+],
+"PNDX-B.ST": [
+"Pandox",
 "Suecia"
 ],
 "ROKO-B.ST": [
 "Röko",
 "Suecia"
 ],
-"HMS.ST": [
-"HMS Networks",
+"CLAS-B.ST": [
+"Clas Ohlson",
 "Suecia"
 ],
-"BUFAB.ST": [
-"Bufab",
+"BRAV.ST": [
+"Bravida",
+"Suecia"
+],
+"ALLEI.ST": [
+"Alleima",
 "Suecia"
 ],
 "ASKER.ST": [
 "Asker Healthcare",
 "Suecia"
 ],
-"PEAB-B.ST": [
-"Peab",
-"Suecia"
-],
 "BIOA-B.ST": [
 "BioArctic",
 "Suecia"
 ],
-"OEM-B.ST": [
-"OEM International",
+"PEAB-B.ST": [
+"Peab",
 "Suecia"
 ],
-"MTRS.ST": [
-"Munters",
+"BUFAB.ST": [
+"Bufab",
 "Suecia"
 ],
 "WALL-B.ST": [
 "Wallenstam",
 "Suecia"
 ],
+"HMS.ST": [
+"HMS Networks",
+"Suecia"
+],
+"MTRS.ST": [
+"Munters",
+"Suecia"
+],
 "CATE.ST": [
 "Catena",
 "Suecia"
 ],
-"ELUX-B.ST": [
-"AB Electrolux",
+"OEM-B.ST": [
+"OEM International",
 "Suecia"
 ],
 "ALIF-B.ST": [
 "AddLife",
 "Suecia"
 ],
-"AQ.ST": [
-"AQ",
+"EKTA-B.ST": [
+"Elekta",
+"Suecia"
+],
+"BURE.ST": [
+"Bure Equity",
 "Suecia"
 ]
 },
@@ -6670,12 +6654,12 @@
 "Pandora",
 "Dinamarca y Noruega"
 ],
-"ALSYDB.CO": [
-"AL Sydbank",
-"Dinamarca y Noruega"
-],
 "JYSK.CO": [
 "Jyske Bank",
+"Dinamarca y Noruega"
+],
+"ALSYDB.CO": [
+"AL Sydbank",
 "Dinamarca y Noruega"
 ],
 "ALK-B.CO": [
@@ -6750,12 +6734,12 @@
 "Embla Medical hf",
 "Dinamarca y Noruega"
 ],
-"DNORD.CO": [
-"Dampskibsselskabet Norden",
-"Dinamarca y Noruega"
-],
 "CHEMM.CO": [
 "ChemoMetec",
+"Dinamarca y Noruega"
+],
+"DNORD.CO": [
+"Dampskibsselskabet Norden",
 "Dinamarca y Noruega"
 ],
 "DFDS.CO": [
@@ -6802,12 +6786,12 @@
 "Telenor",
 "Dinamarca y Noruega"
 ],
-"NHY.OL": [
-"Norsk Hydro",
-"Dinamarca y Noruega"
-],
 "VAR.OL": [
 "Vår Energi",
+"Dinamarca y Noruega"
+],
+"NHY.OL": [
+"Norsk Hydro",
 "Dinamarca y Noruega"
 ],
 "MOWI.OL": [
@@ -6822,16 +6806,20 @@
 "Subsea 7",
 "Dinamarca y Noruega"
 ],
-"AKER.OL": [
-"Aker",
-"Dinamarca y Noruega"
-],
 "ORK.OL": [
 "Orkla",
 "Dinamarca y Noruega"
 ],
+"AKER.OL": [
+"Aker",
+"Dinamarca y Noruega"
+],
 "SB1NO.OL": [
 "SpareBank 1 Sør-Norge",
+"Dinamarca y Noruega"
+],
+"SALM.OL": [
+"SalMar",
 "Dinamarca y Noruega"
 ],
 "STB.OL": [
@@ -6842,14 +6830,6 @@
 "Wallenius Wilhelmsen",
 "Dinamarca y Noruega"
 ],
-"SALM.OL": [
-"SalMar",
-"Dinamarca y Noruega"
-],
-"AUTO.OL": [
-"AutoStore",
-"Dinamarca y Noruega"
-],
 "HAFNI.OL": [
 "Hafnia",
 "Dinamarca y Noruega"
@@ -6858,16 +6838,12 @@
 "Cmb.Tech",
 "Dinamarca y Noruega"
 ],
+"AUTO.OL": [
+"AutoStore",
+"Dinamarca y Noruega"
+],
 "VEND.OL": [
 "Vend Marketplaces",
-"Dinamarca y Noruega"
-],
-"WWI.OL": [
-"Wilh. Wilhelmsen",
-"Dinamarca y Noruega"
-],
-"HAUTO.OL": [
-"Höegh Autoliners",
 "Dinamarca y Noruega"
 ],
 "PROT.OL": [
@@ -6878,16 +6854,24 @@
 "BW LPG",
 "Dinamarca y Noruega"
 ],
+"HAUTO.OL": [
+"Höegh Autoliners",
+"Dinamarca y Noruega"
+],
+"WWI.OL": [
+"Wilh. Wilhelmsen",
+"Dinamarca y Noruega"
+],
+"OET.OL": [
+"Okeanis Eco Tankers",
+"Dinamarca y Noruega"
+],
 "SBNOR.OL": [
 "Sparebanken Norge",
 "Dinamarca y Noruega"
 ],
 "NOD.OL": [
 "Nordic Semiconductor",
-"Dinamarca y Noruega"
-],
-"OET.OL": [
-"Okeanis Eco Tankers",
 "Dinamarca y Noruega"
 ],
 "DOFG.OL": [
@@ -6898,48 +6882,48 @@
 "Veidekke",
 "Dinamarca y Noruega"
 ],
-"TGS.OL": [
-"TGS",
-"Dinamarca y Noruega"
-],
 "TOM.OL": [
 "Tomra Systems",
-"Dinamarca y Noruega"
-],
-"CAPT.OL": [
-"Capital Tankers",
 "Dinamarca y Noruega"
 ],
 "BAKKA.OL": [
 "P/F Bakkafrost",
 "Dinamarca y Noruega"
 ],
-"ODL.OL": [
-"Odfjell Drilling",
+"TGS.OL": [
+"TGS",
+"Dinamarca y Noruega"
+],
+"CAPT.OL": [
+"Capital Tankers",
 "Dinamarca y Noruega"
 ],
 "LSG.OL": [
 "Lerøy Seafood",
 "Dinamarca y Noruega"
 ],
-"SWON.OL": [
-"SoftwareOne",
+"ODL.OL": [
+"Odfjell Drilling",
 "Dinamarca y Noruega"
 ],
-"KIT.OL": [
-"Kitron",
+"CADLR.OL": [
+"Cadeler",
 "Dinamarca y Noruega"
 ],
 "DNO.OL": [
 "DNO",
 "Dinamarca y Noruega"
 ],
+"SWON.OL": [
+"SoftwareOne",
+"Dinamarca y Noruega"
+],
 "AFG.OL": [
 "AF Gruppen",
 "Dinamarca y Noruega"
 ],
-"CADLR.OL": [
-"Cadeler",
+"ATEA.OL": [
+"Atea",
 "Dinamarca y Noruega"
 ]
 },
@@ -6952,32 +6936,32 @@
 "Toyota Motor",
 "Japón"
 ],
-"9984.T": [
-"SoftBank",
+"6098.T": [
+"Recruit",
 "Japón"
 ],
 "6501.T": [
 "Hitachi",
 "Japón"
 ],
-"6098.T": [
-"Recruit",
+"9984.T": [
+"SoftBank",
 "Japón"
 ],
-"6857.T": [
-"Advantest",
+"6758.T": [
+"Sony",
 "Japón"
 ],
 "8316.T": [
 "Sumitomo Mitsui Financial",
 "Japón"
 ],
-"9983.T": [
-"Fast Retailing",
+"6857.T": [
+"Advantest",
 "Japón"
 ],
-"6758.T": [
-"Sony",
+"9983.T": [
+"Fast Retailing",
 "Japón"
 ],
 "6861.T": [
@@ -6996,12 +6980,12 @@
 "ITOCHU",
 "Japón"
 ],
-"8031.T": [
-"Mitsui",
-"Japón"
-],
 "9432.T": [
 "NTT",
+"Japón"
+],
+"8031.T": [
+"Mitsui",
 "Japón"
 ],
 "2914.T": [
@@ -7016,24 +7000,20 @@
 "Murata Manufacturing",
 "Japón"
 ],
-"7182.T": [
-"JAPAN POST BANK",
-"Japón"
-],
-"4063.T": [
-"Shin-Etsu Chemical",
+"4519.T": [
+"Chugai Pharmaceutical",
 "Japón"
 ],
 "9433.T": [
 "KDDI",
 "Japón"
 ],
-"4519.T": [
-"Chugai Pharmaceutical",
+"4063.T": [
+"Shin-Etsu Chemical",
 "Japón"
 ],
-"6503.T": [
-"Mitsubishi Electric",
+"7182.T": [
+"JAPAN POST BANK",
 "Japón"
 ],
 "4502.T": [
@@ -7044,28 +7024,28 @@
 "Nintendo",
 "Japón"
 ],
-"6752.T": [
-"Panasonic",
+"6503.T": [
+"Mitsubishi Electric",
 "Japón"
 ],
 "7741.T": [
 "HOYA",
 "Japón"
 ],
-"8053.T": [
-"Sumitomo",
+"6752.T": [
+"Panasonic",
 "Japón"
 ],
 "8002.T": [
 "Marubeni",
 "Japón"
 ],
-"6702.T": [
-"Fujitsu",
+"8053.T": [
+"Sumitomo",
 "Japón"
 ],
-"5803.T": [
-"Fujikura",
+"6702.T": [
+"Fujitsu",
 "Japón"
 ],
 "8725.T": [
@@ -7076,52 +7056,56 @@
 "NEC",
 "Japón"
 ],
-"285A.T": [
-"Kioxia",
-"Japón"
-],
 "7267.T": [
 "Honda Motor",
+"Japón"
+],
+"285A.T": [
+"Kioxia",
 "Japón"
 ],
 "8015.T": [
 "Toyota Tsusho",
 "Japón"
 ],
-"8750.T": [
-"Daiichi Life",
+"5803.T": [
+"Fujikura",
 "Japón"
 ],
-"5802.T": [
-"Sumitomo Electric Industries",
+"8750.T": [
+"Daiichi Life",
 "Japón"
 ],
 "4578.T": [
 "Otsuka",
 "Japón"
 ],
-"6301.T": [
-"Komatsu",
+"8630.T": [
+"Sompo",
 "Japón"
 ],
 "8591.T": [
 "ORIX",
 "Japón"
 ],
-"8630.T": [
-"Sompo",
+"6301.T": [
+"Komatsu",
 "Japón"
 ],
 "6367.T": [
 "Daikin Industries,Ltd",
 "Japón"
 ],
-"6146.T": [
-"Disco",
+"5802.T": [
+"Sumitomo Electric Industries",
 "Japón"
 ],
-"6762.T": [
-"TDK",
+"4661.T": [
+"Oriental Land",
+"Japón"
+],
+"6146.T": [
+"Disco",
 "Japón"
 ],
 "6723.T": [
@@ -7132,96 +7116,88 @@
 "Fanuc",
 "Japón"
 ],
-"4062.T": [
-"Ibiden Co.,Ltd",
-"Japón"
-],
-"8308.T": [
-"Resona",
-"Japón"
-],
-"4661.T": [
-"Oriental Land",
-"Japón"
-],
-"2802.T": [
-"Ajinomoto Co",
-"Japón"
-],
 "4568.T": [
 "Daiichi Sankyo",
+"Japón"
+],
+"6762.T": [
+"TDK",
 "Japón"
 ],
 "5108.T": [
 "Bridgestone",
 "Japón"
 ],
-"8035.T": [
-"Tokyo Electron",
+"4062.T": [
+"Ibiden Co.,Ltd",
 "Japón"
 ],
-"6902.T": [
-"DENSO",
+"2802.T": [
+"Ajinomoto Co",
 "Japón"
 ],
 "3382.T": [
 "Seven & i",
 "Japón"
 ],
-"6971.T": [
-"Kyocera",
+"8308.T": [
+"Resona",
 "Japón"
 ],
 "8802.T": [
 "Mitsubishi Estate",
 "Japón"
 ],
-"4503.T": [
-"Astellas Pharma",
+"6902.T": [
+"DENSO",
 "Japón"
 ],
-"8604.T": [
-"Nomura",
+"4503.T": [
+"Astellas Pharma",
 "Japón"
 ],
 "1605.T": [
 "Inpex",
 "Japón"
 ],
-"6273.T": [
-"SMC",
+"6971.T": [
+"Kyocera",
 "Japón"
 ],
-"4901.T": [
-"FUJIFILM",
-"Japón"
-],
-"7269.T": [
-"Suzuki Motor",
+"8035.T": [
+"Tokyo Electron",
 "Japón"
 ],
 "8801.T": [
 "Mitsui Fudosan",
 "Japón"
 ],
-"7832.T": [
-"BANDAI NAMCO",
-"Japón"
-],
-"7751.T": [
-"Canon",
+"8604.T": [
+"Nomura",
 "Japón"
 ],
 "9020.T": [
 "East Japan Railway",
 "Japón"
 ],
-"6920.T": [
-"Lasertec",
+"7751.T": [
+"Canon",
 "Japón"
 ],
-"4689.T": [
-"LY",
+"4901.T": [
+"FUJIFILM",
+"Japón"
+],
+"7832.T": [
+"BANDAI NAMCO",
+"Japón"
+],
+"7269.T": [
+"Suzuki Motor",
+"Japón"
+],
+"6273.T": [
+"SMC",
 "Japón"
 ],
 "5020.T": [
@@ -7232,28 +7208,36 @@
 "Central Japan Railway",
 "Japón"
 ],
+"4689.T": [
+"LY",
+"Japón"
+],
 "4543.T": [
 "Terumo",
 "Japón"
 ],
-"9766.T": [
-"Konami",
-"Japón"
-],
-"4452.T": [
-"Kao",
+"4307.T": [
+"Nomura Research Institute",
 "Japón"
 ],
 "7936.T": [
 "ASICS",
 "Japón"
 ],
+"4452.T": [
+"Kao",
+"Japón"
+],
 "5401.T": [
 "Nippon Steel",
 "Japón"
 ],
-"4307.T": [
-"Nomura Research Institute",
+"6920.T": [
+"Lasertec",
+"Japón"
+],
+"9766.T": [
+"Konami",
 "Japón"
 ],
 "8267.T": [
@@ -7264,6 +7248,10 @@
 "Sumitomo Realty & Development",
 "Japón"
 ],
+"9503.T": [
+"Kansai Electric Power",
+"Japón"
+],
 "6326.T": [
 "Kubota",
 "Japón"
@@ -7272,76 +7260,72 @@
 "Nippon Paint",
 "Japón"
 ],
-"9503.T": [
-"Kansai Electric Power",
-"Japón"
-],
 "9101.T": [
 "Nippon Yusen Kabushiki Kaisha",
-"Japón"
-],
-"4004.T": [
-"Resonac",
-"Japón"
-],
-"5016.T": [
-"JX Advanced Metals",
 "Japón"
 ],
 "1925.T": [
 "Daiwa House Industry",
 "Japón"
 ],
-"7013.T": [
-"IHI",
-"Japón"
-],
 "9735.T": [
 "SECOM",
 "Japón"
 ],
-"7735.T": [
-"SCREEN",
-"Japón"
-],
-"9104.T": [
-"Mitsui O.S.K. Lines",
-"Japón"
-],
-"7453.T": [
-"Ryohin Keikaku",
+"7013.T": [
+"IHI",
 "Japón"
 ],
 "4507.T": [
 "Shionogi",
 "Japón"
 ],
+"5016.T": [
+"JX Advanced Metals",
+"Japón"
+],
 "4684.T": [
 "OBIC Co.,Ltd",
 "Japón"
 ],
-"8601.T": [
-"Daiwa Securities",
+"7453.T": [
+"Ryohin Keikaku",
 "Japón"
 ],
-"5838.T": [
-"Rakuten Bank",
-"Japón"
-],
-"6988.T": [
-"Nitto Denko",
+"9104.T": [
+"Mitsui O.S.K. Lines",
 "Japón"
 ],
 "2502.T": [
 "Asahi",
 "Japón"
 ],
-"5801.T": [
-"Furukawa Electric",
+"4004.T": [
+"Resonac",
+"Japón"
+],
+"8601.T": [
+"Daiwa Securities",
+"Japón"
+],
+"2503.T": [
+"Kirin",
+"Japón"
+],
+"6988.T": [
+"Nitto Denko",
+"Japón"
+],
+"5838.T": [
+"Rakuten Bank",
 "Japón"
 ],
 "4091.T": [
 "Nippon Sanso",
+"Japón"
+],
+"8795.T": [
+"T&D",
 "Japón"
 ]
 },
@@ -7370,16 +7354,16 @@
 "Alibaba",
 "China y Hong Kong"
 ],
-"3750.HK": [
-"Contemporary Amperex Technology Co",
-"China y Hong Kong"
-],
 "0857.HK": [
 "PetroChina",
 "China y Hong Kong"
 ],
 "0941.HK": [
 "China Mobile",
+"China y Hong Kong"
+],
+"3750.HK": [
+"Contemporary Amperex Technology Co",
 "China y Hong Kong"
 ],
 "3968.HK": [
@@ -7390,16 +7374,16 @@
 "CNOOC",
 "China y Hong Kong"
 ],
+"2318.HK": [
+"Ping An Insurance (Group) Company of China",
+"China y Hong Kong"
+],
 "3308.HK": [
 "Zhongji Innolight",
 "China y Hong Kong"
 ],
 "1088.HK": [
 "China Shenhua Energy",
-"China y Hong Kong"
-],
-"2318.HK": [
-"Ping An Insurance (Group) Company of China",
 "China y Hong Kong"
 ],
 "2899.HK": [
@@ -7418,12 +7402,12 @@
 "Xiaomi",
 "China y Hong Kong"
 ],
-"1211.HK": [
-"BYD",
-"China y Hong Kong"
-],
 "2628.HK": [
 "China Life Insurance",
+"China y Hong Kong"
+],
+"1211.HK": [
+"BYD",
 "China y Hong Kong"
 ],
 "1658.HK": [
@@ -7446,28 +7430,24 @@
 "BOC Hong Kong (Holdings)",
 "China y Hong Kong"
 ],
-"2888.HK": [
-"Standard Chartered",
-"China y Hong Kong"
-],
-"2723.HK": [
-"Beijing DeepZero Technology",
-"China y Hong Kong"
-],
 "0388.HK": [
 "Hong Kong Exchanges and Clearing",
 "China y Hong Kong"
 ],
-"3690.HK": [
-"Meituan",
+"9633.HK": [
+"Nongfu Spring",
 "China y Hong Kong"
 ],
 "0998.HK": [
 "China CITIC Bank",
 "China y Hong Kong"
 ],
-"9633.HK": [
-"Nongfu Spring",
+"2888.HK": [
+"Standard Chartered",
+"China y Hong Kong"
+],
+"3690.HK": [
+"Meituan",
 "China y Hong Kong"
 ],
 "0981.HK": [
@@ -7478,8 +7458,8 @@
 "China Telecom",
 "China y Hong Kong"
 ],
-"2259.HK": [
-"Zijin Gold International",
+"2475.HK": [
+"Luxshare Precision Industry",
 "China y Hong Kong"
 ],
 "0019.HK": [
@@ -7490,18 +7470,6 @@
 "CITIC",
 "China y Hong Kong"
 ],
-"6030.HK": [
-"CITIC Securities",
-"China y Hong Kong"
-],
-"2475.HK": [
-"Luxshare Precision Industry",
-"China y Hong Kong"
-],
-"0992.HK": [
-"Lenovo",
-"China y Hong Kong"
-],
 "2328.HK": [
 "PICC Property and Casualty",
 "China y Hong Kong"
@@ -7510,24 +7478,32 @@
 "BeOne Medicines",
 "China y Hong Kong"
 ],
-"1276.HK": [
-"Jiangsu Hengrui Pharmaceuticals Co.,Ltd",
+"6030.HK": [
+"CITIC Securities",
 "China y Hong Kong"
 ],
-"3993.HK": [
-"CMOC",
+"2259.HK": [
+"Zijin Gold International",
+"China y Hong Kong"
+],
+"1276.HK": [
+"Jiangsu Hengrui Pharmaceuticals Co.,Ltd",
 "China y Hong Kong"
 ],
 "0016.HK": [
 "Sun Hung Kai Properties",
 "China y Hong Kong"
 ],
-"9618.HK": [
-"JD.com",
+"0992.HK": [
+"Lenovo",
 "China y Hong Kong"
 ],
-"1919.HK": [
-"COSCO SHIPPING",
+"3993.HK": [
+"CMOC",
+"China y Hong Kong"
+],
+"9618.HK": [
+"JD.com",
 "China y Hong Kong"
 ],
 "6809.HK": [
@@ -7538,20 +7514,24 @@
 "China Pacific Insurance (Group)",
 "China y Hong Kong"
 ],
-"2611.HK": [
-"Guotai Haitong Securities",
+"0001.HK": [
+"CK Hutchison",
+"China y Hong Kong"
+],
+"1919.HK": [
+"COSCO SHIPPING",
+"China y Hong Kong"
+],
+"3986.HK": [
+"GigaDevice Semiconductor",
 "China y Hong Kong"
 ],
 "2513.HK": [
 "Z.AI",
 "China y Hong Kong"
 ],
-"0001.HK": [
-"CK Hutchison",
-"China y Hong Kong"
-],
-"3986.HK": [
-"GigaDevice Semiconductor",
+"2611.HK": [
+"Guotai Haitong Securities",
 "China y Hong Kong"
 ],
 "0669.HK": [
@@ -7562,32 +7542,32 @@
 "People's Insurance Company (Group) of China",
 "China y Hong Kong"
 ],
-"1109.HK": [
-"China Resources Land",
+"2714.HK": [
+"Muyuan Foods",
 "China y Hong Kong"
 ],
 "2338.HK": [
 "Weichai Power",
 "China y Hong Kong"
 ],
-"9888.HK": [
-"Baidu",
+"1109.HK": [
+"China Resources Land",
 "China y Hong Kong"
 ],
 "2020.HK": [
 "ANTA Sports Products",
 "China y Hong Kong"
 ],
-"2714.HK": [
-"Muyuan Foods",
+"9888.HK": [
+"Baidu",
 "China y Hong Kong"
 ],
 "0066.HK": [
 "MTR",
 "China y Hong Kong"
 ],
-"2269.HK": [
-"WuXi Biologics (Cayman)",
+"3692.HK": [
+"Hansoh Pharmaceutical",
 "China y Hong Kong"
 ],
 "9961.HK": [
@@ -7598,36 +7578,20 @@
 "CLP",
 "China y Hong Kong"
 ],
-"6951.HK": [
-"Chaozhou Three-Circle (Group) Co.,Ltd",
+"2269.HK": [
+"WuXi Biologics (Cayman)",
 "China y Hong Kong"
 ],
 "1378.HK": [
 "China Hongqiao",
 "China y Hong Kong"
 ],
-"3692.HK": [
-"Hansoh Pharmaceutical",
-"China y Hong Kong"
-],
-"9992.HK": [
-"Pop Mart International",
-"China y Hong Kong"
-],
 "6690.HK": [
 "Haier Smart Home",
 "China y Hong Kong"
 ],
-"6869.HK": [
-"Yangtze Optical Fibre And Cable Joint Stock",
-"China y Hong Kong"
-],
-"1347.HK": [
-"Hua Hong Grace Semiconductor",
-"China y Hong Kong"
-],
-"0762.HK": [
-"China Unicom (Hong Kong)",
+"9992.HK": [
+"Pop Mart International",
 "China y Hong Kong"
 ],
 "1038.HK": [
@@ -7638,8 +7602,32 @@
 "CGN Power",
 "China y Hong Kong"
 ],
+"6951.HK": [
+"Chaozhou Three-Circle (Group) Co.,Ltd",
+"China y Hong Kong"
+],
+"6869.HK": [
+"Yangtze Optical Fibre And Cable Joint Stock",
+"China y Hong Kong"
+],
+"0762.HK": [
+"China Unicom (Hong Kong)",
+"China y Hong Kong"
+],
+"1347.HK": [
+"Hua Hong Grace Semiconductor",
+"China y Hong Kong"
+],
+"3288.HK": [
+"Foshan Haitian Flavouring and Food",
+"China y Hong Kong"
+],
 "6818.HK": [
 "China Everbright Bank",
+"China y Hong Kong"
+],
+"1113.HK": [
+"CK Asset",
 "China y Hong Kong"
 ],
 "0175.HK": [
@@ -7650,20 +7638,16 @@
 "China Tower",
 "China y Hong Kong"
 ],
-"2423.HK": [
-"KE",
-"China y Hong Kong"
-],
-"1113.HK": [
-"CK Asset",
+"6031.HK": [
+"Sany Heavy Industry Co.,Ltd",
 "China y Hong Kong"
 ],
 "1766.HK": [
 "CRRC",
 "China y Hong Kong"
 ],
-"1801.HK": [
-"Innovent Biologics",
+"2423.HK": [
+"KE",
 "China y Hong Kong"
 ]
 },
@@ -7704,24 +7688,24 @@
 "Samsung C&T",
 "Corea del Sur y Taiwán"
 ],
-"012450.KS": [
-"Hanwha Aerospace",
-"Corea del Sur y Taiwán"
-],
 "068270.KS": [
 "Celltrion",
 "Corea del Sur y Taiwán"
 ],
-"055550.KS": [
-"Shinhan Financial",
+"032830.KS": [
+"Samsung Life Insurance",
 "Corea del Sur y Taiwán"
 ],
 "000270.KS": [
 "Kia",
 "Corea del Sur y Taiwán"
 ],
-"032830.KS": [
-"Samsung Life Insurance",
+"055550.KS": [
+"Shinhan Financial",
+"Corea del Sur y Taiwán"
+],
+"012450.KS": [
+"Hanwha Aerospace",
 "Corea del Sur y Taiwán"
 ],
 "006400.KS": [
@@ -7752,16 +7736,16 @@
 "NAVER",
 "Corea del Sur y Taiwán"
 ],
-"096770.KS": [
-"SK Innovation",
-"Corea del Sur y Taiwán"
-],
 "000810.KS": [
 "Samsung Fire & Marine Insurance",
 "Corea del Sur y Taiwán"
 ],
 "034730.KS": [
 "SK",
+"Corea del Sur y Taiwán"
+],
+"096770.KS": [
+"SK Innovation",
 "Corea del Sur y Taiwán"
 ],
 "010120.KS": [
@@ -7772,36 +7756,28 @@
 "Woori Financial",
 "Corea del Sur y Taiwán"
 ],
-"005490.KS": [
-"POSCO",
-"Corea del Sur y Taiwán"
-],
 "011200.KS": [
 "HMM Co.,Ltd",
+"Corea del Sur y Taiwán"
+],
+"005490.KS": [
+"POSCO",
 "Corea del Sur y Taiwán"
 ],
 "138040.KS": [
 "Meritz Financial",
 "Corea del Sur y Taiwán"
 ],
-"042700.KS": [
-"HANMI Semiconductor",
-"Corea del Sur y Taiwán"
-],
-"042660.KS": [
-"Hanwha Ocean",
-"Corea del Sur y Taiwán"
-],
-"051910.KS": [
-"LG Chem",
-"Corea del Sur y Taiwán"
-],
 "033780.KS": [
 "KT&G",
 "Corea del Sur y Taiwán"
 ],
-"010130.KS": [
-"Korea Zinc",
+"042700.KS": [
+"HANMI Semiconductor",
+"Corea del Sur y Taiwán"
+],
+"051910.KS": [
+"LG Chem",
 "Corea del Sur y Taiwán"
 ],
 "009540.KS": [
@@ -7812,8 +7788,16 @@
 "Hyosung Heavy Industries",
 "Corea del Sur y Taiwán"
 ],
-"010950.KS": [
-"S-Oil",
+"010130.KS": [
+"Korea Zinc",
+"Corea del Sur y Taiwán"
+],
+"042660.KS": [
+"Hanwha Ocean",
+"Corea del Sur y Taiwán"
+],
+"018260.KS": [
+"Samsung SDS",
 "Corea del Sur y Taiwán"
 ],
 "000150.KS": [
@@ -7824,8 +7808,8 @@
 "SK Telecom",
 "Corea del Sur y Taiwán"
 ],
-"003550.KS": [
-"LG",
+"024110.KS": [
+"Industrial Bank of Korea",
 "Corea del Sur y Taiwán"
 ],
 "2330.TW": [
@@ -7872,12 +7856,12 @@
 "United Microelectronics",
 "Corea del Sur y Taiwán"
 ],
-"2408.TW": [
-"Nanya Technology",
-"Corea del Sur y Taiwán"
-],
 "2891.TW": [
 "CTBC Financial",
+"Corea del Sur y Taiwán"
+],
+"2408.TW": [
+"Nanya Technology",
 "Corea del Sur y Taiwán"
 ],
 "2382.TW": [
@@ -7892,36 +7876,32 @@
 "Chunghwa Telecom",
 "Corea del Sur y Taiwán"
 ],
-"2327.TW": [
-"Yageo",
-"Corea del Sur y Taiwán"
-],
-"6505.TW": [
-"Formosa Petrochemical",
-"Corea del Sur y Taiwán"
-],
-"2345.TW": [
-"Accton Technology",
-"Corea del Sur y Taiwán"
-],
 "2887.TW": [
 "TS Financial",
+"Corea del Sur y Taiwán"
+],
+"2327.TW": [
+"Yageo",
 "Corea del Sur y Taiwán"
 ],
 "6669.TW": [
 "Wiwynn",
 "Corea del Sur y Taiwán"
 ],
-"2885.TW": [
-"Yuanta Financial",
-"Corea del Sur y Taiwán"
-],
 "3443.TW": [
 "Global Unichip",
 "Corea del Sur y Taiwán"
 ],
-"3653.TW": [
-"Jentech Precision Industrial",
+"6505.TW": [
+"Formosa Petrochemical",
+"Corea del Sur y Taiwán"
+],
+"2885.TW": [
+"Yuanta Financial",
+"Corea del Sur y Taiwán"
+],
+"2345.TW": [
+"Accton Technology",
 "Corea del Sur y Taiwán"
 ],
 "7769.TW": [
@@ -7932,6 +7912,10 @@
 "King Slide Works",
 "Corea del Sur y Taiwán"
 ],
+"3653.TW": [
+"Jentech Precision Industrial",
+"Corea del Sur y Taiwán"
+],
 "2884.TW": [
 "E.SUN Financial",
 "Corea del Sur y Taiwán"
@@ -7940,12 +7924,16 @@
 "Chroma ATE",
 "Corea del Sur y Taiwán"
 ],
+"2886.TW": [
+"Mega Financial",
+"Corea del Sur y Taiwán"
+],
 "3008.TW": [
 "Largan Precision",
 "Corea del Sur y Taiwán"
 ],
-"2886.TW": [
-"Mega Financial",
+"2880.TW": [
+"Hua Nan Financial",
 "Corea del Sur y Taiwán"
 ],
 "2357.TW": [
@@ -7956,36 +7944,32 @@
 "Winbond Electronics",
 "Corea del Sur y Taiwán"
 ],
-"2880.TW": [
-"Hua Nan Financial",
-"Corea del Sur y Taiwán"
-],
 "2890.TW": [
 "SinoPac Financial",
-"Corea del Sur y Taiwán"
-],
-"2883.TW": [
-"KGI Financial",
-"Corea del Sur y Taiwán"
-],
-"2368.TW": [
-"Gold Circuit Electronics",
 "Corea del Sur y Taiwán"
 ],
 "3231.TW": [
 "Wistron",
 "Corea del Sur y Taiwán"
 ],
+"2883.TW": [
+"KGI Financial",
+"Corea del Sur y Taiwán"
+],
 "4958.TW": [
 "Zhen Ding Technology",
 "Corea del Sur y Taiwán"
 ],
-"2301.TW": [
-"Lite-On Technology",
-"Corea del Sur y Taiwán"
-],
 "2892.TW": [
 "First Financial",
+"Corea del Sur y Taiwán"
+],
+"2395.TW": [
+"Advantech",
+"Corea del Sur y Taiwán"
+],
+"2301.TW": [
+"Lite-On Technology",
 "Corea del Sur y Taiwán"
 ]
 },
@@ -8010,12 +7994,12 @@
 "Bajaj Finance",
 "India"
 ],
-"LICI.NS": [
-"Life Insurance Corporation of India",
-"India"
-],
 "LT.NS": [
 "Larsen & Toubro",
+"India"
+],
+"LICI.NS": [
+"Life Insurance Corporation of India",
 "India"
 ],
 "INFY.NS": [
@@ -8038,48 +8022,44 @@
 "Adani Ports and Special Economic Zone",
 "India"
 ],
-"AXISBANK.NS": [
-"Axis Bank",
+"HCLTECH.NS": [
+"HCL Technologies",
 "India"
 ],
 "TITAN.NS": [
 "Titan",
 "India"
 ],
-"ADANIPOWER.NS": [
-"Adani Power",
-"India"
-],
-"HCLTECH.NS": [
-"HCL Technologies",
-"India"
-],
-"ADANIENT.NS": [
-"Adani Enterprises",
+"AXISBANK.NS": [
+"Axis Bank",
 "India"
 ],
 "MARUTI.NS": [
 "Maruti Suzuki India",
 "India"
 ],
+"ADANIPOWER.NS": [
+"Adani Power",
+"India"
+],
 "M&M.NS": [
 "Mahindra & Mahindra",
 "India"
 ],
-"HAL.NS": [
-"Hindustan Aeronautics",
-"India"
-],
-"ITC.NS": [
-"ITC",
+"ADANIENT.NS": [
+"Adani Enterprises",
 "India"
 ],
 "ULTRACEMCO.NS": [
 "UltraTech Cement",
 "India"
 ],
-"NTPC.NS": [
-"NTPC",
+"ITC.NS": [
+"ITC",
+"India"
+],
+"HAL.NS": [
+"Hindustan Aeronautics",
 "India"
 ],
 "ETERNAL.NS": [
@@ -8090,12 +8070,16 @@
 "JSW Steel",
 "India"
 ],
-"BAJAJ-AUTO.NS": [
-"Bajaj Auto",
+"NTPC.NS": [
+"NTPC",
 "India"
 ],
 "ONGC.NS": [
 "Oil and Natural Gas",
+"India"
+],
+"BAJAJ-AUTO.NS": [
+"Bajaj Auto",
 "India"
 ],
 "BAJAJFINSV.NS": [
@@ -8110,10 +8094,6 @@
 "Coal India",
 "India"
 ],
-"NESTLEIND.NS": [
-"Nestlé India",
-"India"
-],
 "DIVISLAB.NS": [
 "Divi's Laboratories",
 "India"
@@ -8122,16 +8102,16 @@
 "Power Grid Corporation of India",
 "India"
 ],
-"HINDZINC.NS": [
-"Hindustan Zinc",
+"NESTLEIND.NS": [
+"Nestlé India",
 "India"
 ],
 "ASIANPAINT.NS": [
 "Asian Paints",
 "India"
 ],
-"SHRIRAMFIN.NS": [
-"Shriram Finance",
+"HINDZINC.NS": [
+"Hindustan Zinc",
 "India"
 ],
 "TATASTEEL.NS": [
@@ -8140,6 +8120,14 @@
 ],
 "DMART.NS": [
 "Avenue Supermarts",
+"India"
+],
+"SHRIRAMFIN.NS": [
+"Shriram Finance",
+"India"
+],
+"GRASIM.NS": [
+"Grasim Industries",
 "India"
 ],
 "ADANIGREEN.NS": [
@@ -8154,10 +8142,6 @@
 "Eicher Motors",
 "India"
 ],
-"GRASIM.NS": [
-"Grasim Industries",
-"India"
-],
 "WIPRO.NS": [
 "Wipro",
 "India"
@@ -8166,68 +8150,68 @@
 "InterGlobe Aviation",
 "India"
 ],
-"SOLARINDS.NS": [
-"Solar Industries India",
+"TECHM.NS": [
+"Tech Mahindra",
 "India"
 ],
 "TORNTPHARM.NS": [
 "Torrent Pharmaceuticals",
 "India"
 ],
-"MOTHERSON.NS": [
-"Samvardhana Motherson International",
-"India"
-],
-"DLF.NS": [
-"DLF",
-"India"
-],
-"ADANIENSOL.NS": [
-"Adani Energy Solutions",
+"SOLARINDS.NS": [
+"Solar Industries India",
 "India"
 ],
 "SBILIFE.NS": [
 "SBI Life Insurance",
 "India"
 ],
-"HYUNDAI.NS": [
-"Hyundai Motor India",
+"DLF.NS": [
+"DLF",
 "India"
 ],
-"TECHM.NS": [
-"Tech Mahindra",
-"India"
-],
-"TRENT.NS": [
-"Trent",
-"India"
-],
-"TMCV.NS": [
-"Tata Motors",
+"MOTHERSON.NS": [
+"Samvardhana Motherson International",
 "India"
 ],
 "PIDILITIND.NS": [
 "Pidilite Industries",
 "India"
 ],
-"BHEL.NS": [
-"Bharat Heavy Electricals",
+"HYUNDAI.NS": [
+"Hyundai Motor India",
 "India"
 ],
-"VBL.NS": [
-"Varun Beverages",
+"ADANIENSOL.NS": [
+"Adani Energy Solutions",
 "India"
 ],
-"VAML.NS": [
-"Vedanta Aluminium Metal",
+"TMCV.NS": [
+"Tata Motors",
 "India"
 ],
-"ABB.NS": [
-"ABB India",
+"TRENT.NS": [
+"Trent",
+"India"
+],
+"PNB.NS": [
+"Punjab National Bank",
+"India"
+],
+"UNIONBANK.NS": [
+"Union Bank of India",
 "India"
 ],
 "JIOFIN.NS": [
 "Jio Financial Services",
+"India"
+],
+"BHEL.NS": [
+"Bharat Heavy Electricals",
+"India"
+],
+"VAML.NS": [
+"Vedanta Aluminium Metal",
 "India"
 ]
 },
@@ -8244,12 +8228,12 @@
 "Rio Tinto",
 "Australia"
 ],
-"GLC.AX": [
-"Glencore",
-"Australia"
-],
 "WBC.AX": [
 "Westpac Banking",
+"Australia"
+],
+"GLC.AX": [
+"Glencore",
 "Australia"
 ],
 "CSL.AX": [
@@ -8264,20 +8248,20 @@
 "Woodside Energy",
 "Australia"
 ],
-"GMG.AX": [
-"Goodman",
-"Australia"
-],
 "TLS.AX": [
 "Telstra",
 "Australia"
 ],
-"FMG.AX": [
-"Fortescue",
+"GMG.AX": [
+"Goodman",
 "Australia"
 ],
 "TCL.AX": [
 "Transurban",
+"Australia"
+],
+"FMG.AX": [
+"Fortescue",
 "Australia"
 ],
 "QBE.AX": [
@@ -8292,10 +8276,6 @@
 "Northern Star Resources",
 "Australia"
 ],
-"SIG.AX": [
-"Sigma Healthcare",
-"Australia"
-],
 "COL.AX": [
 "Coles",
 "Australia"
@@ -8304,20 +8284,28 @@
 "SGH",
 "Australia"
 ],
-"BXB.AX": [
-"Brambles",
+"SIG.AX": [
+"Sigma Healthcare",
 "Australia"
 ],
-"EVN.AX": [
-"Evolution Mining",
+"BXB.AX": [
+"Brambles",
 "Australia"
 ],
 "FPH.AX": [
 "Fisher & Paykel Healthcare",
 "Australia"
 ],
+"EVN.AX": [
+"Evolution Mining",
+"Australia"
+],
 "JHX.AX": [
 "James Hardie Industries",
+"Australia"
+],
+"SUN.AX": [
+"Suncorp",
 "Australia"
 ],
 "REA.AX": [
@@ -8328,20 +8316,16 @@
 "Origin Energy",
 "Australia"
 ],
-"SUN.AX": [
-"Suncorp",
-"Australia"
-],
-"S32.AX": [
-"South32",
-"Australia"
-],
 "IAG.AX": [
 "Insurance Australia",
 "Australia"
 ],
 "PME.AX": [
 "Pro Medicus",
+"Australia"
+],
+"S32.AX": [
+"South32",
 "Australia"
 ],
 "SCG.AX": [
@@ -8356,52 +8340,48 @@
 "Alcoa",
 "Australia"
 ],
-"DPM.AX": [
-"DPM Metals",
-"Australia"
-],
 "MPL.AX": [
 "Medibank Private",
-"Australia"
-],
-"RHC.AX": [
-"Ramsay Health Care",
 "Australia"
 ],
 "WTC.AX": [
 "WiseTech Global",
 "Australia"
 ],
+"ASX.AX": [
+"ASX",
+"Australia"
+],
 "QAN.AX": [
 "Qantas Airways",
 "Australia"
 ],
-"ASX.AX": [
-"ASX",
+"RHC.AX": [
+"Ramsay Health Care",
+"Australia"
+],
+"DPM.AX": [
+"DPM Metals",
 "Australia"
 ],
 "TLC.AX": [
 "Lottery",
 "Australia"
 ],
-"CDA.AX": [
-"Codan",
-"Australia"
-],
 "AIA.AX": [
 "Auckland International Airport",
 "Australia"
 ],
-"LYC.AX": [
-"Lynas Rare Earths",
+"XRO.AX": [
+"Xero",
 "Australia"
 ],
 "VCX.AX": [
 "Vicinity Centres",
 "Australia"
 ],
-"XRO.AX": [
-"Xero",
+"LYC.AX": [
+"Lynas Rare Earths",
 "Australia"
 ],
 "REH.AX": [
@@ -8412,64 +8392,68 @@
 "Technology One",
 "Australia"
 ],
-"IFT.AX": [
-"Infratil",
-"Australia"
-],
 "SGP.AX": [
 "Stockland",
+"Australia"
+],
+"CDA.AX": [
+"Codan",
 "Australia"
 ],
 "ALQ.AX": [
 "ALS",
 "Australia"
 ],
-"ALD.AX": [
-"Ampol",
-"Australia"
-],
-"CSC.AX": [
-"Capstone Copper",
-"Australia"
-],
-"SFR.AX": [
-"Sandfire Resources",
-"Australia"
-],
-"PLS.AX": [
-"PLS",
-"Australia"
-],
-"SHL.AX": [
-"Sonic Healthcare",
-"Australia"
-],
-"CAR.AX": [
-"CAR",
+"IFT.AX": [
+"Infratil",
 "Australia"
 ],
 "LNW.AX": [
 "Light & Wonder",
 "Australia"
 ],
-"MIN.AX": [
-"Mineral Resources",
+"COH.AX": [
+"Cochlear",
+"Australia"
+],
+"CAR.AX": [
+"CAR",
 "Australia"
 ],
 "CHC.AX": [
 "Charter Hall",
 "Australia"
 ],
+"ALD.AX": [
+"Ampol",
+"Australia"
+],
+"SHL.AX": [
+"Sonic Healthcare",
+"Australia"
+],
 "GPT.AX": [
 "GPT",
 "Australia"
 ],
-"COH.AX": [
-"Cochlear",
+"SFR.AX": [
+"Sandfire Resources",
 "Australia"
 ],
-"GMD.AX": [
-"Genesis Minerals",
+"CSC.AX": [
+"Capstone Copper",
+"Australia"
+],
+"PLS.AX": [
+"PLS",
+"Australia"
+],
+"MIN.AX": [
+"Mineral Resources",
+"Australia"
+],
+"AFI.AX": [
+"Australian Foundation Investment",
 "Australia"
 ]
 },
@@ -8498,12 +8482,12 @@
 "Canadian Imperial Bank of Commerce",
 "Canadá"
 ],
-"AEM.TO": [
-"Agnico Eagle Mines",
-"Canadá"
-],
 "SU.TO": [
 "Suncor Energy",
+"Canadá"
+],
+"AEM.TO": [
+"Agnico Eagle Mines",
 "Canadá"
 ],
 "BN.TO": [
@@ -8514,20 +8498,16 @@
 "Canadian Pacific Kansas City",
 "Canadá"
 ],
+"BAM.TO": [
+"Brookfield Asset Management",
+"Canadá"
+],
 "CNR.TO": [
 "Canadian National Railway",
 "Canadá"
 ],
 "MFC.TO": [
 "Manulife Financial",
-"Canadá"
-],
-"BAM.TO": [
-"Brookfield Asset Management",
-"Canadá"
-],
-"ABX.TO": [
-"Barrick Mining",
 "Canadá"
 ],
 "IMO.TO": [
@@ -8538,8 +8518,8 @@
 "TC Energy",
 "Canadá"
 ],
-"WPM.TO": [
-"Wheaton Precious Metals",
+"ABX.TO": [
+"Barrick Mining",
 "Canadá"
 ],
 "CVE.TO": [
@@ -8558,16 +8538,24 @@
 "National Bank of Canada",
 "Canadá"
 ],
+"WPM.TO": [
+"Wheaton Precious Metals",
+"Canadá"
+],
 "ATD.TO": [
 "Alimentation Couche-Tard",
+"Canadá"
+],
+"TRI.TO": [
+"Thomson Reuters",
 "Canadá"
 ],
 "CSU.TO": [
 "Constellation Software",
 "Canadá"
 ],
-"TRI.TO": [
-"Thomson Reuters",
+"WCN.TO": [
+"Waste Connections",
 "Canadá"
 ],
 "FNV.TO": [
@@ -8578,24 +8566,16 @@
 "Sun Life Financial",
 "Canadá"
 ],
-"WCN.TO": [
-"Waste Connections",
+"BBD-B.TO": [
+"Bombardier",
 "Canadá"
 ],
 "POW.TO": [
 "Power Corporation of Canada",
 "Canadá"
 ],
-"BBD-B.TO": [
-"Bombardier",
-"Canadá"
-],
 "DOL.TO": [
 "Dollarama",
-"Canadá"
-],
-"CLS.TO": [
-"Celestica",
 "Canadá"
 ],
 "FFH.TO": [
@@ -8606,32 +8586,36 @@
 "Cameco",
 "Canadá"
 ],
-"NTR.TO": [
-"Nutrien",
-"Canadá"
-],
-"TECK-B.TO": [
-"Teck Resources",
-"Canadá"
-],
 "IFC.TO": [
 "Intact Financial",
 "Canadá"
 ],
-"WN.TO": [
-"George Weston",
+"NTR.TO": [
+"Nutrien",
+"Canadá"
+],
+"CLS.TO": [
+"Celestica",
+"Canadá"
+],
+"FTS.TO": [
+"Fortis",
 "Canadá"
 ],
 "PPL.TO": [
 "Pembina Pipeline",
 "Canadá"
 ],
-"K.TO": [
-"Kinross Gold",
+"TECK-B.TO": [
+"Teck Resources",
 "Canadá"
 ],
-"FTS.TO": [
-"Fortis",
+"WN.TO": [
+"George Weston",
+"Canadá"
+],
+"K.TO": [
+"Kinross Gold",
 "Canadá"
 ],
 "QSR.TO": [
@@ -8642,56 +8626,52 @@
 "Hydro One",
 "Canadá"
 ],
-"FM.TO": [
-"First Quantum Minerals",
-"Canadá"
-],
-"LUN.TO": [
-"Lundin Mining",
-"Canadá"
-],
 "OVV.TO": [
 "Ovintiv",
+"Canadá"
+],
+"FM.TO": [
+"First Quantum Minerals",
 "Canadá"
 ],
 "BCE.TO": [
 "BCE",
 "Canadá"
 ],
-"PAAS.TO": [
-"Pan American Silver",
-"Canadá"
-],
 "TOU.TO": [
 "Tourmaline Oil",
 "Canadá"
 ],
-"MG.TO": [
-"Magna International",
+"LUN.TO": [
+"Lundin Mining",
 "Canadá"
 ],
 "WCP.TO": [
 "Whitecap Resources",
 "Canadá"
 ],
+"WSP.TO": [
+"WSP Global",
+"Canadá"
+],
 "RCI-B.TO": [
 "Rogers Communications",
+"Canadá"
+],
+"MG.TO": [
+"Magna International",
 "Canadá"
 ],
 "BIP-UN.TO": [
 "Brookfield Infrastructure Partners L.P",
 "Canadá"
 ],
-"LUG.TO": [
-"Lundin Gold",
+"GIB-A.TO": [
+"CGI",
 "Canadá"
 ],
-"CDE.TO": [
-"Coeur Mining",
-"Canadá"
-],
-"WSP.TO": [
-"WSP Global",
+"PAAS.TO": [
+"Pan American Silver",
 "Canadá"
 ],
 "GFL.TO": [
@@ -8702,28 +8682,28 @@
 "RB Global",
 "Canadá"
 ],
-"GIB-A.TO": [
-"CGI",
-"Canadá"
-],
-"PHYS.TO": [
-"Sprott Physical Gold Trust",
-"Canadá"
-],
 "EMA.TO": [
 "Emera",
+"Canadá"
+],
+"LUG.TO": [
+"Lundin Gold",
 "Canadá"
 ],
 "MRU.TO": [
 "Metro",
 "Canadá"
 ],
-"AGI.TO": [
-"Alamos Gold",
+"PHYS.TO": [
+"Sprott Physical Gold Trust",
 "Canadá"
 ],
-"EDV.TO": [
-"Endeavour Mining",
+"T.TO": [
+"TELUS",
+"Canadá"
+],
+"CDE.TO": [
+"Coeur Mining",
 "Canadá"
 ],
 "IGM.TO": [
@@ -8734,24 +8714,28 @@
 "iA Financial",
 "Canadá"
 ],
-"T.TO": [
-"TELUS",
+"AGI.TO": [
+"Alamos Gold",
 "Canadá"
 ],
-"EQX.TO": [
-"Equinox Gold",
+"ATZ.TO": [
+"Aritzia",
+"Canadá"
+],
+"EDV.TO": [
+"Endeavour Mining",
 "Canadá"
 ],
 "ALA.TO": [
 "AltaGas",
 "Canadá"
 ],
-"TIH.TO": [
-"Toromont Industries",
+"CCL-B.TO": [
+"CCL Industries",
 "Canadá"
 ],
-"ATZ.TO": [
-"Aritzia",
+"EQX.TO": [
+"Equinox Gold",
 "Canadá"
 ]
 },
@@ -8772,16 +8756,16 @@
 "Nu",
 "Brasil y México"
 ],
+"BPAC11.SA": [
+"Banco BTG Pactual",
+"Brasil y México"
+],
 "VALE3.SA": [
 "Vale",
 "Brasil y México"
 ],
 "ABEV3.SA": [
 "Ambev",
-"Brasil y México"
-],
-"BPAC11.SA": [
-"Banco BTG Pactual",
 "Brasil y México"
 ],
 "BBDC4.SA": [
@@ -8796,24 +8780,24 @@
 "Itaúsa",
 "Brasil y México"
 ],
-"AXIA3.SA": [
-"AXIA Energia",
-"Brasil y México"
-],
 "BBAS3.SA": [
 "Banco do Brasil",
+"Brasil y México"
+],
+"AXIA3.SA": [
+"AXIA Energia",
 "Brasil y México"
 ],
 "KLBN11.SA": [
 "Klabin",
 "Brasil y México"
 ],
-"SBSP3.SA": [
-"Companhia de Saneamento Básico do Estado de São Paulo - SABESP",
-"Brasil y México"
-],
 "B3SA3.SA": [
 "B3 S.A. - Brasil, Bolsa, Balcão",
+"Brasil y México"
+],
+"SBSP3.SA": [
+"Companhia de Saneamento Básico do Estado de São Paulo - SABESP",
 "Brasil y México"
 ],
 "RDOR3.SA": [
@@ -8832,12 +8816,12 @@
 "JBS",
 "Brasil y México"
 ],
-"EMBJ3.SA": [
-"Embraer",
-"Brasil y México"
-],
 "CXSE3.SA": [
 "Caixa Seguridade Participações",
+"Brasil y México"
+],
+"EMBJ3.SA": [
+"Embraer",
 "Brasil y México"
 ],
 "EQTL3.SA": [
@@ -8848,16 +8832,16 @@
 "Eneva",
 "Brasil y México"
 ],
-"CPFE3.SA": [
-"CPFL Energia",
-"Brasil y México"
-],
 "PRIO3.SA": [
 "Prio",
 "Brasil y México"
 ],
 "RENT3.SA": [
 "Localiza Rent a Car",
+"Brasil y México"
+],
+"CPFE3.SA": [
+"CPFL Energia",
 "Brasil y México"
 ],
 "SUZB3.SA": [
@@ -8896,10 +8880,6 @@
 "Motiva Infraestrutura de Mobilidade",
 "Brasil y México"
 ],
-"AURA33.SA": [
-"Aura Minerals",
-"Brasil y México"
-],
 "RADL3.SA": [
 "Raia Drogasil",
 "Brasil y México"
@@ -8908,12 +8888,16 @@
 "Rumo",
 "Brasil y México"
 ],
+"CMIG4.SA": [
+"Companhia Energética de Minas Gerais - CEMIG",
+"Brasil y México"
+],
 "PSSA3.SA": [
 "Porto Seguro",
 "Brasil y México"
 ],
-"CMIG4.SA": [
-"Companhia Energética de Minas Gerais - CEMIG",
+"AURA33.SA": [
+"Aura Minerals",
 "Brasil y México"
 ],
 "GMEXICOB.MX": [
@@ -8940,12 +8924,12 @@
 "Grupo Carso",
 "Brasil y México"
 ],
-"PE&OLES.MX": [
-"Industrias Peñoles",
-"Brasil y México"
-],
 "AC.MX": [
 "Arca Continental",
+"Brasil y México"
+],
+"PE&OLES.MX": [
+"Industrias Peñoles",
 "Brasil y México"
 ],
 "GFINBURO.MX": [
@@ -8980,12 +8964,12 @@
 "Fibra UNO",
 "Brasil y México"
 ],
-"KIMBERA.MX": [
-"Kimberly-Clark de México, S. A. B. de C. V",
-"Brasil y México"
-],
 "PINFRA.MX": [
 "Promotora y Operadora de Infraestructura, S. A. B. de C. V",
+"Brasil y México"
+],
+"KIMBERA.MX": [
+"Kimberly-Clark de México, S. A. B. de C. V",
 "Brasil y México"
 ],
 "SIGMAFA.MX": [
@@ -9000,16 +8984,20 @@
 "Gruma",
 "Brasil y México"
 ],
-"BBAJIOO.MX": [
-"Banco del Bajío, S.A., Institución de Banca Múltiple",
-"Brasil y México"
-],
 "Q.MX": [
 "Quálitas Controladora",
 "Brasil y México"
 ],
+"BBAJIOO.MX": [
+"Banco del Bajío, S.A., Institución de Banca Múltiple",
+"Brasil y México"
+],
 "VESTA.MX": [
 "Corporación Inmobiliaria Vesta",
+"Brasil y México"
+],
+"CUERVO.MX": [
+"Becle",
 "Brasil y México"
 ],
 "GCC.MX": [
@@ -9018,10 +9006,6 @@
 ],
 "MARA.MX": [
 "MARA",
-"Brasil y México"
-],
-"CUERVO.MX": [
-"Becle",
 "Brasil y México"
 ],
 "DANHOS13.MX": [
