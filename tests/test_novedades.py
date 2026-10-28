@@ -105,6 +105,7 @@ def test_cotizaciones_en_bloque_en_trozos_de_150(monkeypatch):
              "twoHundredDayAverage": 90.0, "fiftyTwoWeekHigh": 120.0} for s in simbolos if s != "MAL"]}}
 
     monkeypatch.setattr(YfData, "get_raw_json", falso)
+    monkeypatch.setitem(datos._BLOQUE_EN_PAUSA, "hasta", 0.0)
     tickers = [f"T{i}" for i in range(320)] + ["MAL"]
     r = datos.cotizaciones_bloque(tickers)
     assert sorted(pedidas) == [21, 150, 150] and len(r) == 320 and "MAL" not in r
@@ -169,3 +170,73 @@ def test_corregir_una_posicion_mal_apuntada():
     assert cartera.corregir(cr, "SAN.MC", 90, 11.5) is None
     assert [h["tipo"] for h in cr["historial"]] == ["Compra", "Venta", "Corrección"]
     assert cartera.corregir(cr, "XXX", 1, 1) and cartera.corregir(cr, "SAN.MC", 0, 1)
+
+
+def test_cotizaciones_en_bloque_se_pausan_si_yahoo_las_rechaza(monkeypatch):
+    from yfinance.data import YfData
+
+    from bolsa import datos
+
+    llamadas = []
+
+    def rechazo(self, url, params=None, timeout=None):
+        llamadas.append(1)
+        raise RuntimeError("401 Invalid Crumb")
+
+    monkeypatch.setattr(YfData, "get_raw_json", rechazo)
+    monkeypatch.setitem(datos._BLOQUE_EN_PAUSA, "hasta", 0.0)
+    assert datos.cotizaciones_bloque(["A", "B"]) == {} and len(llamadas) == 1
+    assert datos.cotizaciones_bloque(["A", "B"]) == {} and len(llamadas) == 1      # en pausa: ni lo intenta
+
+
+def test_calculos_recordados_mientras_no_cambian_los_datos():
+    import numpy as np
+
+    from bolsa import senales
+    from bolsa.memo import memorizar
+
+    veces = []
+
+    @memorizar(4)
+    def pesado(df, n=1):
+        veces.append(1)
+        return df["Close"].sum() * n
+
+    df = pd.DataFrame({"Close": np.arange(300.0)}, index=pd.bdate_range("2025-01-01", periods=300))
+    assert pesado(df) == pesado(df.copy()) and len(veces) == 1      # mismos datos: no se recalcula
+    df2 = df.copy()
+    df2.iloc[-1, 0] = 1000.0                                          # llega un precio nuevo
+    assert pesado(df2) != pesado(df) and len(veces) == 2
+    pesado(df, n=2)
+    assert len(veces) == 3
+    # evaluar devuelve una copia: modificarla no estropea lo guardado
+    datos_ = pd.DataFrame({"Open": np.linspace(10, 20, 300), "High": np.linspace(10.2, 20.2, 300),
+                           "Low": np.linspace(9.8, 19.8, 300), "Close": np.linspace(10, 20, 300), "Volume": 1e6},
+                          index=pd.bdate_range("2025-01-01", periods=300))
+    a = senales.evaluar("X", datos_)
+    a.avisos.append("tocado")
+    assert "tocado" not in senales.evaluar("X", datos_).avisos
+
+
+def test_refresco_mas_lento_con_la_bolsa_cerrada(monkeypatch):
+    import ui_comun
+    from bolsa import horario
+
+    monkeypatch.setattr(horario, "estado_mercado", lambda t, ahora=None: {"abierto": t == "AAPL"})
+    assert ui_comun.segundos_refresco() == ui_comun.SEGUNDOS_REFRESCO == 60
+    monkeypatch.setattr(horario, "estado_mercado", lambda t, ahora=None: {"abierto": False})
+    assert ui_comun.segundos_refresco() == ui_comun.SEGUNDOS_REFRESCO_CERRADO == 600
+
+
+def test_fundamentales_se_comparten_entre_listas(monkeypatch):
+    import ui_comun
+    from bolsa import datos
+
+    pedidos = []
+    monkeypatch.setattr(datos, "fundamentales", lambda t: pedidos.append(t) or {"trailingPE": 10.0})
+    ui_comun.olvidar_datos_al_dia()
+    ui_comun.cargar_fundamentales_varios(("A", "B", "C"))
+    ui_comun.cargar_fundamentales_varios(("A", "C"))            # otra lista con los mismos valores: nada nuevo
+    assert ui_comun.cargar_fundamentales("B") == {"trailingPE": 10.0}
+    assert sorted(pedidos) == ["A", "B", "C"]
+    ui_comun.olvidar_datos_al_dia()

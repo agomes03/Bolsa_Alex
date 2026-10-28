@@ -13,7 +13,7 @@ from bolsa import agenda, alertas, aportaciones, asesor, diario, eventos, renta
 from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import _perfil_guardado, eventos_de, nombre_posicion, revisar_cartera_real
-from ui_comun import (SEGUNDOS_REFRESCO, cargar_diario_real, cargar_dividendos_varios, cargar_varios,
+from ui_comun import (fragmento_vivo, cargar_diario_real, cargar_dividendos_varios, cargar_varios,
                       cotizaciones_ahora, cuenta_activa, datos_usuario, enlace, entrada_importe, eur, fecha,
                       fila_informe, fx, tabla_privada,
                       guardar_datos, ir_a, palabras_de_la_pagina, perfil, pestanas, selector_valor,
@@ -161,7 +161,7 @@ def tab_lista():
     lista_de_seguimiento(lista)
 
 
-@st.fragment(run_every=SEGUNDOS_REFRESCO)
+@fragmento_vivo
 def lista_de_seguimiento(lista: list[dict]):
     precios = cotizaciones_ahora([x["ticker"] for x in lista])
     filas = []

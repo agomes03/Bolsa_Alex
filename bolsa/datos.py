@@ -193,6 +193,8 @@ def combinar_precio(diario: pd.Series | None, intradia: pd.Series | None) -> dic
 
 _URL_COTIZACIONES = "https://query1.finance.yahoo.com/v7/finance/quote"
 _POR_PETICION = 150
+_PAUSA_BLOQUE = 600              # si Yahoo rechaza la petición en bloque, no se reintenta hasta pasados 10 min
+_BLOQUE_EN_PAUSA = {"hasta": 0.0}
 
 
 def cotizaciones_bloque(tickers: list[str]) -> dict[str, dict]:
@@ -206,7 +208,7 @@ def cotizaciones_bloque(tickers: list[str]) -> dict[str, dict]:
     from yfinance.data import YfData
 
     tickers = list(dict.fromkeys(tickers))
-    if not tickers:
+    if not tickers or time.time() < _BLOQUE_EN_PAUSA["hasta"]:
         return {}
     yfd = YfData()
 
@@ -220,6 +222,8 @@ def cotizaciones_bloque(tickers: list[str]) -> dict[str, dict]:
     trozos = [tickers[i:i + _POR_PETICION] for i in range(0, len(tickers), _POR_PETICION)]
     with ThreadPoolExecutor(max_workers=min(4, len(trozos))) as pool:
         resultados = [q for r in pool.map(lote, trozos) for q in r]
+    if not resultados:          # rechazada (o Yahoo caído): las descargas de siempre, sin reintentar cada vez
+        _BLOQUE_EN_PAUSA["hasta"] = time.time() + _PAUSA_BLOQUE
     salida = {}
     pedidos = set(tickers)
     for q in resultados:
@@ -256,22 +260,25 @@ def precios_recientes(tickers: list[str]) -> dict[str, dict]:
     if not tickers:
         return salida
 
-    def columnas(bruto):
+    def columnas(bruto, pedidos=None):
+        pedidos = pedidos or tickers
         if bruto is None or bruto.empty or "Close" not in bruto:
             return {}
         c = bruto["Close"]
         if isinstance(c, pd.Series):
-            return {tickers[0]: c}
-        return {t: c[t] for t in c.columns if t in tickers}
+            return {pedidos[0]: c}
+        return {t: c[t] for t in c.columns if t in pedidos}
 
     try:
         diario = columnas(_descargar_yf(yf, tickers, period="5d", interval="1d", auto_adjust=False, progress=False,
                                       threads=True))
     except Exception:  # noqa: BLE001
         diario = {}
+    # Los fondos (0P...) tienen un valor liquidativo al día: pedir sus velas de 15 minutos solo da error.
+    con_intradia = [t for t in tickers if not t.startswith("0P")]
     try:
-        intradia = columnas(_descargar_yf(yf, tickers, period="5d", interval="15m", auto_adjust=False, progress=False,
-                                        threads=True))
+        intradia = columnas(_descargar_yf(yf, con_intradia, period="5d", interval="15m", auto_adjust=False,
+                                        progress=False, threads=True), con_intradia) if con_intradia else {}
     except Exception:  # noqa: BLE001
         intradia = {}
     for t in tickers:

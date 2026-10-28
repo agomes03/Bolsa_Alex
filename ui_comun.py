@@ -155,7 +155,30 @@ def linea_frescura(lista: list[noticias.Noticia]) -> str:
 
 
 SEGUNDOS_PRECIOS = 60       # cada cuánto se refrescan solos los precios en Hoy, Mi cartera, Radar y Mercados
-SEGUNDOS_REFRESCO = 30      # cada cuánto miran las páginas si ya hay datos nuevos (mostrarlos no cuesta nada)
+SEGUNDOS_REFRESCO = 60      # con alguna bolsa abierta, cada cuánto se refrescan solas las páginas
+SEGUNDOS_REFRESCO_CERRADO = 600   # con todo cerrado (noches, fines de semana) los precios no cambian
+
+
+def segundos_refresco() -> int:
+    """Cada minuto si la bolsa española, la europea o la de EEUU está abierta; si no, cada 10 minutos."""
+    from bolsa import horario
+
+    try:
+        abierta = any(horario.estado_mercado(t)["abierto"] for t in ("SAN.MC", "AAPL"))
+    except Exception:  # noqa: BLE001
+        abierta = True
+    return SEGUNDOS_REFRESCO if abierta else SEGUNDOS_REFRESCO_CERRADO
+
+
+def fragmento_vivo(funcion):
+    """Como @st.fragment(run_every=...), pero el intervalo se decide cada vez que se pinta la página: cada minuto
+    con mercado abierto y cada 10 minutos con todo cerrado (menos trabajo para el móvil y el servidor)."""
+    from functools import wraps
+
+    @wraps(funcion)
+    def envoltura(*args, **kwargs):
+        return st.fragment(funcion, run_every=segundos_refresco())(*args, **kwargs)
+    return envoltura
 
 # --------------------------------------------------------------------------- datos «siempre al día» sin esperas
 # Precios y noticias se piden de nuevo en segundo plano: la pantalla enseña al momento lo último que hay y, cuando
@@ -270,11 +293,13 @@ def olvidar_datos_al_dia() -> None:
     """Para «Actualizar todo ahora» (y las pruebas): la próxima vez se descarga todo de nuevo."""
     with _CERROJO_VIVOS:
         _VIVOS.clear()
+    with _CERROJO_FUND:
+        _FUNDAMENTALES.clear()
 
 
 def linea_actualizado() -> str:
     hora = _ULTIMA_HORA.get("precios") or _hora_ahora()
-    return f"🔄 Precios de las {hora} · se actualizan solos cada minuto, sin tocar nada"
+    return f"🔄 Precios de las {hora} · se actualizan solos (cada minuto con la bolsa abierta)"
 
 
 def _precios_recientes(tickers: tuple[str, ...], esperar: bool = True) -> dict[str, dict]:
@@ -337,9 +362,31 @@ def cotizacion_al_instante(ticker: str) -> dict | None:
         return None
 
 
-@st.cache_data(ttl=6 * 3600, show_spinner=False)
+# Datos de empresa, guardados valor a valor (cambian poco: 6 horas). Así lo descargado para Mi cartera sirve
+# también para Hoy, Analizar o la cartera virtual aunque cada una pida una lista distinta.
+_FUNDAMENTALES: dict[str, tuple[float, dict]] = {}
+_CERROJO_FUND = threading.Lock()
+SEGUNDOS_FUNDAMENTALES = 6 * 3600
+
+
+def cargar_fundamentales_varios(tickers) -> dict[str, dict]:
+    ahora = time.time()
+    with _CERROJO_FUND:
+        faltan = [t for t in dict.fromkeys(tickers)
+                  if t not in _FUNDAMENTALES or ahora - _FUNDAMENTALES[t][0] > SEGUNDOS_FUNDAMENTALES]
+    if faltan:
+        with ThreadPoolExecutor(max_workers=min(8, len(faltan))) as pool:
+            nuevos = list(pool.map(datos.fundamentales, faltan))
+        with _CERROJO_FUND:
+            for t, f in zip(faltan, nuevos):
+                if f or t not in _FUNDAMENTALES:      # un fallo de Yahoo no borra lo bueno que ya había
+                    _FUNDAMENTALES[t] = (ahora, f)
+    with _CERROJO_FUND:
+        return {t: dict(_FUNDAMENTALES[t][1]) for t in tickers if t in _FUNDAMENTALES}
+
+
 def cargar_fundamentales(ticker: str) -> dict:
-    return datos.fundamentales(ticker)
+    return cargar_fundamentales_varios((ticker,)).get(ticker, {})
 
 
 @st.cache_data(ttl=6 * 3600, show_spinner=False)
@@ -354,12 +401,6 @@ def cargar_composiciones(tickers: tuple[str, ...]) -> dict[str, dict]:
     """Qué hay dentro de cada fondo o ETF (cambia poco: se pide una vez al día)."""
     with ThreadPoolExecutor(max_workers=3) as pool:
         return dict(zip(tickers, pool.map(datos.composicion_fondo, tickers)))
-
-
-@st.cache_data(ttl=6 * 3600, show_spinner=False)
-def cargar_fundamentales_varios(tickers: tuple[str, ...]) -> dict[str, dict]:
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        return dict(zip(tickers, pool.map(datos.fundamentales, tickers)))
 
 
 @st.cache_data(ttl=900, show_spinner=False)

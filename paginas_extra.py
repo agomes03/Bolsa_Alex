@@ -17,7 +17,7 @@ from bolsa import (alertas, asesor, asesor_diario, avisos, bankinter, cartera, c
 from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
-from ui_comun import (SEGUNDOS_REFRESCO, almacen_actual, cargar_activos, cargar_analistas, cargar_composiciones,
+from ui_comun import (fragmento_vivo, almacen_actual, cargar_activos, cargar_analistas, cargar_composiciones,
                       cargar_diario_real, cargar_dividendos_varios, cargar_fundamentales, cargar_fundamentales_varios,
                       cargar_historico, cargar_informe, cargar_noticias, cargar_varios, cotizaciones_ahora,
                       cuenta_activa, datos_usuario, descargas_en_paralelo, enlace, entrada_importe, estrategia_actual,
@@ -525,7 +525,7 @@ ICONO_NIVEL = {"vender": "🔴", "vigilar": "🟠", "poner_stop": "🟡", "subir
                "sin_datos": "⚪"}
 
 
-@st.fragment(run_every=SEGUNDOS_REFRESCO)
+@fragmento_vivo
 def asesor_hoy(inf: dict | None):
     """«🧑‍💼 Tu asesor hoy»: tu dinero, qué hacer con cada acción y lo demás de hoy. Se refresca solo cada minuto."""
     pf = perfil()
@@ -939,7 +939,7 @@ def ficha_activo(f: dict, filas: list[dict]) -> None:
                "arriba para volver al resumen.")
 
 
-@st.fragment(run_every=SEGUNDOS_REFRESCO)
+@fragmento_vivo
 def resumen_cartera(nombres: list[str], elegida: str):
     """Valor, ganancia, cambio de hoy y tabla de posiciones. Se refresca solo cada minuto."""
     pf = perfil()

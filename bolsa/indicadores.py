@@ -4,6 +4,8 @@ Open, High, Low, Close, Volume (formato de Yahoo Finance)."""
 import numpy as np
 import pandas as pd
 
+from .memo import memorizar
+
 
 def media_movil(serie: pd.Series, dias: int) -> pd.Series:
     return serie.rolling(dias, min_periods=dias).mean()
@@ -57,6 +59,7 @@ def variacion(serie: pd.Series, sesiones: int) -> float:
     return float((serie.iloc[-1] / serie.iloc[-1 - sesiones] - 1) * 100)
 
 
+@memorizar(48)
 def calcular_todo(df: pd.DataFrame) -> pd.DataFrame:
     """Devuelve una copia del histórico con todas las columnas de indicadores añadidas."""
     out = df.copy()

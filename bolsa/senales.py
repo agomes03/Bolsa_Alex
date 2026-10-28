@@ -16,6 +16,7 @@ from datetime import datetime
 import pandas as pd
 
 from .indicadores import calcular_todo, variacion, volatilidad_anual
+from .memo import memorizar
 
 
 @dataclass
@@ -78,6 +79,7 @@ def _ok(x) -> bool:
     return x is not None and not (isinstance(x, float) and math.isnan(x))
 
 
+@memorizar(128)
 def evaluar(ticker: str, historico: pd.DataFrame, sentimiento_noticias: float | None = None,
             n_noticias: int = 0, mercado_alcista: bool | None = None,
             fundamentales: dict | None = None, prediccion=None,

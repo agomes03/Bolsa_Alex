@@ -11,7 +11,7 @@ import streamlit as st
 
 from bolsa.tickers import CATALOGO, CATEGORIAS, nombre_de
 from paginas_hoy import bloque_fases
-from ui_comun import (SEGUNDOS_PRECIOS, SEGUNDOS_REFRESCO, al_dia, cargar_activos, cargar_informe, cargar_varios,
+from ui_comun import (SEGUNDOS_PRECIOS, fragmento_vivo, al_dia, cargar_activos, cargar_informe, cargar_varios,
                       cotizaciones_ahora, ir_a, linea_actualizado, num, palabras_de_la_pagina, pct, perfil)
 
 
@@ -175,7 +175,7 @@ def precargar_grupos(actual: str) -> None:
     threading.Thread(target=todos, daemon=True).start()
 
 
-@st.fragment(run_every=SEGUNDOS_REFRESCO)
+@fragmento_vivo
 def bloque_mercado(grupo: str) -> bool:
     """Tarjetas de índices y tabla del grupo, con precios de ahora. Se refresca solo cada minuto."""
     hueco = st.empty()

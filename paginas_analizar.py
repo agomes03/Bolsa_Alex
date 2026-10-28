@@ -12,6 +12,7 @@ from plotly.subplots import make_subplots
 from bolsa import asesor, bankinter, costes, ficha, noticias, senales
 from bolsa.activos import clase_de
 from bolsa.indicadores import calcular_todo
+from bolsa.memo import memorizar
 from bolsa.tickers import NO_INVERTIBLES, nombre_de, sector_de
 from paginas_extra import bloque_operar, limite_empresa, pesos_cartera_real
 from paginas_hoy import bloque_que_puede_pasar_accion, pagina_radar_global
@@ -22,8 +23,12 @@ from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, carg
 
 
 def grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None = None) -> go.Figure:
+    return _grafico(df, titulo, plan, perfil().movil, alto_grafico())
+
+
+@memorizar(12, copiar=False)        # el mismo gráfico en cada refresco: se reutiliza (montarlo cuesta ~0,3 s)
+def _grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None, movil: bool, alto: int) -> go.Figure:
     # Solo lo necesario: un año visible (medio año en el móvil) más 200 sesiones para calcular la media larga.
-    movil = perfil().movil
     visibles = 130 if movil else 260
     d = calcular_todo(df.tail(visibles + 210)).tail(visibles)
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.72, 0.28], vertical_spacing=0.04)
@@ -39,7 +44,7 @@ def grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None = None) -> 
     fig.add_hrect(y0=70, y1=100, fillcolor="#dc2626", opacity=0.08, line_width=0, row=2, col=1)
     fig.add_hrect(y0=0, y1=30, fillcolor="#16a34a", opacity=0.08, line_width=0, row=2, col=1)
     fig.update_yaxes(range=[0, 100], row=2, col=1, title_text="RSI")
-    fig.update_layout(title=None if movil else titulo, height=alto_grafico(), xaxis_rangeslider_visible=False,
+    fig.update_layout(title=None if movil else titulo, height=alto, xaxis_rangeslider_visible=False,
                       legend=dict(orientation="h", y=1.08), margin=dict(l=5, r=5, t=40, b=5))
     return fig
 

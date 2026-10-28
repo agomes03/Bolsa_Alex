@@ -16,7 +16,7 @@ from paginas_seguimiento import bloque_pendientes
 from ui_comun import (cargar_informe, cargar_noticias, cargar_varios, conclusion_noticia, cotizaciones_ahora,
                       cuenta_activa, dias_informe, eur, fecha, guardar_datos, hora_espana, ir_a, linea_actualizado,
                       linea_frescura, moneda_de, num, palabras_de_la_pagina, pct, perfil, pestanas, precio, reducir,
-                      SEGUNDOS_REFRESCO, texto_estado_precio)
+                      fragmento_vivo, texto_estado_precio)
 
 COLOR_SEMAFORO = {"verde": ("success", "🟢 Mercado favorable"),
                   "ambar": ("warning", "🟡 Mercado mixto"),
@@ -194,7 +194,7 @@ def mostrar_contexto(inf: dict, mer: dict) -> None:
     noticias_importantes(inf)
 
 
-@st.fragment(run_every=SEGUNDOS_REFRESCO)
+@fragmento_vivo
 def noticias_importantes(inf: dict):
     """Las 3 noticias de más impacto ahora mismo (si no se pueden leer, las del informe de la noche)."""
     st.subheader("📰 Lo más importante")
@@ -268,7 +268,7 @@ def bloque_que_puede_pasar(pesos: dict[str, float], importe: float, mensual: flo
 
 
 # --------------------------------------------------------------------------- 📡 Radar
-@st.fragment(run_every=SEGUNDOS_REFRESCO)
+@fragmento_vivo
 def tabla_radar(f: pd.DataFrame, ideas: set[str]):
     """La tabla del radar con los precios de ahora. Se refresca sola cada minuto."""
     pf = perfil()
