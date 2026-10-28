@@ -4,7 +4,8 @@ la abras tú. Streamlit Cloud duerme las apps que nadie usa durante horas (despe
 Uso: APP_URL=https://tu-app.streamlit.app python scripts/despertar.py
 
 No necesita la contraseña de la app: con solo abrir la pantalla de la contraseña, la app empieza a descargar en
-segundo plano lo que necesitará Hoy.
+segundo plano lo que necesitará Hoy. Sí necesita que la app sea pública en Streamlit Cloud (las privadas piden
+iniciar sesión en Streamlit); si es privada, lo avisa y termina sin error.
 """
 
 from __future__ import annotations
@@ -52,6 +53,13 @@ def main() -> int:
             texto = _texto(pagina)
             if int(time.time() - inicio) % 30 < 5:          # qué se ve (para saber qué pasa si no carga)
                 print(f"[{time.time() - inicio:.0f} s] " + " / ".join(texto.split("\n"))[:300], flush=True)
+            if "do not have access to this app" in texto:
+                # App privada en Streamlit Cloud: solo entra quien ha iniciado sesión (tú, desde tu móvil).
+                print("::warning::La app es privada en Streamlit Cloud y el despertador no puede entrar. Para que "
+                      "funcione: share.streamlit.io → tu app → ⋮ → Settings → Sharing → «This app is public». "
+                      "Hazlo solo si la app tiene contraseña propia (Secrets: [app] password).")
+                navegador.close()
+                return 0
             if any(t in texto for t in TEXTOS_APP):
                 print(f"App despierta en {time.time() - inicio:.0f} s. Dejando que descargue los datos...")
                 pagina.wait_for_timeout(int(os.environ.get("ESPERA_MS", 60_000)))   # lo que tarda en calentar la caché
