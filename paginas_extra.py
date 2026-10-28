@@ -17,7 +17,7 @@ from bolsa import (alertas, asesor, asesor_diario, avisos, bankinter, cartera, c
 from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
-from ui_comun import (fragmento_vivo, almacen_actual, cargar_activos, cargar_analistas, cargar_composiciones,
+from ui_comun import (fragmento_vivo, tipos_cambio, almacen_actual, cargar_activos, cargar_analistas, cargar_composiciones,
                       cargar_diario_real, cargar_dividendos_varios, cargar_fundamentales, cargar_fundamentales_varios,
                       cargar_historico, cargar_informe, cargar_noticias, cargar_varios, cotizaciones_ahora,
                       cuenta_activa, datos_usuario, descargas_en_paralelo, enlace, entrada_importe, estrategia_actual,
@@ -452,7 +452,9 @@ def revisar_cartera_real(cr: dict | None = None) -> list[dict]:
         return []
     p = estrategia_actual()
     tickers = tuple(sorted(cr["posiciones"]))
-    hist = cargar_varios(tickers, "2y")
+    # Todo lo que hace falta, a la vez (antes iba en fila: historia, luego datos de empresa, luego precios...).
+    with descargas_en_paralelo(*tareas_revision(cr)):
+        hist = cargar_varios(tickers, "2y")
     funds = cargar_fundamentales_varios(tickers)
     try:
         ahora = cotizaciones_ahora(tickers)
@@ -487,6 +489,37 @@ def revisar_cartera_real(cr: dict | None = None) -> list[dict]:
                       "resultados_pronto": any("resultados" in a for a in ev.avisos)})
     _precios_frescos(filas)
     return filas
+
+
+def _clases(cr: dict) -> dict[str, str]:
+    return {t: pos.get("clase") or clase_de(t) for t, pos in sorted((cr.get("posiciones") or {}).items())}
+
+
+def tareas_revision(cr: dict) -> list:
+    """Descargas para revisar una cuenta, además de su historia (las mismas claves de caché que usa la página)."""
+    clases = _clases(cr)
+    tickers = tuple(clases)
+    return [lambda: cargar_fundamentales_varios(tickers), lambda: cotizaciones_ahora(tickers), tipos_cambio,
+            *[lambda t=t: mercado_alcista_para(t) for t, c in clases.items() if c == "Acciones"]]
+
+
+def tareas_hoy(cr: dict) -> list:
+    """Lo demás que pide «Tu asesor hoy»: otros activos, analistas, noticias, tu semana y dividendos."""
+    clases = _clases(cr)
+    tickers = list(clases)
+    acciones = tuple(t for t, c in clases.items() if c == "Acciones")
+    return [cargar_activos, lambda: cargar_analistas(acciones), cargar_noticias,
+            lambda: cargar_varios(tuple(set(tickers) | {"^IBEX", "IWDA.AS"}), "1mo"),
+            lambda: cargar_dividendos_varios([t for t, c in clases.items() if c in ("Acciones", "Fondos y ETF")])]
+
+
+def calentar_cuentas(d: dict) -> None:
+    """Todo lo que necesitará Hoy para cada cuenta, descargado ya (mientras escribes la contraseña, o al despertar
+    la app por la mañana). No enseña nada: solo deja los datos públicos de mercado en la caché."""
+    for cr in cuentas.asegurar(d).values():
+        if cr.get("posiciones"):
+            with descargas_en_paralelo(*tareas_revision(cr), *tareas_hoy(cr)):
+                cargar_varios(tuple(sorted(cr["posiciones"])), "2y")
 
 
 def _precios_frescos(filas: list[dict]) -> None:
@@ -539,15 +572,10 @@ def asesor_hoy(inf: dict | None):
                         "Kutxabank...) en 🏦 Mi cartera y aquí verás cada día cuánto vale tu dinero y qué hacer con él.")
             enlace("bankinter", "Ir a Mi cartera", "🏦")
             return
-        tickers = sorted(cr["posiciones"])
-        acciones = tuple(t for t in tickers if (cr["posiciones"][t].get("clase") or clase_de(t)) == "Acciones")
         try:
             # Lo que se necesita más abajo (analistas, dividendos, otros activos) se descarga a la vez que se
             # revisa la cartera: la primera carga de la mañana tarda la mitad.
-            with descargas_en_paralelo(cargar_activos, lambda: cargar_analistas(acciones),
-                                       lambda: cargar_dividendos_varios(
-                                           [t for t in tickers if (cr["posiciones"][t].get("clase") or clase_de(t))
-                                            in ("Acciones", "Fondos y ETF")])):
+            with descargas_en_paralelo(*tareas_hoy(cr)):
                 filas = revisar_cartera_real()
             activos_hoy = cargar_activos()
         except Exception as e:  # noqa: BLE001 - la página Hoy nunca debe romperse por la cartera

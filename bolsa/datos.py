@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -25,19 +26,50 @@ def _ruta_respaldo(ticker: str, tipo: str) -> Path:
     return CARPETA_RESPALDO / (re.sub(r"[^A-Za-z0-9._-]", "_", f"{tipo}_{ticker}") + ".pkl")
 
 
+# Las copias se escriben en disco por detrás (un hilo): escribir 50 archivos durante la primera carga de la
+# mañana la retrasaba varios segundos. Mientras no estén escritas, se leen de aquí.
+_PENDIENTES: dict[Path, tuple[pd.DataFrame, float]] = {}
+_CERROJO_RESPALDO = threading.Lock()
+_ESCRITOR: dict = {"activo": False}
+
+
 def _guardar_respaldo(ticker: str, tipo: str, df: pd.DataFrame) -> None:
-    try:
-        CARPETA_RESPALDO.mkdir(parents=True, exist_ok=True)
-        ruta = _ruta_respaldo(ticker, tipo)
-        temporal = ruta.with_suffix(f".{os.getpid()}.tmp")
-        df.to_pickle(temporal)
-        os.replace(temporal, ruta)           # escritura atómica
-    except Exception:  # noqa: BLE001 - el respaldo nunca debe romper una descarga correcta
-        pass
+    ruta = _ruta_respaldo(ticker, tipo)
+    with _CERROJO_RESPALDO:
+        _PENDIENTES[ruta] = (df, time.time())
+        if _ESCRITOR["activo"]:
+            return
+        _ESCRITOR["activo"] = True
+    threading.Thread(target=_escribir_pendientes, daemon=True).start()
+
+
+def _escribir_pendientes() -> None:
+    while True:
+        with _CERROJO_RESPALDO:
+            if not _PENDIENTES:
+                _ESCRITOR["activo"] = False
+                return
+            ruta, pendiente = next(iter(_PENDIENTES.items()))
+        try:
+            ruta.parent.mkdir(parents=True, exist_ok=True)
+            temporal = ruta.with_suffix(f".{os.getpid()}.tmp")
+            pendiente[0].to_pickle(temporal)
+            os.replace(temporal, ruta)           # escritura atómica
+        except Exception:  # noqa: BLE001 - el respaldo nunca debe romper una descarga correcta
+            pass
+        with _CERROJO_RESPALDO:
+            if _PENDIENTES.get(ruta) is pendiente:   # (si entretanto llegó uno más nuevo, se escribe en la vuelta)
+                del _PENDIENTES[ruta]
 
 
 def _leer_respaldo(ticker: str, tipo: str) -> pd.DataFrame:
     ruta = _ruta_respaldo(ticker, tipo)
+    with _CERROJO_RESPALDO:
+        pendiente = _PENDIENTES.get(ruta)
+    if pendiente is not None:
+        RESPALDOS_USADOS[ticker] = pendiente[1]
+        _CUANDO_RESPALDO[ticker] = time.time()
+        return pendiente[0].copy()
     try:
         df = pd.read_pickle(ruta)
     except Exception:  # noqa: BLE001

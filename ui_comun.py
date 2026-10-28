@@ -254,7 +254,7 @@ def descargas_en_paralelo(*funciones):
         add_script_run_ctx(threading.current_thread(), ctx)
         try:
             f()
-        except Exception:  # noqa: BLE001
+        except BaseException:  # noqa: BLE001 - (también si la página se recarga): se repite luego sin hilos
             pass
 
     pool = ThreadPoolExecutor(max_workers=max(len(funciones), 1))
@@ -800,6 +800,38 @@ def _clave_app() -> str | None:
         return None
 
 
+_CALENTADO = {"cuando": 0.0}
+_CERROJO_CALENTAR = threading.Lock()
+SEGUNDOS_ENTRE_CALENTADOS = 1200
+
+
+def calentar_en_segundo_plano() -> None:
+    """Descarga ya, por detrás, lo que necesitará Hoy para tus cuentas (como mucho cada 20 min). Solo deja datos
+    públicos de mercado en la caché del servidor: no enseña nada antes de la contraseña."""
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    with _CERROJO_CALENTAR:
+        if time.time() - _CALENTADO["cuando"] < SEGUNDOS_ENTRE_CALENTADOS:
+            return
+        _CALENTADO["cuando"] = time.time()
+    alm = _almacen()
+
+    # Sin atarlo a esta ejecución de la página: la pantalla de la contraseña termina enseguida (st.stop) y
+    # Streamlit pararía también las descargas.
+    def correr():
+        try:
+            d, _ = alm.cargar_con_version()
+            if d:
+                from paginas_extra import calentar_cuentas
+                calentar_cuentas(d)
+            cargar_informe()
+        except BaseException as e:  # noqa: BLE001 - si algo falla, se descargará al abrir la página
+            import logging
+            logging.getLogger(__name__).warning("No se ha podido calentar la caché: %r", e)
+
+    threading.Thread(target=correr, daemon=True).start()
+
+
 def control_acceso() -> None:
     """Pide la contraseña de la app (Secrets: [app] password = "...") antes de mostrar nada. Sin contraseña
     configurada, la app se abre (y la barra lateral avisa de que conviene ponerla)."""
@@ -809,6 +841,7 @@ def control_acceso() -> None:
     clave = _clave_app()
     if not clave or st.session_state.get("_acceso_ok"):
         return
+    calentar_en_segundo_plano()          # mientras escribes la contraseña, se van descargando los datos de Hoy
     st.title("🔒 Asistente de Bolsa")
     st.caption("Esta app contiene tu cartera. Introduce la contraseña para entrar.")
     espera = st.session_state.get("_acceso_espera", 0) - time.time()

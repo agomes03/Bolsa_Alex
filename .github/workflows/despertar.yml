@@ -1,0 +1,44 @@
+name: Despertar la app
+
+# Abre la app antes de que empiece el día para que esté despierta y con los datos ya descargados.
+# Necesita el secreto APP_URL (la dirección de la app en Streamlit Cloud); sin él, no hace nada.
+on:
+  schedule:
+    # De lunes a viernes a las 6:40 y 12:40 UTC (8:40 y 14:40 en verano, 7:40 y 13:40 en invierno, hora peninsular).
+    - cron: "40 6,12 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  despertar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Comprobar que hay dirección
+        id: url
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          if [ -z "$APP_URL" ]; then echo "Sin el secreto APP_URL: no se hace nada."; echo "hay=no" >> "$GITHUB_OUTPUT"; else echo "hay=si" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/checkout@v4
+        if: steps.url.outputs.hay == 'si'
+
+      - uses: actions/setup-python@v5
+        if: steps.url.outputs.hay == 'si'
+        with:
+          python-version: "3.12"
+
+      - name: Instalar el navegador
+        if: steps.url.outputs.hay == 'si'
+        run: |
+          pip install playwright==1.58.0
+          python -m playwright install --with-deps chromium
+
+      - name: Abrir la app
+        if: steps.url.outputs.hay == 'si'
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: python scripts/despertar.py
