@@ -49,13 +49,17 @@ def main() -> int:
                         boton.first.click()
                 except Exception:  # noqa: BLE001
                     pass
-            if any(t in _texto(pagina) for t in TEXTOS_APP):
+            texto = _texto(pagina)
+            if int(time.time() - inicio) % 30 < 5:          # qué se ve (para saber qué pasa si no carga)
+                print(f"[{time.time() - inicio:.0f} s] " + " / ".join(texto.split("\n"))[:300], flush=True)
+            if any(t in texto for t in TEXTOS_APP):
                 print(f"App despierta en {time.time() - inicio:.0f} s. Dejando que descargue los datos...")
                 pagina.wait_for_timeout(int(os.environ.get("ESPERA_MS", 60_000)))   # lo que tarda en calentar la caché
                 navegador.close()
                 return 0
             pagina.wait_for_timeout(5_000)
         print("La app no ha respondido en 5 minutos.")
+        pagina.screenshot(path="despertar.png", full_page=True)
         navegador.close()
         return 1
 

@@ -43,3 +43,11 @@ jobs:
         env:
           APP_URL: ${{ secrets.APP_URL }}
         run: python scripts/despertar.py
+
+      - name: Guardar la captura si ha fallado
+        if: failure() && steps.url.outputs.hay == 'si'
+        uses: actions/upload-artifact@v4
+        with:
+          name: captura-despertar
+          path: despertar.png
+          if-no-files-found: ignore
