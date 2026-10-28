@@ -13,7 +13,8 @@ permissions:
 
 jobs:
   despertar:
-    runs-on: ubuntu-latest
+    # (Playwright todavía no instala su navegador en ubuntu-latest = Ubuntu 26.04)
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Comprobar que hay dirección
