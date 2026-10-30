@@ -19,6 +19,7 @@ import pandas as pd
 import streamlit as st
 
 from bolsa import almacen, costes, cuentas, datos, finnhub, noticias, prediccion, senales
+from bolsa.guardados import Guardados
 from bolsa.simulador import Parametros
 from bolsa.tickers import TODAS_LAS_ACCIONES, indice_de_referencia, nombre_de
 
@@ -81,13 +82,8 @@ def cargar_activos() -> list[dict]:
     return activos.resumen(datos.varios(list(activos.ACTIVOS), "2y"))
 
 
-@st.cache_data(ttl=43_200, show_spinner=False)
-def _dividendos_varios(tickers: tuple[str, ...]) -> dict[str, pd.Series]:
-    return datos.dividendos_varios(list(tickers))
-
-
 def cargar_dividendos_varios(tickers) -> dict[str, pd.Series]:
-    return _dividendos_varios(tuple(sorted(set(tickers))))
+    return _DIVIDENDOS.varios(sorted(set(tickers)))
 
 
 def clave_finnhub() -> str | None:
@@ -293,8 +289,8 @@ def olvidar_datos_al_dia() -> None:
     """Para «Actualizar todo ahora» (y las pruebas): la próxima vez se descarga todo de nuevo."""
     with _CERROJO_VIVOS:
         _VIVOS.clear()
-    with _CERROJO_FUND:
-        _FUNDAMENTALES.clear()
+    for guardados in (_FUNDAMENTALES, _ANALISTAS, _DIVIDENDOS):
+        guardados.olvidar()
 
 
 def linea_actualizado() -> str:
@@ -362,40 +358,41 @@ def cotizacion_al_instante(ticker: str) -> dict | None:
         return None
 
 
-# Datos de empresa, guardados valor a valor (cambian poco: 6 horas). Así lo descargado para Mi cartera sirve
-# también para Hoy, Analizar o la cartera virtual aunque cada una pida una lista distinta.
-_FUNDAMENTALES: dict[str, tuple[float, dict]] = {}
-_CERROJO_FUND = threading.Lock()
+# Datos de empresa, analistas y dividendos: valor a valor y también en disco (cambian poco). Lo descargado para
+# Mi cartera sirve para Hoy, Analizar o la cartera virtual aunque pidan listas distintas, y tras un reinicio de la
+# app se enseña al momento lo guardado mientras se renueva por detrás (ver bolsa/guardados.py).
 SEGUNDOS_FUNDAMENTALES = 6 * 3600
 
 
+def _uno_a_uno(funcion, hilos: int):
+    def descargar(tickers):
+        with ThreadPoolExecutor(max_workers=min(hilos, len(tickers))) as pool:
+            return dict(zip(tickers, pool.map(funcion, tickers)))
+    return descargar
+
+
+_FUNDAMENTALES = Guardados("empresa", SEGUNDOS_FUNDAMENTALES, _uno_a_uno(lambda t: datos.fundamentales(t), 8),
+                           carpeta=lambda: datos.CARPETA_RESPALDO)
+# Pocas a la vez: Yahoo limita las peticiones de analistas.
+_ANALISTAS = Guardados("analistas", 6 * 3600, _uno_a_uno(lambda t: datos.analistas(t), 3),
+                       carpeta=lambda: datos.CARPETA_RESPALDO)
+# Una empresa que no reparte tiene una lista vacía (vale); lo que falta en la respuesta es un fallo.
+_DIVIDENDOS = Guardados("dividendos", 12 * 3600, lambda ts: datos.dividendos_varios(list(ts)),
+                        vale=lambda v: v is not None, carpeta=lambda: datos.CARPETA_RESPALDO)
+
+
 def cargar_fundamentales_varios(tickers) -> dict[str, dict]:
-    ahora = time.time()
-    with _CERROJO_FUND:
-        # Lo bueno vale 6 horas; un vacío (Yahoo limitando, un fallo de red) se vuelve a pedir a los 10 minutos.
-        faltan = [t for t in dict.fromkeys(tickers)
-                  if t not in _FUNDAMENTALES or ahora - _FUNDAMENTALES[t][0] >
-                  (SEGUNDOS_FUNDAMENTALES if _FUNDAMENTALES[t][1] else 600)]
-    if faltan:
-        with ThreadPoolExecutor(max_workers=min(8, len(faltan))) as pool:
-            nuevos = list(pool.map(datos.fundamentales, faltan))
-        with _CERROJO_FUND:
-            for t, f in zip(faltan, nuevos):
-                if f or t not in _FUNDAMENTALES:      # un fallo de Yahoo no borra lo bueno que ya había
-                    _FUNDAMENTALES[t] = (ahora, f)
-    with _CERROJO_FUND:
-        return {t: dict(_FUNDAMENTALES[t][1]) for t in tickers if t in _FUNDAMENTALES}
+    return {t: dict(f) for t, f in _FUNDAMENTALES.varios(tickers).items()}
 
 
 def cargar_fundamentales(ticker: str) -> dict:
     return cargar_fundamentales_varios((ticker,)).get(ticker, {})
 
 
-@st.cache_data(ttl=6 * 3600, show_spinner=False)
 def cargar_analistas(tickers: tuple[str, ...]) -> dict[str, dict]:
-    """Datos de analistas de varias empresas (cambian poco: se piden cada 6 horas)."""
-    with ThreadPoolExecutor(max_workers=3) as pool:      # pocas a la vez: Yahoo limita las peticiones
-        return dict(zip(tickers, pool.map(datos.analistas, tickers)))
+    """Datos de analistas de varias empresas (cambian poco: se renuevan cada 6 horas)."""
+    hay = _ANALISTAS.varios(tickers)
+    return {t: hay.get(t, {}) for t in tickers}
 
 
 @st.cache_data(ttl=86_400, show_spinner=False)

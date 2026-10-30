@@ -253,8 +253,51 @@ def test_fundamentales_vacios_se_reintentan_pronto(monkeypatch):
     ui_comun.olvidar_datos_al_dia()
     assert ui_comun.cargar_fundamentales("X") == {}                  # Yahoo falla: vacío
     assert ui_comun.cargar_fundamentales("X") == {} and len(respuestas) == 1   # no se reintenta en seguida
-    cuando, vacio = ui_comun._FUNDAMENTALES["X"]
-    ui_comun._FUNDAMENTALES["X"] = (cuando - 601, vacio)             # pasados 10 minutos...
+    cuando, vacio = ui_comun._FUNDAMENTALES.datos["X"]
+    ui_comun._FUNDAMENTALES.datos["X"] = (cuando - 601, vacio)             # pasados 10 minutos...
     assert ui_comun.cargar_fundamentales("X") == {"trailingPE": 9.0}  # ...se vuelve a pedir
     ui_comun.olvidar_datos_al_dia()
     assert _t.time()
+
+
+def test_guardados_sobreviven_a_un_reinicio_y_se_renuevan_por_detras(tmp_path):
+    import threading
+    import time as _t
+
+    from bolsa.guardados import Guardados
+
+    pedidos, sigue = [], threading.Event()
+
+    def bajar(ts):
+        pedidos.append(list(ts))
+        if len(pedidos) > 1:
+            sigue.wait(5)
+        return {t: {"v": len(pedidos)} for t in ts}
+
+    a = Guardados("prueba", 3600, bajar, carpeta=lambda: tmp_path)
+    assert a.varios(["A", "B"]) == {"A": {"v": 1}, "B": {"v": 1}}
+    for _ in range(100):                          # se escribe en disco por detrás
+        if (tmp_path / "guardados_prueba.pkl").exists():
+            break
+        _t.sleep(0.02)
+    b = Guardados("prueba", 3600, bajar, carpeta=lambda: tmp_path)       # «reinicio de la app»
+    assert b.varios(["A"]) == {"A": {"v": 1}} and len(pedidos) == 1     # sin descargar nada
+    b.datos["A"] = (b.datos["A"][0] - 3601, b.datos["A"][1])              # ya es viejo...
+    assert b.varios(["A"]) == {"A": {"v": 1}}                            # ...se enseña lo guardado al momento
+    sigue.set()
+    for _ in range(100):
+        if b.datos["A"][1] == {"v": 2}:
+            break
+        _t.sleep(0.02)
+    assert b.varios(["A"]) == {"A": {"v": 2}}                            # y se ha renovado por detrás
+
+
+def test_guardados_un_fallo_no_borra_lo_bueno(tmp_path):
+    from bolsa.guardados import Guardados
+
+    respuestas = [{"A": {"v": 1}}, {}]
+    g = Guardados("fallo", 3600, lambda ts: respuestas.pop(0))
+    g.varios(["A"])
+    g.datos["A"] = (g.datos["A"][0] - 3601, g.datos["A"][1])
+    g._bajar_y_guardar(["A"])                     # Yahoo falla al renovar
+    assert g.varios(["A"]) == {"A": {"v": 1}}
