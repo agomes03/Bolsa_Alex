@@ -13,7 +13,8 @@ from bolsa.costes import simular_aportaciones
 from bolsa.tickers import nombre_de
 from paginas_extra import asesor_hoy, limite_empresa, pesos_cartera_real
 from paginas_seguimiento import bloque_pendientes
-from ui_comun import (cargar_informe, cargar_noticias, cargar_varios, conclusion_noticia, cotizaciones_ahora,
+from ui_comun import (lineas,
+                      cargar_informe, cargar_noticias, cargar_varios, conclusion_noticia, cotizaciones_ahora,
                       cuenta_activa, dias_informe, eur, fecha, guardar_datos, hora_espana, ir_a, linea_actualizado,
                       linea_frescura, moneda_de, num, palabras_de_la_pagina, pct, perfil, pestanas, precio, reducir,
                       fragmento_vivo, texto_estado_precio)
@@ -286,8 +287,11 @@ def tabla_radar(f: pd.DataFrame, ideas: set[str]):
         "": ["⭐" if t in ideas else "" for t in f["ticker"]],
         "Empresa": f["nombre"],
         "Precio": [precio_txt(t, d) for t, d in zip(f["ticker"], f.get("divisa", [None] * len(f)))],
-        "Hoy (%)": [round(precios[t]["variacion_pct"], 2) if precios.get(t, {}).get("variacion_pct") is not None
-                    else None for t in f["ticker"]],
+        # Mientras llega el precio de ahora, la variación de la última sesión del informe (y no celdas «None»).
+        "Hoy (%)": pd.Series([round(precios[t]["variacion_pct"], 2) if precios.get(t, {}).get("variacion_pct")
+                              is not None else (round(float(v), 2) if v is not None and not pd.isna(v) else 0.0)
+                              for t, v in zip(f["ticker"], f.get("var_1d", [None] * len(f)))], dtype="float64",
+                             index=f.index),
         "Cotización": [texto_estado_precio(precios[t]) if t in precios else "cierre (cargando…)" for t in f["ticker"]],
         "Veredicto": f["veredicto_txt"], "Nota": f["nota"],
         "Riesgo de caída": f["riesgo_nivel"].map(ICONO_RIESGO),
@@ -435,7 +439,7 @@ def bloque_entrenamiento_diario():
         curvas = pd.DataFrame({k: pd.Series(v["valores"], index=pd.to_datetime(v["fechas"]))
                                for k, v in e.get("curvas", {}).items()})
         if not curvas.empty:
-            st.line_chart(reducir(curvas), height=300 if pf.movil else 380)
+            lineas(reducir(curvas), height=300 if pf.movil else 380)
         veredicto_simulacion(e["fuera_de_muestra"], e["comprar_y_mantener"])
         from bolsa.simulador import Parametros
         with st.expander("Reglas vigentes"):
@@ -502,7 +506,7 @@ def mostrar_cartera(k: str, c: dict, por_ticker: dict, sugerida: bool):
     curvas = pd.DataFrame({"Esta cartera": pd.Series(c["curva"]["valores"], index=pd.to_datetime(c["curva"]["fechas"])),
                            "Todas a partes iguales": pd.Series(c["curva_referencia"]["valores"],
                                                                index=pd.to_datetime(c["curva_referencia"]["fechas"]))})
-    st.line_chart(reducir(curvas), height=240 if pf.movil else 320)
+    lineas(reducir(curvas), height=240 if pf.movil else 320)
     st.caption(f"Qué habría pasado con {eur(c.get('capital_simulado', 10_000), '€').replace(',00', '')} invertidos desde "
                f"el {fecha(m['desde'])} siguiendo la regla, en euros y con las comisiones reales de Bankinter "
                "(gráfico escalado a 10.000 €; sin IRPF). «Todas a partes iguales» es la referencia: comprar todas las "

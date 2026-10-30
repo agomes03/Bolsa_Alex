@@ -171,7 +171,6 @@ def bloque_evolucion(cv: dict):
 
 # --------------------------------------------------------------------------- posiciones
 def bloque_posiciones(cv: dict, info: dict):
-    pf = perfil()
     st.subheader("💼 Tu posición")
     # La misma tabla y el mismo consejo que en 🏦 Mi cartera, para seguirla igual que la real.
     filas = revisar_cartera_real(cv)
@@ -181,17 +180,17 @@ def bloque_posiciones(cv: dict, info: dict):
         ficha_activo(f_activo, filas)
         _editar_stop_virtual(cv, info)
         return
-    c = st.columns(3 if not pf.movil else 2)
-    c[0].metric("Valor de tus posiciones", eur(total))
-    c[1].metric("Ganancia o pérdida (sin vender)", eur(ganancia),
-                pct(ganancia / (total - ganancia) * 100, 1) if total - ganancia else None)
-    c[2 % len(c)].metric("Hoy", eur(cambio_hoy),
-                         pct(cambio_hoy / (total - cambio_hoy) * 100, 2) if total - cambio_hoy else None)
+    # (El valor total y la ganancia ya están arriba: aquí, solo lo que tienes en valores, en una línea.)
+    st.markdown(f"En valores: **{eur(total)}** · sin vender **{eur(ganancia)}**"
+                + (f" ({pct(ganancia / (total - ganancia) * 100, 1)})" if total - ganancia else "")
+                + f" · hoy **{eur(cambio_hoy)}**"
+                + (f" ({pct(cambio_hoy / (total - cambio_hoy) * 100, 2)})" if total - cambio_hoy else ""))
     pintar_tabla_posiciones(vista, "Parte de lo que tienes en acciones y fondos (sin contar el efectivo).")
     if vista["Precio actual"].isna().any():
         st.warning("No hay cotización ahora mismo para algún valor: su valoración no se puede calcular.")
     atencion = [f for f in filas if f["nivel"] != "mantener"]
-    with st.expander(f"📌 Qué haría el asesor con cada una ({len(atencion)} necesitan atención)" if atencion
+    with st.expander(f"📌 Qué haría el asesor con cada una ({len(atencion)} "
+                     f"{'necesita' if len(atencion) == 1 else 'necesitan'} atención)" if atencion
                      else "📌 Qué haría el asesor con cada una"):
         for f in filas:
             st.markdown(f"{ICONO_NIVEL[f['nivel']]} **{f['nombre']}**: {f['consejo']}")
@@ -331,7 +330,7 @@ def _cabecera_orden(ticker: str, q: dict, sentido: str) -> None:
                 unsafe_allow_html=True)
     c = st.columns([3, 2])
     c[0].markdown(
-        f"<div class='orden-valor'>{corto} · {nombre}</div>"
+        f"<div class='orden-valor'>{nombre if corto.upper() == nombre else f'{corto} · {nombre}'}</div>"
         f"<div class='orden-precio'>{txt_precio(q['precio'], m)} <span style='color:{color}'>{flecha} "
         + (f"{pct(var, 2)}" if var is not None else "") + "</span></div>"
         f"<div class='orden-hora'>{hora:%H:%M} · {bankinter.mercado_de(ticker).upper()}</div>",

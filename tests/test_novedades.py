@@ -240,3 +240,21 @@ def test_fundamentales_se_comparten_entre_listas(monkeypatch):
     assert ui_comun.cargar_fundamentales("B") == {"trailingPE": 10.0}
     assert sorted(pedidos) == ["A", "B", "C"]
     ui_comun.olvidar_datos_al_dia()
+
+
+def test_fundamentales_vacios_se_reintentan_pronto(monkeypatch):
+    import time as _t
+
+    import ui_comun
+    from bolsa import datos
+
+    respuestas = [{}, {"trailingPE": 9.0}]
+    monkeypatch.setattr(datos, "fundamentales", lambda t: respuestas.pop(0))
+    ui_comun.olvidar_datos_al_dia()
+    assert ui_comun.cargar_fundamentales("X") == {}                  # Yahoo falla: vacío
+    assert ui_comun.cargar_fundamentales("X") == {} and len(respuestas) == 1   # no se reintenta en seguida
+    cuando, vacio = ui_comun._FUNDAMENTALES["X"]
+    ui_comun._FUNDAMENTALES["X"] = (cuando - 601, vacio)             # pasados 10 minutos...
+    assert ui_comun.cargar_fundamentales("X") == {"trailingPE": 9.0}  # ...se vuelve a pedir
+    ui_comun.olvidar_datos_al_dia()
+    assert _t.time()

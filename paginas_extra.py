@@ -17,7 +17,8 @@ from bolsa import (alertas, asesor, asesor_diario, avisos, bankinter, cartera, c
 from bolsa.simulador import Parametros
 from bolsa.activos import CLASES, clase_de
 from bolsa.tickers import EEUU, ETFS, IBEX35, TODAS_LAS_ACCIONES, nombre_de
-from ui_comun import (fragmento_vivo, tipos_cambio, almacen_actual, cargar_activos, cargar_analistas, cargar_composiciones,
+from ui_comun import (lineas, fragmento_vivo, tipos_cambio,
+                      almacen_actual, cargar_activos, cargar_analistas, cargar_composiciones,
                       cargar_diario_real, cargar_dividendos_varios, cargar_fundamentales, cargar_fundamentales_varios,
                       cargar_historico, cargar_informe, cargar_noticias, cargar_varios, cotizaciones_ahora,
                       cuenta_activa, datos_usuario, descargas_en_paralelo, enlace, entrada_importe, estrategia_actual,
@@ -167,7 +168,7 @@ def pagina_simulador():
         cols = st.columns(1 if pf.movil else 2)
         tarjetas_metricas(r.metricas, "🤖 Estrategia de la app", capital, cols[0])
         tarjetas_metricas(m_mant, "🧺 Comprar y mantener (referencia)", capital, cols[-1])
-        st.line_chart(reducir(pd.DataFrame({"Estrategia": r.curva, "Comprar y mantener": mant})),
+        lineas(reducir(pd.DataFrame({"Estrategia": r.curva, "Comprar y mantener": mant})),
                       height=300 if pf.movil else 380)
         if cual.startswith("Reglas entrenadas"):
             st.caption("⚠️ Estas reglas se eligieron mirando estos mismos años, así que este resultado es "
@@ -233,7 +234,7 @@ def mostrar_entrenamiento(wf: dict, capital: float):
     tarjetas_metricas(wf["metricas_entrenada"], "🏋️ Estrategia entrenada", capital, cols[0])
     tarjetas_metricas(wf["metricas_defecto"], "📏 Reglas por defecto", capital, cols[1 % len(cols)])
     tarjetas_metricas(wf["metricas_mantener"], "🧺 Comprar y mantener", capital, cols[2 % len(cols)])
-    st.line_chart(reducir(pd.DataFrame({"Entrenada": wf["curva_entrenada"], "Por defecto": wf["curva_defecto"],
+    lineas(reducir(pd.DataFrame({"Entrenada": wf["curva_entrenada"], "Por defecto": wf["curva_defecto"],
                                         "Comprar y mantener": wf["curva_mantener"]})), height=300 if pf.movil else 400)
     veredicto_simulacion(wf["metricas_entrenada"], wf["metricas_mantener"])
 
@@ -342,7 +343,7 @@ def robot():
                     pct((float(mant.iloc[-1]) / rb["capital"] - 1) * 100, 2))
         c[2 % len(c)].metric("Operaciones cerradas", len(r.operaciones))
         if len(r.curva) > 1:
-            st.line_chart(reducir(pd.DataFrame({"Robot": r.curva, "Comprar y mantener": mant})), height=280)
+            lineas(reducir(pd.DataFrame({"Robot": r.curva, "Comprar y mantener": mant})), height=280)
         if not r.abiertas.empty:
             st.markdown("**Posiciones abiertas del robot**")
             a = r.abiertas.copy()
@@ -410,7 +411,7 @@ def robot_cartera(rb: dict):
                    pct((float(ref.iloc[-1]) / rb["capital"] - 1) * 100, 2))
     cols[2 % len(cols)].metric("Comisiones pagadas", eur(met.get("gastos", 0.0)))
     if len(curva) > 1:
-        st.line_chart(reducir(pd.DataFrame({"Robot": curva, "Todas a partes iguales": ref})), height=280)
+        lineas(reducir(pd.DataFrame({"Robot": curva, "Todas a partes iguales": ref})), height=280)
     filas = [{"Empresa": nombre_de(t), "Acciones": n, "Valor": eur(n * float(cierres[t].iloc[-1]))}
              for t, n in met["cartera_final"].items()]
     st.markdown("**Lo que tiene ahora el robot**")
@@ -1360,7 +1361,7 @@ def bloque_comparativa(filas: list[dict]):
         "Peor mes": pct(m["peor_mes"] * 100, 0) if m.get("peor_mes") is not None else "—"} for nombre, m in res.items()]),
         hide_index=True, width="stretch")
     curvas = pd.DataFrame({nombre.split(" (")[0]: m["curva"] * 10_000 for nombre, m in res.items()}).ffill()
-    st.line_chart(reducir(curvas), height=260)
+    lineas(reducir(curvas), height=260)
     texto = comparativa.conclusion(res)
     if texto:
         st.info(texto)
@@ -1474,14 +1475,18 @@ def bloque_diagnostico(filas: list[dict]) -> bool:
     else:                            # solo fondos, ETF u otros activos: no hay acciones de un país concreto
         m[3 % len(m)].metric("País principal", "Varios", "fondos y ETF", delta_color="off", delta_arrow="off")
 
-    figura = go.Figure(go.Bar(x=[e["peso"] * 100 for e in dg["empresas"]], y=[e["nombre"] for e in dg["empresas"]],
+    figura = go.Figure(go.Bar(x=[e["peso"] * 100 for e in dg["empresas"]],
+                              y=[e["nombre"].split(" (")[0][:28] for e in dg["empresas"]],
                               orientation="h", marker_color=["#d62728" if e["peso"] > lim["empresa"]
                                                              else "#2ca02c" for e in dg["empresas"]],
-                              text=[f"{e['peso'] * 100:.0f} %" for e in dg["empresas"]], textposition="auto"))
-    figura.add_vline(x=lim["empresa"] * 100, line_dash="dash",
+                              text=[f"{e['peso'] * 100:.0f} %" for e in dg["empresas"]], textposition="outside",
+                              cliponaxis=False))
+    figura.add_vline(x=lim["empresa"] * 100, line_dash="dash", annotation_position="bottom right",
                      annotation_text=f"máximo prudente {lim['empresa'] * 100:.0f} %")
-    figura.update_layout(height=80 + 45 * len(dg["empresas"]), margin=dict(l=0, r=0, t=30, b=0),
-                         xaxis_title="% de tu dinero", yaxis=dict(autorange="reversed"))
+    maximo = max([e["peso"] * 100 for e in dg["empresas"]] + [lim["empresa"] * 100])
+    figura.update_layout(height=80 + 45 * len(dg["empresas"]), margin=dict(l=0, r=10, t=30, b=0),
+                         xaxis=dict(title="% de tu dinero", range=[0, maximo * 1.2]),   # que quepa el «49 %»
+                         yaxis=dict(autorange="reversed"))
     mostrar_plotly(figura)
 
     for x in dg["hallazgos"]:

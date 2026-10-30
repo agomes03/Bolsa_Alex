@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from bolsa import costes, letras, libertad
-from ui_comun import alto_grafico, cuenta_activa, perfil, pestanas, privado, reducir
+from ui_comun import lineas, alto_grafico, cuenta_activa, perfil, pestanas, privado, reducir
 from ui_comun import precio as eur  # importes de ejemplo: se ven también en modo privado
 
 
@@ -75,7 +75,7 @@ def pagina_calculadoras():
                                          "(con años de -40% y años de +30%). No está garantizado.")
         filas = costes.simular_aportaciones(mensual, anos, rent, inicial)
         tabla = pd.DataFrame(filas).set_index("Año")
-        st.area_chart(reducir(tabla[["Aportado", "Ganancia"]]), height=alto_grafico() - 150)
+        lineas(apiladas=True, datos=reducir(tabla[["Aportado", "Ganancia"]]), height=alto_grafico() - 150)
         f = filas[-1]
         st.success(f"Aportando {eur(mensual)} al mes durante {anos} años habrías puesto **{eur(f['Aportado'])}** "
                    f"y tendrías unos **{eur(f['Valor'])}**. El interés compuesto hace el resto.")
@@ -164,6 +164,6 @@ def calculadora_libertad():
     tabla = pd.DataFrame({n: e["valores"][:anos_max + 1] for n, e in r["escenarios"].items()})
     tabla["Objetivo"] = r["objetivo"]
     tabla.index.name = "Años"
-    st.line_chart(tabla, height=alto_grafico() - 150)
+    lineas(tabla, height=alto_grafico() - 150)
     st.caption("Escenarios con 2 puntos menos y 2 más de rentabilidad al año. La bolsa no sube en línea recta: habrá "
                "años de -30 % por el camino. Es una guía para planificar, no una promesa.")

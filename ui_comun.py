@@ -372,8 +372,10 @@ SEGUNDOS_FUNDAMENTALES = 6 * 3600
 def cargar_fundamentales_varios(tickers) -> dict[str, dict]:
     ahora = time.time()
     with _CERROJO_FUND:
+        # Lo bueno vale 6 horas; un vacío (Yahoo limitando, un fallo de red) se vuelve a pedir a los 10 minutos.
         faltan = [t for t in dict.fromkeys(tickers)
-                  if t not in _FUNDAMENTALES or ahora - _FUNDAMENTALES[t][0] > SEGUNDOS_FUNDAMENTALES]
+                  if t not in _FUNDAMENTALES or ahora - _FUNDAMENTALES[t][0] >
+                  (SEGUNDOS_FUNDAMENTALES if _FUNDAMENTALES[t][1] else 600)]
     if faltan:
         with ThreadPoolExecutor(max_workers=min(8, len(faltan))) as pool:
             nuevos = list(pool.map(datos.fundamentales, faltan))
@@ -954,11 +956,39 @@ def pestanas(nombres: list[str], clave: str):
 def mostrar_plotly(fig, alto: int | None = None, margen: dict | None = None):
     """Gráfico fluido: sin barra de herramientas y, en el móvil, sin capturar el deslizamiento ni el zoom (así la
     página se desplaza bien con el dedo). `margen`: para gráficos con etiquetas fuera (p. ej. el de araña)."""
-    fig.update_layout(dragmode=False, margin=margen or dict(l=0, r=0, t=30, b=0), **({"height": alto} if alto else {}))
+    # separators: coma decimal y punto de miles, como en España (100.000 y no 100,000)
+    fig.update_layout(dragmode=False, separators=",.", margin=margen or dict(l=0, r=0, t=30, b=0),
+                      **({"height": alto} if alto else {}))
     if st.session_state.get("_perfil") and st.session_state["_perfil"].movil:
         fig.update_xaxes(fixedrange=True)
         fig.update_yaxes(fixedrange=True)
     st.plotly_chart(fig, width="stretch", config={"displayModeBar": False, "scrollZoom": False, "responsive": True})
+
+
+COLORES_LINEAS = ["#2563eb", "#f59e0b", "#16a34a", "#dc2626", "#7c3aed", "#0891b2", "#db2777"]
+
+
+def lineas(datos, height: int = 300, apiladas: bool = False) -> None:
+    """Curvas (una por columna) con números en español y el valor de todas al tocar una fecha. Sustituye a
+    st.line_chart / st.area_chart (que ponen los miles con coma inglesa)."""
+    import plotly.graph_objects as go
+
+    if datos is None or len(datos) == 0:
+        return
+    if isinstance(datos, pd.Series):
+        datos = datos.to_frame(datos.name or "Valor")
+    fig = go.Figure()
+    for i, col in enumerate(datos.columns):
+        color = COLORES_LINEAS[i % len(COLORES_LINEAS)]
+        fig.add_trace(go.Scatter(x=datos.index, y=datos[col], name=str(col), mode="lines",
+                                 line=dict(color=color, width=2 if i == 0 else 1.6),
+                                 stackgroup="uno" if apiladas else None,
+                                 hovertemplate="%{y:,.2f}<extra>" + str(col) + "</extra>"))
+    fig.update_layout(height=height, hovermode="x unified", showlegend=len(datos.columns) > 1,
+                      legend=dict(orientation="h", y=-0.15, x=0))
+    if float(datos.abs().max().max()) >= 1000:          # 35.000 y no «35k»
+        fig.update_yaxes(tickformat=",.0f")
+    mostrar_plotly(fig, margen=dict(l=0, r=0, t=10, b=0))
 
 
 def reducir(datos, max_puntos: int = 400):
@@ -1188,7 +1218,9 @@ ESTILOS = """
 @media (max-width: 640px) {
   .st-key-barra_inferior { display: flex !important; position: fixed; left: 0; right: 0; bottom: 0; z-index: 999990;
     background: #ffffff; border-top: 1px solid rgba(128,128,128,.25); box-shadow: 0 -2px 10px rgba(0,0,0,.06);
-    padding: .15rem .6rem calc(.15rem + env(safe-area-inset-bottom)) .6rem; margin: 0 !important; }
+    padding: .15rem 7.6rem calc(.15rem + env(safe-area-inset-bottom)) .4rem; margin: 0 !important; }
+  /* (A la derecha queda hueco para el botón «Manage app» que Streamlit Cloud pone abajo a la derecha al dueño de
+     la app: no se puede quitar desde aquí y taparía «Seguir».) */
   .st-key-barra_inferior [data-testid="stPageLink"] { flex: 1 1 0; min-width: 0; }
   .st-key-barra_inferior [data-testid="stPageLink"] a { flex-direction: column; align-items: center; gap: 0;
     padding: .25rem .1rem; border-radius: 10px; }

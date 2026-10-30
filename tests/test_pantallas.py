@@ -543,7 +543,7 @@ def test_cartera_virtual_con_la_misma_tabla_que_mi_cartera():
         assert col in tabla.columns, col
     assert abs(tabla["Peso (%)"].sum() - 100) < 0.5
     assert "stop 11,00" in tabla["Protección"].tolist()
-    assert any(m.label == "Hoy" for m in at.metric)
+    assert any("En valores:" in m.value and "hoy" in m.value for m in at.markdown)   # una línea, sin repetir cifras
     assert any("Qué haría el asesor" in e.label for e in at.expander)
 
 

@@ -171,7 +171,7 @@ def lista_de_seguimiento(lista: list[dict]):
         etiqueta = asesor.veredicto(inf)[0] if inf else "—"
         ahora = q.get("precio")
         desde = (ahora / x["precio_inicial"] - 1) * 100 if ahora and x.get("precio_inicial") else None
-        filas.append({"Valor": x["nombre"], "Precio": round(ahora, 2) if ahora else None,
+        filas.append({"Valor": x.get("nombre") or nombre_de(x["ticker"]), "Precio": round(ahora, 2) if ahora else None,
                       "Hoy (%)": round(q["variacion_pct"], 2) if q.get("variacion_pct") is not None else None,
                       "Desde que la añadiste (%)": round(desde, 1) if desde is not None else None,
                       "Nota app": inf.get("nota"), "Veredicto": etiqueta,
@@ -340,7 +340,7 @@ def tab_aportacion():
             f"y tendrías unos **{eur(final['Valor'])}**.")
     if cfg.get("hechas"):
         with st.expander("Historial de aportaciones"):
-            st.dataframe(tabla_privada(pd.DataFrame([{"Fecha": h["fecha"], "Importe (€)": h["importe"]}
+            st.dataframe(tabla_privada(pd.DataFrame([{"Fecha": fecha(h["fecha"]), "Importe (€)": h["importe"]}
                                                      for h in reversed(cfg["hechas"])])), hide_index=True,
                          width="stretch")
 
@@ -395,7 +395,7 @@ def tab_diario():
         df = hist.get(e["ticker"])
         ahora = float(df["Close"].iloc[-1]) if df is not None and not df.empty else None
         ev = diario.evaluar(e, ahora)
-        filas.append({"Fecha": e["fecha"], "Valor": e["nombre"], "Qué": e["accion"], "Precio": e.get("precio"),
+        filas.append({"Fecha": fecha(e["fecha"]), "Valor": e["nombre"], "Qué": e["accion"], "Precio": e.get("precio"),
                       "Ahora": round(ahora, 2) if ahora else None,
                       "Cambio (%)": round(ev["cambio"] * 100, 1) if ev["cambio"] is not None else None,
                       "Por qué": e["motivo"], "Lección": e.get("leccion", "")})
@@ -474,7 +474,7 @@ def tab_renta():
     if ventas:
         st.subheader("Ventas → «Ganancias y pérdidas patrimoniales (acciones admitidas a negociación)»")
         st.dataframe(tabla_privada(pd.DataFrame([{
-            "Fecha": v["fecha"], "Valor": v["nombre"], "Títulos": v["acciones"],
+            "Fecha": fecha(v["fecha"]), "Valor": v["nombre"], "Títulos": v["acciones"],
             "Venta (€)": round(v["importe_venta"], 2), "Compra (€)": round(v["importe_compra"], 2),
             "Resultado (€)": round(v["resultado"], 2)} for v in ventas])), hide_index=True, width="stretch")
         st.caption("Importes con los gastos de compra y venta ya incluidos, como pide Hacienda. La app usa el precio "
@@ -483,7 +483,7 @@ def tab_renta():
     if dividendos:
         st.subheader("Dividendos → «Rendimientos del capital mobiliario»")
         st.dataframe(tabla_privada(pd.DataFrame([{
-            "Fecha ex": x["fecha"], "Valor": x["nombre"], "Títulos": x["acciones"], "Bruto (€)": round(x["bruto"], 2),
+            "Fecha ex": fecha(x["fecha"]), "Valor": x["nombre"], "Títulos": x["acciones"], "Bruto (€)": round(x["bruto"], 2),
             "Retención 19 % (€)": round(x["retencion"], 2)} for x in dividendos])), hide_index=True, width="stretch")
         st.caption("Estimado con tus títulos en cada fecha ex-dividendo. Ojo: a Hacienda le cuenta el año en que se "
                    "PAGA (un dividendo con fecha ex a finales de diciembre que se cobra en enero va al año siguiente). "

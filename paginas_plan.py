@@ -26,23 +26,27 @@ def _cuestionario(cta: dict) -> dict | None:
         st.caption("🙈 Modo privado: tus respuestas (con tu dinero) están ocultas. Quita «Ocultar importes» en el "
                    "menú lateral para cambiarlas.")
         return previo
+    # Fuera del formulario: según el objetivo, se enseñan unas preguntas u otras (las de «operación», solo ahí).
+    objetivo = st.radio("1️⃣ ¿Para qué es este dinero?", list(plan.OBJETIVOS), format_func=plan.OBJETIVOS.get,
+                        index=list(plan.OBJETIVOS).index(previo.get("objetivo", "crecer")), key="plan_objetivo")
     with st.form("cuestionario"):
-        objetivo = st.radio("1️⃣ ¿Para qué es este dinero?", list(plan.OBJETIVOS), format_func=plan.OBJETIVOS.get,
-                            index=list(plan.OBJETIVOS).index(previo.get("objetivo", "crecer")))
         c = st.columns(2)
         importe = c[0].number_input("2️⃣ ¿Cuánto dinero? (€)", 0.0, 10_000_000.0, float(previo.get("importe", 5_000.0)),
-                                    500.0)
+                                    500.0, format="%.0f")
         mensual = c[1].number_input("¿Cuánto podrías añadir cada mes? (€)", 0.0, 100_000.0,
-                                    float(previo.get("mensual", 0.0)), 25.0, help="0 si no vas a añadir más.")
+                                    float(previo.get("mensual", 0.0)), 25.0, format="%.0f",
+                                    help="0 si no vas a añadir más.")
         intereses = st.multiselect("3️⃣ ¿Qué te interesa? (puedes elegir varios)", plan.INTERESES,
                                    default=[i for i in previo.get("intereses", []) if i in plan.INTERESES],
                                    placeholder="Si no eliges nada, uso lo habitual para tu objetivo")
-        c = st.columns(2)
-        plazo = c[0].select_slider("4️⃣ Si es una operación, ¿cuánto tiempo la mantendrías?", list(plan.PLAZOS),
-                                   value=previo.get("plazo", "1-3 meses"))
-        perdida = c[1].select_slider("Si es una operación, ¿cuánto aceptas perder como máximo? (% del dinero)",
-                                     PERDIDAS_MAX, value=previo.get("perdida_max", 5),
-                                     help="Si todo sale mal y saltan todos los stop-loss, perderías como mucho esto.")
+        plazo, perdida = previo.get("plazo", "1-3 meses"), previo.get("perdida_max", 5)
+        if objetivo == "operacion":
+            c = st.columns(2)
+            plazo = c[0].select_slider("4️⃣ ¿Cuánto tiempo mantendrías la operación?", list(plan.PLAZOS),
+                                       value=plazo)
+            perdida = c[1].select_slider("¿Cuánto aceptas perder como máximo? (% del dinero)", PERDIDAS_MAX,
+                                         value=perdida, help="Si todo sale mal y saltan todos los stop-loss, "
+                                                             "perderías como mucho esto.")
         horizonte = st.slider("5️⃣ ¿Dentro de cuántos años podrías necesitar este dinero para otra cosa?", 0, 40,
                               int(previo.get("horizonte", 10)))
         reaccion = st.radio("6️⃣ Si lo que compras bajara un 20 % en pocas semanas, ¿qué harías?",
