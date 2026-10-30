@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -18,8 +17,8 @@ from paginas_extra import bloque_operar, limite_empresa, pesos_cartera_real
 from paginas_hoy import bloque_que_puede_pasar_accion, pagina_radar_global
 from paginas_noticias import tarjeta_noticia
 from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, cargar_informe, cotizaciones_ahora,
-                      estrategia_actual, eur, fila_informe, fx, mercado_alcista_para, moneda_de, mostrar_plotly,
-                      noticias_empresa, num, palabras_de_la_pagina, pct, perfil, precio, selector_valor)
+                      descargas_en_paralelo, estrategia_actual, eur, fila_informe, fx, mercado_alcista_para, moneda_de,
+                      mostrar_plotly, noticias_empresa, num, palabras_de_la_pagina, pct, perfil, precio, selector_valor)
 
 
 PERIODOS_GRAFICO = {"1 mes": 22, "6 meses": 130, "1 año": 260, "5 años": 1300}
@@ -172,14 +171,14 @@ def pagina_analizar():
     ticker = selector_valor("an", defecto=pre)
 
     with st.spinner(f"Analizando {nombre_de(ticker)}..."):
-        df = cargar_historico(ticker, "10y")
+        # Todo lo que pide la página, a la vez (antes iba en fila: historia, empresa y noticias, índice, precio).
+        with descargas_en_paralelo(lambda: cargar_fundamentales(ticker), lambda: noticias_empresa(ticker),
+                                   lambda: cotizaciones_ahora([ticker]), lambda: mercado_alcista_para(ticker)):
+            df = cargar_historico(ticker, "10y")
         if df.empty or len(df) < 30:
             st.error("No hay datos suficientes para ese código. Comprueba que está bien escrito.")
             return
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            f_fund = pool.submit(cargar_fundamentales, ticker)
-            f_news = pool.submit(noticias_empresa, ticker)
-            fund, news = f_fund.result(), f_news.result()
+        fund, news = cargar_fundamentales(ticker), noticias_empresa(ticker)
         fila = fila_informe(ticker)
         inf = cargar_informe()
         riesgo_modelo = None
