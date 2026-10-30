@@ -90,6 +90,51 @@ def selector_de_cuenta() -> None:
     st.divider()
 
 
+# Streamlit guarda el tema elegido en el navegador (localStorage, una clave por dirección de la página) y lo lee al
+# cargar. Desde Python no se puede cambiar: se escribe esa clave para esta página, la de inicio y las del menú, y se
+# recarga. Así se queda puesto también al volver a abrir la app en el móvil.
+_CAMBIAR_TEMA = """
+<script>
+(() => {
+  const valor = JSON.stringify("%s");
+  const base = location.pathname.replace(/[^/]*$/, "");
+  const rutas = new Set([location.pathname, base, base.replace(/\\/$/, "") || "/"]);
+  document.querySelectorAll("a[href]").forEach(a => {
+    try { const u = new URL(a.href, location.href);
+          if (u.origin === location.origin && u.pathname.startsWith(base)) rutas.add(u.pathname); } catch (e) {}
+  });
+  try {
+    Object.keys(localStorage).filter(k => k.startsWith("stActiveTheme-")).forEach(k => localStorage.setItem(k, valor));
+    rutas.forEach(r => localStorage.setItem("stActiveTheme-" + r + "-v2", valor));
+  } catch (e) {}
+  location.reload();
+})();
+</script>
+"""
+
+
+def _tema_actual_oscuro() -> bool:
+    try:
+        return st.context.theme.type == "dark"
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _al_cambiar_tema() -> None:
+    st.session_state["_tema_pendiente"] = "Dark" if st.session_state.get("_oscuro") else "Light"
+
+
+def modo_oscuro() -> None:
+    """Interruptor de modo oscuro (fondo negro, mejor de noche y gasta menos batería en pantallas OLED)."""
+    if "_oscuro" not in st.session_state:
+        st.session_state["_oscuro"] = _tema_actual_oscuro()
+    st.toggle("🌙 Modo oscuro", key="_oscuro", on_change=_al_cambiar_tema,
+              help="Fondo oscuro, más cómodo de noche. Se queda guardado en este móvil o navegador.")
+    pendiente = st.session_state.pop("_tema_pendiente", None)
+    if pendiente:
+        st.html(_CAMBIAR_TEMA % pendiente, unsafe_allow_javascript=True)
+
+
 def barra_lateral() -> Perfil:
     """Pinta la barra lateral y devuelve el perfil elegido."""
     with st.sidebar:
@@ -100,6 +145,7 @@ def barra_lateral() -> Perfil:
         st.toggle("🙈 Ocultar importes", key="_privado",
                   help="Modo privado: tus euros salen como «•••» y las tablas solo enseñan precios y porcentajes. "
                        "Para enseñar la app sin que se vea cuánto tienes.")
+        modo_oscuro()
         if privado():                # sin enseñar tu dinero: se usa el de tu plan
             capital = float(st.session_state.get("_capital_sueltas") or round(_capital_por_defecto(), -1))
             st.caption("💶 Dinero para acciones sueltas: ••• € (oculto)")

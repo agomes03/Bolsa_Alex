@@ -1,6 +1,14 @@
 [theme]
 primaryColor = "#ff6600"
 
+# Versión clara y oscura del mismo tema: así se puede elegir (🌙 Modo oscuro en la barra lateral) y Streamlit
+# recuerda la elección en el navegador. Con un solo tema la descartaba al cargar.
+[theme.light]
+primaryColor = "#ff6600"
+
+[theme.dark]
+primaryColor = "#ff6600"
+
 [client]
 # Sin el botón «Deploy» ni el menú de desarrollador arriba a la derecha.
 toolbarMode = "minimal"

@@ -907,3 +907,14 @@ def test_calculadora_de_orden_limitada_en_calculadoras():
     at = abrir("pagina_calculadoras")
     sin_fallos(at)
     assert any(m.label == "Precio para no perder" for m in at.metric)
+
+
+def test_interruptor_de_modo_oscuro():
+    at = abrir("pagina_calculadoras")
+    interruptor = at.sidebar.toggle(key="_oscuro")
+    assert interruptor.value is False
+    interruptor.set_value(True).run()
+    sin_fallos(at)
+    assert "_tema_pendiente" not in at.session_state       # el cambio se ha mandado al navegador
+    html = [e.proto.body for e in at.get("html") if "stActiveTheme" in e.proto.body]
+    assert html and 'JSON.stringify("Dark")' in html[0]
