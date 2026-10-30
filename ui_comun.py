@@ -1183,6 +1183,22 @@ ESTILOS = """
   font-size: .8rem; letter-spacing: .03em; opacity: .8; }
 .st-key-orden_ticket button[kind="primary"], .st-key-orden_confirmar button[kind="primary"] {
   background: #f7941d; border-color: #f7941d; border-radius: 999px; letter-spacing: .06em; }
+/* Barra de atajos de abajo: solo en el móvil. */
+.st-key-barra_inferior { display: none !important; }
+@media (max-width: 640px) {
+  .st-key-barra_inferior { display: flex !important; position: fixed; left: 0; right: 0; bottom: 0; z-index: 999990;
+    background: #ffffff; border-top: 1px solid rgba(128,128,128,.25); box-shadow: 0 -2px 10px rgba(0,0,0,.06);
+    padding: .15rem .6rem calc(.15rem + env(safe-area-inset-bottom)) .6rem; margin: 0 !important; }
+  .st-key-barra_inferior [data-testid="stPageLink"] { flex: 1 1 0; min-width: 0; }
+  .st-key-barra_inferior [data-testid="stPageLink"] a { flex-direction: column; align-items: center; gap: 0;
+    padding: .25rem .1rem; border-radius: 10px; }
+  .st-key-barra_inferior [data-testid="stPageLink"] a span { font-size: 1.25rem; line-height: 1.2; }
+  .st-key-barra_inferior [data-testid="stPageLink"] p { font-size: .68rem; white-space: nowrap; }
+  [data-testid="stMainBlockContainer"] { padding-bottom: 5.5rem !important; }
+}
+@media (max-width: 640px) and (prefers-color-scheme: dark) {
+  .st-key-barra_inferior { background: #0e1117; border-top-color: rgba(250,250,250,.15); }
+}
 /* Cifras un poco más pequeñas: caben más sin hacer scroll. */
 [data-testid="stMetricValue"] { font-size: clamp(1.3rem, 2.4vw, 1.9rem); }
 @media (max-width: 640px) {
@@ -1236,6 +1252,21 @@ AYUDAS_TACTILES = """
 })();
 </script>
 """
+
+
+# Barra fija abajo en el móvil (como en las apps del banco): lo que más se usa, a un toque. Arriba, el menú «»»
+# sigue teniendo todas las páginas.
+BARRA_INFERIOR = (("hoy", "Hoy"), ("bankinter", "Cartera"), ("mercados", "Mercados"), ("analizar", "Analizar"),
+                  ("seguimiento", "Seguir"))
+
+
+def barra_inferior(paginas: dict) -> None:
+    try:
+        with st.container(key="barra_inferior", horizontal=True, horizontal_alignment="distribute", gap=None):
+            for clave, etiqueta in BARRA_INFERIOR:
+                st.page_link(paginas[clave], label=etiqueta, icon=paginas[clave].icon)
+    except Exception:  # noqa: BLE001 - una barra de atajos nunca debe romper la página
+        pass
 
 
 def estilos() -> None:

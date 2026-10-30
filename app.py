@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ui_comun import aviso_carga_fallida, aviso_datos_antiguos, control_acceso, estilos
+from ui_comun import aviso_carga_fallida, aviso_datos_antiguos, barra_inferior, control_acceso, estilos
 
 st.set_page_config(page_title="Asistente de Bolsa", page_icon="📈", layout="wide",
                    initial_sidebar_state="collapsed")
@@ -61,6 +61,7 @@ GRUPOS = {
 nav = st.navigation(GRUPOS, position="top")
 _hueco_aviso = st.empty()
 nav.run()
+barra_inferior(PAGINAS)
 aviso_datos_antiguos(_hueco_aviso)
 
 

@@ -201,7 +201,10 @@ def decidir(fila: dict, valor: float, total: float, limite: float, analistas: di
     situacion = None
     if precio and pos.get("precio_medio"):
         ganancia = precio / pos["precio_medio"] - 1
-        situacion = (f"Tienes {_num(pos['acciones']).rstrip('0').rstrip(',')} acciones compradas a "
+        unidad = ("participaciones" if fila.get("ticker", "").startswith("0P") else
+                  "unidades" if fila.get("clase") == "Criptomonedas" else
+                  "acciones" if fila.get("clase", "Acciones") == "Acciones" else "títulos")
+        situacion = (f"Tienes {_num(pos['acciones']).rstrip('0').rstrip(',')} {unidad} compradas a "
                      f"{_num(pos['precio_medio'])} · hoy {_num(precio)} ({_pct(ganancia)})")
     return {"clave": clave, "icono": icono, "titulo": titulo, "texto": texto, "tambien": tambien,
             "motivos": motivos, "analistas": (a.get("lineas") or []), "peso": peso, "situacion": situacion}

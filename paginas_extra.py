@@ -554,6 +554,8 @@ def pesos_cartera_real() -> dict[str, float]:
     return {t: v / total for t, v in valores.items()} if total > 0 else {}
 
 
+TEXTO_NIVEL = {"vender": "Vender", "vigilar": "Vigilar", "poner_stop": "Poner stop-loss", "subir_stop": "Subir el stop",
+               "mantener": "Mantener", "sin_datos": "Sin cotización"}
 ICONO_NIVEL = {"vender": "🔴", "vigilar": "🟠", "poner_stop": "🟡", "subir_stop": "🟢⬆️", "mantener": "🟢",
                "sin_datos": "⚪"}
 
@@ -600,7 +602,7 @@ def asesor_hoy(inf: dict | None):
                              pct((valor / invertido - 1) * 100, 1) if invertido else None)
         if dg.get("clases"):
             principal = max(dg["clases"].items(), key=lambda x: x[1])
-            c[2 % len(c)].metric("Reparto", f"{principal[1] * 100:.0f} % {principal[0].lower()}",
+            c[2 % len(c)].metric(f"Reparto · más en {principal[0]}", f"{principal[1] * 100:.0f} %",
                                  TITULO_SEMAFORO.get(dg["semaforo"], ""), delta_color="off", delta_arrow="off")
         st.caption(linea_actualizado())
         decisiones_por_accion(filas)
@@ -678,29 +680,46 @@ def decisiones_por_accion(filas: list[dict]) -> None:
     lista.sort(key=lambda x: orden.index(x[1]["clave"]))
     if privado():                    # sin importes ni número de acciones
         for _, d in lista:
-            d["situacion"] = re.sub(r"Tienes [\d.,]+ acciones", "Tienes acciones", d.get("situacion") or "")
+            d["situacion"] = re.sub(r"Tienes [\d.,]+ (\w+)", r"Tienes \1", d.get("situacion") or "")
             d["texto"] = _ocultar_importes(d["texto"])
             d["tambien"] = [_ocultar_importes(x) for x in d["tambien"]]
     st.markdown("**📌 Qué hacer con cada acción tuya**")
+    # Primero, de un vistazo: cada consejo con los valores a los que se aplica.
+    grupos: dict[str, list] = {}
     for f, d in lista:
-        with st.container(border=True):
-            st.markdown(f"**{f['nombre']}** · {d['peso'] * 100:.0f} % de tu dinero"
-                        + (f"  \n<small>{d['situacion']}</small>" if d.get("situacion") else ""),
-                        unsafe_allow_html=True)
+        grupos.setdefault(d["clave"], []).append((f, d))
+    for clave, miembros in grupos.items():
+        icono, titulo = decision.ACCIONES[clave]
+        st.markdown(f"{icono} **{titulo}:** " + ", ".join(f["nombre"].split(" (")[0] for f, _ in miembros))
+    # Lo que se repite en varios valores (p. ej. «si la compraste a largo plazo...»), una sola vez.
+    repetidos = [x for x in dict.fromkeys(x for _, d in lista for x in d["tambien"])
+                 if sum(x in d["tambien"] for _, d in lista) > 1]
+    for x in repetidos:
+        st.caption(x)
+    st.caption("Toca cada valor para ver por qué:")
+    for f, d in lista:
+        ganancia = (f["precio"] / f["pos"]["precio_medio"] - 1) * 100 if f["pos"].get("precio_medio") else None
+        titulo = (f"{d['icono']} {f['nombre'].split(' (')[0]} · {d['peso'] * 100:.0f} %"
+                  + (f" · {pct(ganancia, 0)}" if ganancia is not None else "") + f" · {d['titulo']}")
+        with st.expander(titulo, expanded=d["clave"] in ("vender", "vigilar")):
+            if d.get("situacion"):
+                st.caption(d["situacion"])
             st.markdown(f"👉 Te recomiendo: {d['icono']} **{d['titulo']}**  \n{d['texto']}")
             for x in d["tambien"]:
-                st.markdown(x)
+                if x not in repetidos:
+                    st.markdown(x)
             for m in d["motivos"]:
                 st.caption(m)
             if d.get("analistas"):
-                with st.expander("🏦 Qué dicen los analistas"):
-                    for linea in d["analistas"]:
-                        st.markdown(f"- {linea}")
-    st.caption("Analistas: los de los bancos y brókers que siguen cada empresa (entre 10 y 30 en las grandes), "
-               "recogidos por Yahoo Finance: qué recomiendan, a qué precio creen que llegará (la mediana, que no "
-               "distorsiona un analista extremo) y si suben o bajan sus previsiones. La fiabilidad sube cuantos más "
-               "son y más de acuerdo están. No se usan foros: ahí opina cualquiera, sin responsabilidad y a veces "
-               "para mover el precio. Los analistas también fallan: es una mirada más, no la decisión.")
+                st.markdown("**🏦 Qué dicen los analistas**")
+                for linea in d["analistas"]:
+                    st.markdown(f"- {linea}")
+    with st.expander("ℹ️ De dónde sale la opinión de los analistas"):
+        st.caption("Analistas: los de los bancos y brókers que siguen cada empresa (entre 10 y 30 en las grandes), "
+                   "recogidos por Yahoo Finance: qué recomiendan, a qué precio creen que llegará (la mediana, que no "
+                   "distorsiona un analista extremo) y si suben o bajan sus previsiones. La fiabilidad sube cuantos "
+                   "más son y más de acuerdo están. No se usan foros: ahí opina cualquiera, sin responsabilidad y a "
+                   "veces para mover el precio. Los analistas también fallan: es una mirada más, no la decisión.")
 
 
 def bloque_telegram():
@@ -768,11 +787,7 @@ def avisos_resumen():
                 st.markdown(f"{ICONO_NIVEL[f['nivel']]} **{f['nombre']}**: {f['consejo']}")
 
 
-def pagina_bankinter():
-    broker = bankinter.broker() if bankinter.broker() != "Otro" else "tu banco"
-    st.title("🏦 Mi cartera")
-    if st.session_state.get("_alta_hecha"):          # lo que se acaba de apuntar a mano (arriba, se vea la pestaña que se vea)
-        st.success(st.session_state.pop("_alta_hecha"))
+def _como_se_conecta(broker: str) -> None:
     with st.expander(f"🔒 Cómo se conecta con {broker} (y por qué no te pide la contraseña)"):
         st.markdown(
             f"Ni {broker} ni ningún banco español ofrece a particulares una forma oficial de que otra app lea tus "
@@ -783,6 +798,13 @@ def pagina_bankinter():
             "2. La app las **analiza**: acciones, fondos, ETF, oro, criptomonedas...\n"
             "3. Cada día te **aconseja** qué hacer y te deja la **orden escrita** para copiarla en tu bróker.\n\n"
             "Tú das siempre la última orden. Tus datos se guardan solo en tu copia de la app.")
+
+
+def pagina_bankinter():
+    broker = bankinter.broker() if bankinter.broker() != "Otro" else "tu banco"
+    st.title("🏦 Mi cartera")
+    if st.session_state.get("_alta_hecha"):          # lo que se acaba de apuntar a mano (arriba, se vea la pestaña que se vea)
+        st.success(st.session_state.pop("_alta_hecha"))
     d = datos_usuario()
     nombres = list(cuentas.asegurar(d))
     elegida = d["cuenta_activa"]
@@ -790,9 +812,10 @@ def pagina_bankinter():
     if len(nombres) > 1:
         st.info(f"👤 Estás viendo la cuenta **{elegida}**. Cámbiala en el menú lateral (»): la app asesora a cada "
                 "cuenta por separado y no las suma.")
-    bloque_cuentas(d)
-
     filas = revisar_cartera_real()
+    if not filas:                    # primera vez: cómo funciona y las cuentas, arriba
+        _como_se_conecta(broker)
+        bloque_cuentas(d)
     if filas:
         resumen_cartera(nombres, elegida)
         p_hacer, p_diag, p_div, p_comp, p_anadir = pestanas(["📋 Qué hacer", "🩺 Diagnóstico", "💶 Dividendos",
@@ -824,6 +847,9 @@ def pagina_bankinter():
         st.caption("Aún no has registrado posiciones en esta cuenta. Impórtalas de tu banco o añádelas a mano.")
         bloque_anadir()
         bloque_telegram()
+    if filas:                        # con cartera, lo de cada día va arriba y esto, al final
+        bloque_cuentas(d)
+        _como_se_conecta(broker)
 
     palabras_de_la_pagina(["Concentración", "Diversificación", "Sector", "Volatilidad", "Caída máxima", "Stop-loss",
                            "Dividendo", "Fecha ex-dividendo", "Retención", "Ganancia patrimonial", "Base del ahorro",
@@ -871,9 +897,10 @@ def pintar_tabla_posiciones(tabla: pd.DataFrame, ayuda_peso: str) -> None:
     pf = perfil()
     if privado():                   # sin euros: precios, porcentajes y peso sí
         tabla = tabla.drop(columns=["Títulos", "Invertido (€)", "Valor (€)", "Ganancia (€)"])
-    if pf.movil:
-        tabla = tabla[[c for c in ("", "Activo", "Precio actual", "Hoy (%)", "Precio compra", "Ganancia (%)",
-                                   "Ganancia (€)", "Valor (€)", "Peso (%)", "Títulos", "Protección") if c in tabla]]
+    if pf.movil:      # lo que más se mira, primero (el resto, deslizando la tabla)
+        tabla = tabla[[c for c in ("", "Activo", "Valor (€)", "Ganancia (%)", "Hoy (%)", "Ganancia (€)",
+                                   "Precio actual", "Precio compra", "Peso (%)", "Títulos", "Protección")
+                       if c in tabla]]
     st.dataframe(tabla, hide_index=True, width="stretch", column_config={
         "": st.column_config.TextColumn(width=30, pinned=True),
         "Activo": st.column_config.TextColumn(pinned=True),
@@ -976,7 +1003,8 @@ def resumen_cartera(nombres: list[str], elegida: str):
         return
     avisos = [f for f in filas if f["nivel"] not in ("mantener",)]
     if avisos:
-        st.warning(f"🔔 {len(avisos)} posición(es) necesitan tu atención.")
+        st.warning(f"🔔 {len(avisos)} posiciones necesitan tu atención: mira «📋 Qué hacer» más abajo."
+                   if len(avisos) > 1 else "🔔 1 posición necesita tu atención: mira «📋 Qué hacer» más abajo.")
     tabla, total, ganancia, cambio_hoy = tabla_posiciones(filas)
     f_activo = selector_activo(filas, "mc_activo")
     if f_activo:
@@ -991,7 +1019,26 @@ def resumen_cartera(nombres: list[str], elegida: str):
                          pct(cambio_hoy / (total - cambio_hoy) * 100, 2) if total - cambio_hoy else None)
     pintar_tabla_posiciones(tabla, "Parte de lo que tienes invertido en esta cuenta. En 🧭 Hoy el peso cuenta "
                                    "también el dinero en cuentas y depósitos, por eso allí puede salir algo menor.")
+    grafico_reparto(tabla)
     st.caption(linea_actualizado())
+
+
+def grafico_reparto(tabla: pd.DataFrame) -> None:
+    """Cuánto pesa cada valor en tu cartera y si gana (verde) o pierde (rojo), de un vistazo."""
+    if tabla.empty or "Peso (%)" not in tabla or tabla["Peso (%)"].isna().all():
+        return
+    t = tabla.dropna(subset=["Peso (%)"]).sort_values("Peso (%)")
+    nombres = [n.split(" (")[0][:24] for n in t["Activo"]]
+    ganancias = t["Ganancia (%)"].fillna(0)
+    colores = ["#16a34a" if g >= 0 else "#dc2626" for g in ganancias]
+    textos = [f"{p:.0f} % · {pct(g, 0)}" for p, g in zip(t["Peso (%)"], ganancias)]
+    fig = go.Figure(go.Bar(x=t["Peso (%)"], y=nombres, orientation="h", marker_color=colores, text=textos,
+                           textposition="outside", cliponaxis=False, hoverinfo="skip"))
+    fig.update_layout(title=dict(text="Reparto de tu dinero (verde: ganas · rojo: pierdes)", font=dict(size=13)),
+                      height=60 + 28 * len(t), showlegend=False, bargap=0.35,
+                      xaxis=dict(visible=False, range=[0, float(t["Peso (%)"].max()) * 1.45]),
+                      yaxis=dict(tickfont=dict(size=12)))
+    mostrar_plotly(fig, margen=dict(l=0, r=10, t=30, b=0))
 
 
 def bloque_cuentas(d: dict):
@@ -1725,7 +1772,7 @@ def _corregir_posicion(t: str, pos: dict, clase: str):
 
 def posicion_detalle(f: dict, cr: dict):
     t, pos = f["ticker"], f["pos"]
-    with st.expander(f"{ICONO_NIVEL[f['nivel']]} {f['nombre']} — {f['consejo'][:70]}"):
+    with st.expander(f"{ICONO_NIVEL[f['nivel']]} {f['nombre'].split(' (')[0]} · {TEXTO_NIVEL[f['nivel']]}"):
         st.write(f["consejo"])
         if f["ev"]:
             for a in f["ev"].avisos:

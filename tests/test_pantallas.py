@@ -475,9 +475,10 @@ def test_tabla_de_mi_cartera_con_todas_las_columnas():
 def test_hoy_dice_que_hacer_con_cada_accion_y_puede_centrarse_en_mi_cartera():
     at = abrir("pagina_hoy", datos_usuario={"cartera_real": cartera_de_prueba()})
     sin_fallos(at)
-    textos = " ".join(m.value for m in at.markdown)
+    textos = " ".join(m.value for m in [*at.markdown, *at.caption])
     assert "Qué hacer con cada acción tuya" in textos
     assert "Te recomiendo:" in textos and "Tienes 2.500 acciones compradas a 12,46" in textos
+    assert "Tienes 0,05 unidades" in textos                                    # el bitcoin no son «acciones»
     assert any("analistas" in c.value for c in at.caption)                    # el consenso de los brókers
     assert any("Fiabilidad del consenso" in m.value for m in at.markdown)
     assert any("se actualizan solos cada minuto" in c.value for c in at.caption)

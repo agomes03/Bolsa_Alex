@@ -22,30 +22,52 @@ from ui_comun import (alto_grafico, cargar_fundamentales, cargar_historico, carg
                       noticias_empresa, num, palabras_de_la_pagina, pct, perfil, precio, selector_valor)
 
 
-def grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None = None) -> go.Figure:
-    return _grafico(df, titulo, plan, perfil().movil, alto_grafico())
+PERIODOS_GRAFICO = {"1 mes": 22, "6 meses": 130, "1 año": 260, "5 años": 1300}
+
+
+def grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None = None, periodo: str = "1 año",
+            velas: bool = False) -> go.Figure:
+    return _grafico(df, titulo, plan, perfil().movil, alto_grafico(), periodo, velas)
 
 
 @memorizar(12, copiar=False)        # el mismo gráfico en cada refresco: se reutiliza (montarlo cuesta ~0,3 s)
-def _grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None, movil: bool, alto: int) -> go.Figure:
-    # Solo lo necesario: un año visible (medio año en el móvil) más 200 sesiones para calcular la media larga.
-    visibles = 130 if movil else 260
+def _grafico(df: pd.DataFrame, titulo: str, plan: senales.Plan | None, movil: bool, alto: int,
+             periodo: str = "1 año", velas: bool = False) -> go.Figure:
+    """Línea sencilla (por defecto) o velas con el RSI debajo. Siempre con las medias de 50 y 200 sesiones y, si
+    hay plan, el stop-loss y el objetivo."""
+    visibles = PERIODOS_GRAFICO.get(periodo, 260)
     d = calcular_todo(df.tail(visibles + 210)).tail(visibles)
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.72, 0.28], vertical_spacing=0.04)
-    fig.add_trace(go.Candlestick(x=d.index, open=d["Open"], high=d["High"], low=d["Low"], close=d["Close"],
-                                 name="Precio", showlegend=False), row=1, col=1)
-    for col, color in (("SMA50", "#f59e0b"), ("SMA200", "#6366f1")):
-        fig.add_trace(go.Scatter(x=d.index, y=d[col], name=f"Media {col[3:]}",
-                                 line=dict(color=color, width=1.6)), row=1, col=1)
+    if velas and len(d) > 300:            # 5 años en velas diarias no se ven: una vela por semana
+        d = d.resample("W-FRI").agg({"Open": "first", "High": "max", "Low": "min", "Close": "last",
+                                     "SMA50": "last", "SMA200": "last", "RSI": "last"}).dropna(subset=["Close"])
+    filas = 2 if velas else 1
+    fig = make_subplots(rows=filas, cols=1, shared_xaxes=True, vertical_spacing=0.04,
+                        row_heights=[0.72, 0.28] if velas else [1.0])
+    if velas:
+        fig.add_trace(go.Candlestick(x=d.index, open=d["Open"], high=d["High"], low=d["Low"], close=d["Close"],
+                                     name="Precio", showlegend=False), row=1, col=1)
+    else:
+        sube = d["Close"].iloc[-1] >= d["Close"].iloc[0]
+        color = "#16a34a" if sube else "#dc2626"
+        fig.add_trace(go.Scatter(x=d.index, y=d["Close"], name="Precio", line=dict(color=color, width=2.2),
+                                 fill="tozeroy", fillcolor="rgba(22,163,74,.08)" if sube else "rgba(220,38,38,.08)",
+                                 hovertemplate="%{x|%d/%m/%Y}: %{y:,.2f}<extra></extra>"), row=1, col=1)
+        fig.update_yaxes(range=[float(d["Low"].min()) * 0.97, float(d["High"].max()) * 1.03], row=1, col=1)
+    for col, color, nombre in (("SMA50", "#f59e0b", "Media 3 meses"), ("SMA200", "#6366f1", "Media 1 año")):
+        fig.add_trace(go.Scatter(x=d.index, y=d[col], name=nombre, line=dict(color=color, width=1.4),
+                                 hoverinfo="skip"), row=1, col=1)
     if plan:
         for y, txt, color in ((plan.stop, "Stop-loss", "#dc2626"), (plan.objetivo, "Objetivo", "#16a34a")):
-            fig.add_hline(y=y, line_dash="dash", line_color=color, annotation_text=txt, row=1, col=1)
-    fig.add_trace(go.Scatter(x=d.index, y=d["RSI"], name="RSI", line=dict(color="#0ea5e9")), row=2, col=1)
-    fig.add_hrect(y0=70, y1=100, fillcolor="#dc2626", opacity=0.08, line_width=0, row=2, col=1)
-    fig.add_hrect(y0=0, y1=30, fillcolor="#16a34a", opacity=0.08, line_width=0, row=2, col=1)
-    fig.update_yaxes(range=[0, 100], row=2, col=1, title_text="RSI")
-    fig.update_layout(title=None if movil else titulo, height=alto, xaxis_rangeslider_visible=False,
-                      legend=dict(orientation="h", y=1.08), margin=dict(l=5, r=5, t=40, b=5))
+            fig.add_hline(y=y, line_dash="dash", line_color=color, annotation_text=txt,
+                          annotation_position="top left", row=1, col=1)
+    if velas:
+        fig.add_trace(go.Scatter(x=d.index, y=d["RSI"], name="RSI", line=dict(color="#0ea5e9")), row=2, col=1)
+        fig.add_hrect(y0=70, y1=100, fillcolor="#dc2626", opacity=0.08, line_width=0, row=2, col=1)
+        fig.add_hrect(y0=0, y1=30, fillcolor="#16a34a", opacity=0.08, line_width=0, row=2, col=1)
+        fig.update_yaxes(range=[0, 100], row=2, col=1, title_text="RSI")
+    fig.update_layout(title=None if movil else titulo, height=alto if velas else int(alto * 0.75),
+                      xaxis_rangeslider_visible=False, hovermode="x unified" if not velas else "closest",
+                      legend=dict(orientation="h", y=1.1), margin=dict(l=5, r=5, t=40, b=5))
     return fig
 
 
@@ -213,10 +235,19 @@ def pagina_analizar():
             st.metric("Riesgo de caer más de un 10 % el próximo mes", pct(riesgo_modelo["prob"] * 100, 0, False),
                       f"lo normal: {pct(riesgo_modelo['base'] * 100, 0, False)}", delta_color="off", delta_arrow="off")
     with c2:
-        mostrar_plotly(grafico(df, "Último año" if not movil else "Últimos 6 meses", ev.plan))
-        st.caption("Velas: cada día (verde si subió, roja si bajó). Naranja: media de 50 sesiones (≈3 meses). "
-                   "Morada: media de 200 sesiones (≈1 año). Abajo, el RSI: por encima de 70 ha subido muy deprisa, "
-                   "por debajo de 30 ha caído muy deprisa.")
+        with st.container(horizontal=True, gap="small"):
+            periodo = st.segmented_control("Periodo", list(PERIODOS_GRAFICO), key="an_periodo",
+                                           default="6 meses" if movil else "1 año",
+                                           label_visibility="collapsed") or ("6 meses" if movil else "1 año")
+            velas = st.toggle("Velas", key="an_velas", help="Para quien ya conoce el análisis técnico: velas "
+                                                             "diarias y el RSI debajo.")
+        mostrar_plotly(grafico(df, periodo, ev.plan, periodo, velas))
+        st.caption(("Velas: cada día (verde si subió, roja si bajó). Abajo, el RSI: por encima de 70 ha subido muy "
+                    "deprisa, por debajo de 30 ha caído muy deprisa. " if velas else
+                    "Precio de cierre de cada día (verde si sube en el periodo, rojo si baja). ")
+                   + "Naranja: media de los últimos 3 meses. Morada: media del último año (si el precio está por "
+                     "encima, la tendencia de fondo es buena)."
+                   + (" Rayas: el stop-loss y el objetivo que propone la app." if ev.plan else ""))
     for a in ev.avisos:
         st.warning(a)
     peso = pesos_cartera_real().get(ticker, 0.0)
