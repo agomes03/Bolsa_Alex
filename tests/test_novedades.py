@@ -301,3 +301,21 @@ def test_guardados_un_fallo_no_borra_lo_bueno(tmp_path):
     g.datos["A"] = (g.datos["A"][0] - 3601, g.datos["A"][1])
     g._bajar_y_guardar(["A"])                     # Yahoo falla al renovar
     assert g.varios(["A"]) == {"A": {"v": 1}}
+
+
+def test_orden_limitada_cuanto_ganas_o_pierdes():
+    import pytest
+
+    from bolsa import costes
+
+    t = costes.Tarifa()
+    r = costes.resultado_orden(100, 65.0, 67.0, "SAN.MC", t)       # compras 100 a 65 y vendes a 67
+    assert r["bruto"] == pytest.approx(200.0)
+    assert r["gasto_compra"] == pytest.approx(9.0 + 6500 * 0.002)   # 8 € + canon 1 € + tasa Tobin 0,2 %
+    assert r["gasto_venta"] == pytest.approx(9.0)
+    assert r["neto"] == pytest.approx(169.0) and r["limpio"] == pytest.approx(169.0 * 0.81)
+    ya = costes.resultado_orden(100, 65.0, 62.0, "SAN.MC", t, ya_comprada=True)   # ya las tienes: solo la venta
+    assert ya["neto"] == pytest.approx(-309.0) and ya["irpf"] == 0
+    p = costes.precio_sin_perder(100, 65.0, "SAN.MC", t)
+    assert 65.0 < p < 65.5
+    assert abs(costes.resultado_orden(100, 65.0, p, "SAN.MC", t)["neto"]) < 0.01

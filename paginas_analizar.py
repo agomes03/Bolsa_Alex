@@ -257,6 +257,11 @@ def pagina_analizar():
                    f"{tope * 100:.0f} %. Mira en 🏦 Mi cartera cómo repartir el riesgo.")
         etiqueta, color = "Ya tienes demasiada", "orange"
 
+    if not es_indice and ticker not in NO_INVERTIBLES:
+        with st.expander("🎯 ¿Cuánto gano o pierdo si vendo a…? (para poner la orden limitada)"):
+            from paginas_calculadoras import calculadora_orden
+            calculadora_orden("an_orden", ticker, precio_hoy)
+
     with st.expander(f"🧠 Por qué (puntuación técnica {ev.puntuacion}/100, explicada paso a paso)"):
         for mo in sorted(ev.motivos, key=lambda x: -abs(x.puntos)):
             st.markdown(f"{mo.icono} **{mo.titulo}** ({mo.puntos:+d})  \n{mo.explicacion}")

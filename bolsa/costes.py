@@ -187,6 +187,40 @@ def acciones_asequibles(efectivo: float, precio: float, ticker: str, tarifa: Tar
     return max(n, 0)
 
 
+
+def resultado_orden(acciones: float, compra: float, venta: float, ticker: str, tarifa, f_eur: float = 1.0,
+                    ya_comprada: bool = False, capitalizacion: float | None = None) -> dict:
+    """Cuánto se gana o pierde comprando `acciones` a `compra` y vendiéndolas a `venta` (precios en la divisa del
+    valor; `f_eur`: euros por unidad de esa divisa). Con `ya_comprada`, la compra ya está hecha: solo cuentan los
+    gastos de la venta. Todo en euros: bruto (solo el precio), gastos, neto (antes de Hacienda), irpf y limpio."""
+    invertido = acciones * compra * f_eur
+    cobras = acciones * venta * f_eur
+    gasto_compra = 0.0 if ya_comprada else coste_compra(invertido, ticker, tarifa, capitalizacion)["total"]
+    gasto_venta = tarifa.coste(cobras, ticker)
+    bruto = cobras - invertido
+    neto = bruto - gasto_compra - gasto_venta
+    irpf = impuesto_ganancia(neto)
+    base = invertido + gasto_compra
+    return {"invertido": invertido, "cobras": cobras, "bruto": bruto, "gasto_compra": gasto_compra,
+            "gasto_venta": gasto_venta, "gastos": gasto_compra + gasto_venta, "neto": neto, "irpf": irpf,
+            "limpio": neto - irpf, "pct": neto / base * 100 if base else 0.0}
+
+
+def precio_sin_perder(acciones: float, compra: float, ticker: str, tarifa, f_eur: float = 1.0,
+                      ya_comprada: bool = False, capitalizacion: float | None = None) -> float:
+    """Precio de venta a partir del cual se gana dinero una vez pagadas las comisiones."""
+    if acciones <= 0 or compra <= 0:
+        return compra
+    bajo, alto = compra * 0.5, compra * 2.0
+    for _ in range(60):
+        medio = (bajo + alto) / 2
+        if resultado_orden(acciones, compra, medio, ticker, tarifa, f_eur, ya_comprada, capitalizacion)["neto"] < 0:
+            bajo = medio
+        else:
+            alto = medio
+    return alto
+
+
 @dataclass
 class TarifaPersonal:
     """Comisiones de cualquier otro banco o bróker (las pone el usuario). Misma interfaz que `Tarifa`."""

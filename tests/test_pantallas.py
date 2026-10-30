@@ -889,3 +889,21 @@ def test_corregir_un_fondo_con_lo_que_pusiste():
     sin_fallos(at)
     pos = at.session_state["_datos"]["cartera_real"]["posiciones"]["0P00000WLG.F"]
     assert pos["acciones"] == 1.25803 and round(pos["precio_medio"], 2) == 2548.29
+
+
+def test_calculadora_de_orden_limitada_con_tu_posicion():
+    # Tienes 1.500 IDR.MC a 60,80: en Analizar, el cálculo sale con tus acciones y tu precio medio.
+    at = abrir("pagina_analizar", datos_usuario={"cartera_real": cartera_de_prueba()},
+               estado={"analizar_ticker": "IDR.MC"})
+    sin_fallos(at)
+    assert at.segmented_control(key="an_orden_modo_IDR.MC").value == "Ya las tengo"
+    assert at.number_input(key="an_orden_acciones_IDR.MC_True").value == 1500
+    assert at.number_input(key="an_orden_compra_IDR.MC_True").value == pytest.approx(60.80)
+    assert any(m.label == "Te queda limpio" for m in at.metric)
+    assert any("Arriesgas" in md.value for md in at.markdown)
+
+
+def test_calculadora_de_orden_limitada_en_calculadoras():
+    at = abrir("pagina_calculadoras")
+    sin_fallos(at)
+    assert any(m.label == "Precio para no perder" for m in at.metric)

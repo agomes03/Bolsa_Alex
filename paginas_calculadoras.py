@@ -7,6 +7,8 @@ import streamlit as st
 
 from bolsa import costes, letras, libertad
 from ui_comun import lineas, alto_grafico, cuenta_activa, perfil, pestanas, privado, reducir
+from ui_comun import (cargar_fundamentales, cargar_historico, cotizaciones_ahora, datos_usuario, fx, moneda_de,
+                      mostrar_plotly, num, pct, selector_valor)
 from ui_comun import precio as eur  # importes de ejemplo: se ven también en modo privado
 
 
@@ -14,8 +16,11 @@ def pagina_calculadoras():
     pf = perfil()
     movil, tarifa = pf.movil, pf.tarifa
     st.title("🧮 Calculadoras")
-    t1, t2, t3, t4, t5 = pestanas(["💶 Coste", "🏛️ Impuestos", "🌱 Cada mes", "🏖️ Libertad financiera",
-                                   "📜 Letras del Tesoro"], "calc_pestana")
+    t0, t1, t2, t3, t4, t5 = pestanas(["🎯 Orden limitada", "💶 Coste", "🏛️ Impuestos", "🌱 Cada mes",
+                                       "🏖️ Libertad financiera", "📜 Letras del Tesoro"], "calc_pestana")
+    with t0:
+        if t0.open:
+            calculadora_orden("orden")
     with t5:
         calculadora_letras(movil)
     with t4:
@@ -167,3 +172,133 @@ def calculadora_libertad():
     lineas(tabla, height=alto_grafico() - 150)
     st.caption("Escenarios con 2 puntos menos y 2 más de rentabilidad al año. La bolsa no sube en línea recta: habrá "
                "años de -30 % por el camino. Es una guía para planificar, no una promesa.")
+
+
+def calculadora_orden(clave: str, ticker: str | None = None, precio_hoy: float | None = None):
+    """¿Cuánto gano o pierdo si pongo la orden limitada a X? Con las comisiones de tu bróker y lo que se lleva
+    Hacienda, el precio a partir del cual empiezas a ganar y, si pones stop-loss, lo que arriesgas."""
+    import plotly.graph_objects as go
+
+    pf = perfil()
+    movil, tarifa = pf.movil, pf.tarifa
+    if ticker is None:
+        st.caption("Pon a qué precio compras (o compraste) y a qué precio pondrías la orden de venta: te dice cuánto "
+                   "ganas o pierdes de verdad, ya con comisiones e impuestos.")
+        ticker = selector_valor(f"{clave}_v", solo_invertibles=True)
+    fund = cargar_fundamentales(ticker)
+    m, f_eur = moneda_de(ticker, fund), fx(ticker, fund)
+    if f_eur is None:
+        st.warning("No se ha podido leer el tipo de cambio de su divisa: prueba de nuevo en un momento.")
+        return
+    if precio_hoy is None:
+        q = cotizaciones_ahora([ticker]).get(ticker)
+        if q:
+            precio_hoy = q["precio"]
+        else:
+            df = cargar_historico(ticker, "1mo")
+            precio_hoy = float(df["Close"].iloc[-1]) if not df.empty else None
+    if not precio_hoy:
+        st.warning("No hay precio de este valor ahora mismo.")
+        return
+    pos = ((datos_usuario().get("cartera_real") or {}).get("posiciones") or {}).get(ticker)
+    paso = 0.01 if precio_hoy < 50 else 0.05 if precio_hoy < 500 else 0.5
+    redondo = lambda x: round(round(x / paso) * paso, 2)  # noqa: E731
+
+    modos = ["Voy a comprar", "Ya las tengo"]
+    modo = st.segmented_control("¿Qué vas a hacer?", modos, key=f"{clave}_modo_{ticker}",
+                                default=modos[1] if pos else modos[0]) or modos[0]
+    ya = modo == modos[1]
+    c = st.columns(2)
+    defecto_compra = float(pos["precio_medio"]) if ya and pos else float(redondo(precio_hoy))
+    compra = c[0].number_input(f"{'Precio medio de compra' if ya else 'Precio de compra'} ({m})", 0.0001, 1e7,
+                               defecto_compra, paso, format="%.2f", key=f"{clave}_compra_{ticker}_{ya}",
+                               help="El que te sale en Bankinter en la posición." if ya else
+                                    "El precio límite de tu orden de compra (o el de ahora si compras ya).")
+    defecto_acciones = float(pos["acciones"]) if ya and pos else float(max(1, int(1000 / (precio_hoy * f_eur))))
+    acciones = c[1].number_input("Acciones" if not ya else "Acciones que tienes", 0.0, 1e9, defecto_acciones, 1.0,
+                                 format="%.0f" if defecto_acciones == int(defecto_acciones) else "%.4f",
+                                 key=f"{clave}_acciones_{ticker}_{ya}")
+    c = st.columns(2)
+    venta = c[0].number_input(f"Vender a ({m}) · orden limitada", 0.0001, 1e7, float(redondo(compra * 1.05)), paso,
+                              format="%.2f", key=f"{clave}_venta_{ticker}_{ya}",
+                              help="El precio al que pones la orden limitada de venta: se vende a ese precio o más.")
+    stop = c[1].number_input(f"Stop-loss ({m}) · 0 = sin stop", 0.0, 1e7, float(redondo(compra * 0.95)), paso,
+                             format="%.2f", key=f"{clave}_stop_{ticker}_{ya}",
+                             help="Si baja hasta aquí, se vende para cortar la pérdida. Pon 0 si no quieres stop.")
+    if acciones <= 0:
+        st.info("Pon cuántas acciones para calcularlo.")
+        return
+    cap = fund.get("marketCap")
+    r = costes.resultado_orden(acciones, compra, venta, ticker, tarifa, f_eur, ya, cap)
+    equilibrio = costes.precio_sin_perder(acciones, compra, ticker, tarifa, f_eur, ya, cap)
+    from ui_comun import eur as dinero      # tu dinero: en modo privado sale «•••»
+    signo = lambda x: ("+" if x > 0 else "") + dinero(x)  # noqa: E731
+    color = "green" if r["neto"] > 0 else "red"
+    cambio = (venta / compra - 1) * 100
+    st.markdown(f"#### Si se vende a {eur(venta, m)} ({pct(cambio)}): :{color}[{'ganas' if r['neto'] > 0 else 'pierdes'}"
+                f" {dinero(abs(r['neto']))}]")
+    k = st.columns(2 if movil else 4)
+    k[0].metric("Resultado (con comisiones)", signo(r["neto"]), pct(r["pct"]))
+    k[1].metric("Hacienda (IRPF)", dinero(r["irpf"]))
+    k[2 % len(k)].metric("Te queda limpio", signo(r["limpio"]))
+    k[3 % len(k)].metric("Precio para no perder", eur(equilibrio, m),
+                         help="Hay que vender por encima de este precio para ganar algo: por debajo, las "
+                              "comisiones se comen la subida.")
+    detalle = [f"subida del precio {signo(r['bruto'])}"]
+    if r["gasto_compra"]:
+        detalle.append(f"gastos de compra {dinero(-r['gasto_compra'])}")
+    detalle.append(f"gastos de venta {dinero(-r['gasto_venta'])}")
+    st.caption(" · ".join(detalle) + (f" · en euros al cambio de hoy ({num(1 / f_eur, 4)} {m} por €)"
+                                      if m != "€" else ""))
+
+    perdida = None
+    if 0 < stop < compra:
+        rs = costes.resultado_orden(acciones, compra, stop, ticker, tarifa, f_eur, ya, cap)
+        perdida = -rs["neto"]
+        st.markdown(f"Si salta el stop a {eur(stop, m)} ({pct((stop / compra - 1) * 100)}): "
+                    f":red[pierdes {dinero(perdida)}]")
+        if r["neto"] > 0 and perdida > 0:
+            ratio = r["neto"] / perdida
+            veredicto = ("✅ buena proporción" if ratio >= 2 else "🟡 justa: lo habitual es buscar al menos 2 a 1"
+                         if ratio >= 1 else "🔴 arriesgas más de lo que puedes ganar")
+            st.markdown(f"**Arriesgas {dinero(perdida)} para ganar {dinero(r['neto'])}: {num(ratio, 1)} a 1** · {veredicto}")
+    elif stop >= compra and stop > 0:
+        st.caption("El stop está por encima del precio de compra: así asegura ganancia (stop de beneficios).")
+
+    # Lo que ganas o pierdes según a qué precio se venda: de un poco por debajo del stop a un poco por encima
+    # del objetivo.
+    bajo = min(x for x in (stop or compra * 0.9, compra * 0.9, precio_hoy) if x > 0) * 0.97
+    alto = max(venta, compra * 1.1, precio_hoy) * 1.03
+    precios = [bajo + (alto - bajo) * i / 80 for i in range(81)]
+    netos = [costes.resultado_orden(acciones, compra, p, ticker, tarifa, f_eur, ya, cap)["neto"] for p in precios]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=precios, y=[max(n, 0) for n in netos], fill="tozeroy", mode="none",
+                             fillcolor="rgba(22,163,74,.25)", hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=precios, y=[min(n, 0) for n in netos], fill="tozeroy", mode="none",
+                             fillcolor="rgba(220,38,38,.25)", hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=precios, y=netos, mode="lines", line=dict(color="#475569", width=2),
+                             hovertemplate=f"Vender a %{{x:,.2f}} {m}<br>%{{y:+,.0f}} €<extra></extra>"))
+    marcas = [(precio_hoy, "Ahora", "#2563eb"), (venta, "Venta", "#16a34a")]
+    if 0 < stop:
+        marcas.append((stop, "Stop", "#dc2626"))
+    for x, txt, col in marcas:
+        fig.add_vline(x=x, line=dict(color=col, width=1.5, dash="dot"))
+        fig.add_annotation(x=x, y=1, yref="paper", text=txt, showarrow=False, yanchor="bottom",
+                           font=dict(color=col, size=12))
+    fig.add_hline(y=0, line=dict(color="#94a3b8", width=1))
+    fig.update_layout(showlegend=False, xaxis_title=f"Precio de venta ({m})", yaxis_title="Ganas o pierdes (€)",
+                      yaxis=dict(tickformat="+,.0f"))
+    if privado():
+        fig.update_yaxes(showticklabels=False)
+    mostrar_plotly(fig, alto=260 if movil else 320, margen=dict(l=10, r=10, t=30, b=10))
+
+    with st.expander("📋 Tabla de precios (cuánto ganas o pierdes en cada uno)"):
+        filas = []
+        for d in (-10, -7.5, -5, -3, -2, -1, 1, 2, 3, 5, 7.5, 10, 15):
+            p = compra * (1 + d / 100)
+            x = costes.resultado_orden(acciones, compra, p, ticker, tarifa, f_eur, ya, cap)
+            filas.append({"Vender a": eur(p, m), "Cambio": pct(d, 1), "Resultado": signo(x["neto"]),
+                          "Limpio (tras IRPF)": signo(x["limpio"])})
+        st.dataframe(pd.DataFrame(filas), hide_index=True, width="stretch")
+    st.caption("Cálculo con tu tarifa de comisiones (⚙️ Mi plan) y el IRPF de la base del ahorro, como si fuera tu "
+               "única venta del año. Una orden limitada se ejecuta a tu precio o mejor, pero solo si el mercado llega.")
