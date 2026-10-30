@@ -213,8 +213,12 @@ def _editar_stop_virtual(cv: dict, info: dict):
                                 key=f"v_obj_{t}", format="%.3f")
         if pos.get("stop") and stop and stop < pos["stop"]:
             st.warning("Estás bajando el stop-loss: la regla de oro es no bajarlo nunca (solo subirlo).")
-        if stop and stop >= ultimo:
+        cambiado = (stop or None) != pos.get("stop")
+        if stop and stop >= ultimo and cambiado:
             st.error("El stop-loss tiene que estar por debajo del precio actual.")
+        elif stop and stop >= ultimo:
+            st.info("El precio ya está por debajo de tu stop-loss: la venta se ejecutará en la próxima revisión "
+                    "de órdenes (como en el bróker).")
         elif st.button("Guardar cambios", key=f"v_guardar_{t}"):
             pos["stop"], pos["objetivo"] = (stop or None), (obj or None)
             guardar_datos()
